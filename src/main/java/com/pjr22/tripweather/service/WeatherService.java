@@ -2,8 +2,6 @@ package com.pjr22.tripweather.service;
 
 import com.pjr22.tripweather.model.WeatherData;
 
-import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -12,7 +10,6 @@ import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 
 @Service
-@Slf4j
 public class WeatherService {
 
     private final RestClient restClient;
@@ -33,8 +30,6 @@ public class WeatherService {
                 return WeatherData.createError("Unable to get forecast URL for location");
             }
 
-            log.info("Retrieving weather data from URL: {}", forecastUrl);
-
             JsonNode forecastData = restClient.get()
                     .uri(forecastUrl)
                     .retrieve()
@@ -48,9 +43,7 @@ public class WeatherService {
             JsonNode periods = forecastData.get("properties").get("periods");
             
             JsonNode matchingPeriod = findMatchingPeriod(periods, targetDateTime);
-            
-            log.info("forcastData matchingPeriod:\n{}", matchingPeriod);
-            
+
             if (matchingPeriod == null) {
                 return WeatherData.createError("No forecast available for selected date/time");
             }

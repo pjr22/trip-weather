@@ -34,6 +34,66 @@ function initializeMap(lat, lng, zoom) {
         .openPopup();
     
     map.on('click', onMapClick);
+    
+    addRecenterControl();
+}
+
+function addRecenterControl() {
+    const RecenterControl = L.Control.extend({
+        options: {
+            position: 'topleft'
+        },
+        
+        onAdd: function(map) {
+            const container = L.DomUtil.create('div', 'leaflet-bar recenter-control');
+            container.innerHTML = '⌖';
+            container.title = 'Recenter on my location';
+            
+            L.DomEvent.on(container, 'click', function(e) {
+                L.DomEvent.stopPropagation(e);
+                L.DomEvent.preventDefault(e);
+                recenterOnUserLocation();
+            });
+            
+            return container;
+        }
+    });
+    
+    map.addControl(new RecenterControl());
+}
+
+function recenterOnUserLocation() {
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const currentZoom = map.getZoom();
+                
+                map.setView([lat, lng], currentZoom);
+                
+                if (userLocationMarker) {
+                    userLocationMarker.setLatLng([lat, lng]);
+                    userLocationMarker.openPopup();
+                } else {
+                    userLocationMarker = L.marker([lat, lng]).addTo(map)
+                        .bindPopup('Your location')
+                        .openPopup();
+                }
+            },
+            function(error) {
+                console.warn('Geolocation error:', error.message);
+                alert('Unable to get your current location. Please check your browser permissions.');
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 0
+            }
+        );
+    } else {
+        alert('Geolocation is not supported by your browser.');
+    }
 }
 
 function onMapClick(e) {
@@ -47,6 +107,8 @@ function addWaypoint(lat, lng) {
     
     addMarkerToMap(waypoint, id);
     updateTable();
+    
+    fetchLocationName(waypoint);
 }
 
 function addMarkerToMap(waypoint, orderNumber) {
@@ -213,6 +275,36 @@ async function fetchWeatherForWaypoint(waypoint) {
 }
 
 function updateMarkerWithWeather(waypoint) {
+    const index = waypoints.findIndex(w => w.id === waypoint.id);
+    if (index !== -1) {
+        const marker = waypointMarkers[index];
+        if (marker) {
+            updateMarkerPopup(marker, waypoint, index + 1);
+        }
+    }
+}
+
+async function fetchLocationName(waypoint) {
+    try {
+        const params = new URLSearchParams({
+            latitude: waypoint.lat,
+            longitude: waypoint.lng
+        });
+        
+        const response = await fetch(`/api/location/reverse?${params}`);
+        const data = await response.json();
+        
+        if (data.locationName) {
+            waypoint.locationName = data.locationName;
+            updateTable();
+            updateMarkerWithLocation(waypoint);
+        }
+    } catch (error) {
+        console.warn('Failed to fetch location name:', error);
+    }
+}
+
+function updateMarkerWithLocation(waypoint) {
     const index = waypoints.findIndex(w => w.id === waypoint.id);
     if (index !== -1) {
         const marker = waypointMarkers[index];
