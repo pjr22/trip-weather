@@ -22,8 +22,13 @@
             <div id="map"></div>
             
             <div class="waypoints-section">
-                <h2>Waypoints</h2>
-                <p class="instructions">Click on the map to add waypoints</p>
+                <div class="waypoints-header">
+                    <div>
+                        <h2>Waypoints</h2>
+                        <p class="instructions">Click on the map to add waypoints</p>
+                    </div>
+                    <button id="search-btn" class="search-btn">🔍 Search Location</button>
+                </div>
                 
                 <div class="table-container">
                     <table id="waypoints-table">
@@ -46,6 +51,19 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <div id="search-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Search for a Location</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="search-input" placeholder="Enter city, address, or place name..." autocomplete="off">
+                <div id="search-results" class="search-results"></div>
+            </div>
+        </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"

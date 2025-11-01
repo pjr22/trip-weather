@@ -374,4 +374,118 @@ function getUserLocation() {
 
 document.addEventListener('DOMContentLoaded', function() {
     getUserLocation();
+    initializeSearch();
 });
+
+let searchDebounceTimer = null;
+
+function initializeSearch() {
+    const modal = document.getElementById('search-modal');
+    const btn = document.getElementById('search-btn');
+    const closeBtn = document.querySelector('.close');
+    const searchInput = document.getElementById('search-input');
+    
+    btn.onclick = function() {
+        modal.style.display = 'block';
+        searchInput.focus();
+    };
+    
+    closeBtn.onclick = function() {
+        modal.style.display = 'none';
+        searchInput.value = '';
+        document.getElementById('search-results').innerHTML = '';
+    };
+    
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = 'none';
+            searchInput.value = '';
+            document.getElementById('search-results').innerHTML = '';
+        }
+    };
+    
+    searchInput.addEventListener('input', function() {
+        const query = searchInput.value.trim();
+        
+        if (searchDebounceTimer) {
+            clearTimeout(searchDebounceTimer);
+        }
+        
+        if (query.length < 2) {
+            document.getElementById('search-results').innerHTML = '';
+            return;
+        }
+        
+        document.getElementById('search-results').innerHTML = '<div class="search-loading">Searching...</div>';
+        
+        searchDebounceTimer = setTimeout(() => {
+            performSearch(query);
+        }, 1000);
+    });
+}
+
+async function performSearch(query) {
+    try {
+        const params = new URLSearchParams({ query: query });
+        const response = await fetch(`/api/location/search?${params}`);
+        const data = await response.json();
+        
+        displaySearchResults(data);
+    } catch (error) {
+        console.error('Search error:', error);
+        document.getElementById('search-results').innerHTML = '<div class="search-no-results">Error performing search</div>';
+    }
+}
+
+function displaySearchResults(data) {
+    const resultsContainer = document.getElementById('search-results');
+    
+    if (!data || !data.features || data.features.length === 0) {
+        resultsContainer.innerHTML = '<div class="search-no-results">No results found</div>';
+        return;
+    }
+    
+    resultsContainer.innerHTML = '';
+    
+    data.features.forEach(feature => {
+        const properties = feature.properties;
+        const coordinates = feature.geometry.coordinates;
+        
+        const resultItem = document.createElement('div');
+        resultItem.className = 'search-result-item';
+        
+        const label = properties.label || properties.name || 'Unknown';
+        const details = [];
+        
+        if (properties.locality) details.push(properties.locality);
+        if (properties.region) details.push(properties.region);
+        if (properties.country) details.push(properties.country);
+        
+        resultItem.innerHTML = `
+            <div class="result-label">${label}</div>
+            <div class="result-details">${details.join(', ')}</div>
+        `;
+        
+        resultItem.onclick = function() {
+            selectSearchResult(coordinates[1], coordinates[0], label);
+        };
+        
+        resultsContainer.appendChild(resultItem);
+    });
+}
+
+function selectSearchResult(lat, lng, locationName) {
+    document.getElementById('search-modal').style.display = 'none';
+    document.getElementById('search-input').value = '';
+    document.getElementById('search-results').innerHTML = '';
+    
+    const id = waypoints.length + 1;
+    const waypoint = new Waypoint(id, lat, lng);
+    waypoint.locationName = locationName;
+    waypoints.push(waypoint);
+    
+    addMarkerToMap(waypoint, id);
+    updateTable();
+    
+    map.setView([lat, lng], 13);
+}

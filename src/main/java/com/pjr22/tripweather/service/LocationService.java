@@ -52,4 +52,24 @@ public class LocationService {
             return null;
         }
     }
+
+    public JsonNode searchLocations(String searchText) {
+        try {
+            if (apiKey == null || apiKey.isEmpty()) {
+                return null;
+            }
+
+            String url = String.format("/geocode/search?api_key=%s&text=%s",
+                    apiKey, searchText);
+
+            JsonNode response = restClient.get()
+                    .uri(url)
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            return response;
+        } catch (Exception e) {
+            return null;
+        }
+    }
 }

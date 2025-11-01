@@ -1,5 +1,6 @@
 package com.pjr22.tripweather.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.pjr22.tripweather.service.LocationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,5 +32,10 @@ public class LocationController {
         Map<String, String> response = new HashMap<>();
         response.put("locationName", locationName);
         return response;
+    }
+
+    @GetMapping("/search")
+    public JsonNode searchLocations(@RequestParam String query) {
+        return locationService.searchLocations(query);
     }
 }
