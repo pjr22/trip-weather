@@ -6,18 +6,23 @@ public class WeatherData {
     private String temperatureUnit;
     private String windSpeed;
     private String windDirection;
+    private String iconUrl;
+    private Integer precipitationProbability;
     private String error;
 
     public WeatherData() {
     }
 
     public WeatherData(String condition, Integer temperature, String temperatureUnit, 
-                       String windSpeed, String windDirection) {
+                       String windSpeed, String windDirection, String iconUrl, 
+                       Integer precipitationProbability) {
         this.condition = condition;
         this.temperature = temperature;
         this.temperatureUnit = temperatureUnit;
         this.windSpeed = windSpeed;
         this.windDirection = windDirection;
+        this.iconUrl = iconUrl;
+        this.precipitationProbability = precipitationProbability;
     }
 
     public static WeatherData createError(String errorMessage) {
@@ -64,6 +69,22 @@ public class WeatherData {
 
     public void setWindDirection(String windDirection) {
         this.windDirection = windDirection;
+    }
+
+    public String getIconUrl() {
+        return iconUrl;
+    }
+
+    public void setIconUrl(String iconUrl) {
+        this.iconUrl = iconUrl;
+    }
+
+    public Integer getPrecipitationProbability() {
+        return precipitationProbability;
+    }
+
+    public void setPrecipitationProbability(Integer precipitationProbability) {
+        this.precipitationProbability = precipitationProbability;
     }
 
     public String getError() {

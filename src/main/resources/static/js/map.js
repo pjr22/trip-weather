@@ -58,16 +58,47 @@ function addMarkerToMap(waypoint, orderNumber) {
     });
     
     const marker = L.marker([waypoint.lat, waypoint.lng], { icon: customIcon })
-        .addTo(map)
-        .bindPopup(`Waypoint ${orderNumber}<br>Lat: ${waypoint.lat}<br>Lng: ${waypoint.lng}`);
+        .addTo(map);
     
     marker.waypointId = waypoint.id;
     
     marker.on('click', function() {
         highlightTableRow(waypoint.id);
+        updateMarkerPopup(marker, waypoint, orderNumber);
     });
     
+    updateMarkerPopup(marker, waypoint, orderNumber);
+    
     waypointMarkers.push(marker);
+}
+
+function updateMarkerPopup(marker, waypoint, orderNumber) {
+    let popupContent = `<strong>Waypoint ${orderNumber}</strong><br>`;
+    popupContent += `Lat: ${waypoint.lat}<br>`;
+    popupContent += `Lon: ${waypoint.lng}<br>`;
+    
+    if (waypoint.locationName) {
+        popupContent += `<br><strong>${waypoint.locationName}</strong><br>`;
+    }
+    
+    if (waypoint.weather && !waypoint.weather.error) {
+        popupContent += `<br>`;
+        if (waypoint.weather.iconUrl) {
+            popupContent += `<img src="${waypoint.weather.iconUrl}" alt="${waypoint.weather.condition}" class="weather-icon"> `;
+        }
+        popupContent += `${waypoint.weather.condition}<br>`;
+        
+        if (waypoint.weather.temperature) {
+            popupContent += `Temp: ${waypoint.weather.temperature}°${waypoint.weather.temperatureUnit}<br>`;
+        }
+        popupContent += `Wind: ${waypoint.weather.windSpeed} ${waypoint.weather.windDirection}<br>`;
+        
+        if (waypoint.weather.precipitationProbability !== null) {
+            popupContent += `Precip: ${waypoint.weather.precipitationProbability}%`;
+        }
+    }
+    
+    marker.bindPopup(popupContent);
 }
 
 function updateTable() {
@@ -85,8 +116,6 @@ function updateTable() {
             <td><input type="date" value="${waypoint.date}" onchange="updateWaypointField(${waypoint.id}, 'date', this.value)"></td>
             <td><input type="time" value="${waypoint.time}" onchange="updateWaypointField(${waypoint.id}, 'time', this.value)"></td>
             <td><input type="text" value="${waypoint.locationName}" placeholder="Enter location name" onchange="updateWaypointField(${waypoint.id}, 'locationName', this.value)"></td>
-            <td>${waypoint.lat}</td>
-            <td>${waypoint.lng}</td>
             ${weatherHtml}
             <td><button class="delete-btn" onclick="deleteWaypoint(${waypoint.id})">Delete</button></td>
         `;
@@ -107,13 +136,13 @@ function updateTable() {
 function getWeatherHtml(waypoint) {
     if (waypoint.weatherLoading) {
         return `
-            <td colspan="3" class="weather-loading">Loading weather...</td>
+            <td colspan="4" class="weather-loading">Loading weather...</td>
         `;
     }
     
     if (waypoint.weather && waypoint.weather.error) {
         return `
-            <td colspan="3" class="weather-error">${waypoint.weather.error}</td>
+            <td colspan="4" class="weather-error">${waypoint.weather.error}</td>
         `;
     }
     
@@ -121,15 +150,24 @@ function getWeatherHtml(waypoint) {
         const tempDisplay = waypoint.weather.temperature ? 
             `${waypoint.weather.temperature}°${waypoint.weather.temperatureUnit}` : 'N/A';
         const windDisplay = `${waypoint.weather.windSpeed} ${waypoint.weather.windDirection}`;
+        const precipDisplay = waypoint.weather.precipitationProbability !== null ? 
+            `${waypoint.weather.precipitationProbability}%` : '-';
+        
+        let weatherIcon = '';
+        if (waypoint.weather.iconUrl) {
+            weatherIcon = `<img src="${waypoint.weather.iconUrl}" alt="${waypoint.weather.condition}" class="weather-icon"> `;
+        }
         
         return `
-            <td>${waypoint.weather.condition}</td>
+            <td>${weatherIcon}${waypoint.weather.condition}</td>
             <td>${tempDisplay}</td>
             <td>${windDisplay}</td>
+            <td>${precipDisplay}</td>
         `;
     }
     
     return `
+        <td>-</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>
@@ -166,10 +204,21 @@ async function fetchWeatherForWaypoint(waypoint) {
         waypoint.weather = data;
         waypoint.weatherLoading = false;
         updateTable();
+        updateMarkerWithWeather(waypoint);
     } catch (error) {
         waypoint.weather = { error: 'Failed to fetch weather data' };
         waypoint.weatherLoading = false;
         updateTable();
+    }
+}
+
+function updateMarkerWithWeather(waypoint) {
+    const index = waypoints.findIndex(w => w.id === waypoint.id);
+    if (index !== -1) {
+        const marker = waypointMarkers[index];
+        if (marker) {
+            updateMarkerPopup(marker, waypoint, index + 1);
+        }
     }
 }
 

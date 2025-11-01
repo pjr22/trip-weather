@@ -43,8 +43,6 @@ Trip Weather is a Spring Boot web application that allows users to plot a driven
    - Date (editable input field)
    - Time (editable input field)
    - Location Name (initially blank or coordinates, editable)
-   - Latitude (auto-populated from map click)
-   - Longitude (auto-populated from map click)
 5. Add functionality to:
    - Add new waypoints by clicking on the map
    - Remove waypoints (with delete button in table)
@@ -74,15 +72,19 @@ Trip Weather is a Spring Boot web application that allows users to plot a driven
    - Parse weather.gov API response (JSON)
    - Extract relevant weather information:
      - Overall weather description
+     - Weather icon URL
      - Temperature
      - Wind speed and direction
+     - Precipitation probability
    - Handle API errors and edge cases (invalid coordinates, API unavailable)
 
 2. **Frontend Development**:
    - Add weather data columns to the table:
      - Weather Condition
+     - Weather Icon
      - Temperature
      - Wind Speed & Direction
+     - Precipitation Probability
    - Add JavaScript to trigger weather API call when:
      - Date and time are entered/modified for a waypoint
      - A new waypoint is added with date/time already set
@@ -114,8 +116,8 @@ The National Weather Service API (weather.gov) provides free weather forecasts.
 1. Get grid endpoint: `https://api.weather.gov/points/{latitude},{longitude}`
    - Returns forecast URLs and metadata for the location
    
-2. Get forecast: `https://api.weather.gov/gridpoints/{office}/{gridX},{gridY}/forecast`
-   - Returns detailed forecast periods with weather conditions
+2. Get forecastHourly: `https://api.weather.gov/gridpoints/{office}/{gridX},{gridY}/forecast/hourly`
+   - Returns detailed hourly forecast periods with weather conditions
 
 **API Requirements**:
 - User-Agent header must be set (e.g., "TripWeather/1.0 (contact@email.com)")
@@ -129,13 +131,30 @@ The National Weather Service API (weather.gov) provides free weather forecasts.
     "periods": [
       {
         "number": 1,
-        "name": "Tonight",
-        "startTime": "2025-10-29T18:00:00-05:00",
-        "temperature": 45,
+        "name": "",
+        "startTime": "2025-11-01T12:00:00-05:00",
+        "endTime": "2025-11-01T13:00:00-05:00",
+        "isDaytime": true,
+        "temperature": 43,
         "temperatureUnit": "F",
+        "temperatureTrend": "",
+        "probabilityOfPrecipitation": {
+          "unitCode": "wmoUnit:percent",
+          "value": 5
+        },
+        "dewpoint": {
+          "unitCode": "wmoUnit:degC",
+          "value": 0.5555555555555556
+        },
+        "relativeHumidity": {
+          "unitCode": "wmoUnit:percent",
+          "value": 67
+        },
         "windSpeed": "10 mph",
-        "windDirection": "NW",
-        "shortForecast": "Partly Cloudy"
+        "windDirection": "N",
+        "icon": "https://api.weather.gov/icons/land/day/bkn?size=small",
+        "shortForecast": "Partly Sunny",
+        "detailedForecast": ""
       }
     ]
   }

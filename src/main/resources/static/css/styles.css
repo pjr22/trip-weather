@@ -151,3 +151,10 @@ main {
     color: #e74c3c;
     font-size: 12px;
 }
+
+.weather-icon {
+    width: 32px;
+    height: 32px;
+    vertical-align: middle;
+    margin-right: 5px;
+}

@@ -1,6 +1,9 @@
 package com.pjr22.tripweather.service;
 
 import com.pjr22.tripweather.model.WeatherData;
+
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -9,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 
 @Service
+@Slf4j
 public class WeatherService {
 
     private final RestClient restClient;
@@ -29,6 +33,8 @@ public class WeatherService {
                 return WeatherData.createError("Unable to get forecast URL for location");
             }
 
+            log.info("Retrieving weather data from URL: {}", forecastUrl);
+
             JsonNode forecastData = restClient.get()
                     .uri(forecastUrl)
                     .retrieve()
@@ -42,6 +48,8 @@ public class WeatherService {
             JsonNode periods = forecastData.get("properties").get("periods");
             
             JsonNode matchingPeriod = findMatchingPeriod(periods, targetDateTime);
+            
+            log.info("forcastData matchingPeriod:\n{}", matchingPeriod);
             
             if (matchingPeriod == null) {
                 return WeatherData.createError("No forecast available for selected date/time");
@@ -65,7 +73,9 @@ public class WeatherService {
 
             if (pointsData != null && pointsData.has("properties")) {
                 JsonNode properties = pointsData.get("properties");
-                if (properties.has("forecast")) {
+                if (properties.has("forecastHourly")) {
+                    return properties.get("forecastHourly").asText();
+                } else if (properties.has("forecast")) {
                     return properties.get("forecast").asText();
                 }
             }
@@ -120,7 +130,19 @@ public class WeatherService {
         
         String windDirection = period.has("windDirection") ? 
                 period.get("windDirection").asText() : "Unknown";
+        
+        String iconUrl = period.has("icon") ? 
+                period.get("icon").asText() : null;
+        
+        Integer precipitationProbability = null;
+        if (period.has("probabilityOfPrecipitation")) {
+            JsonNode precipNode = period.get("probabilityOfPrecipitation");
+            if (precipNode.has("value") && !precipNode.get("value").isNull()) {
+                precipitationProbability = precipNode.get("value").asInt();
+            }
+        }
 
-        return new WeatherData(condition, temperature, temperatureUnit, windSpeed, windDirection);
+        return new WeatherData(condition, temperature, temperatureUnit, windSpeed, 
+                windDirection, iconUrl, precipitationProbability);
     }
 }
