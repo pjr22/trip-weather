@@ -118,18 +118,46 @@ main {
     border-color: #3498db;
 }
 
-.delete-btn {
-    background-color: #e74c3c;
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
+.actions-cell {
+    white-space: nowrap;
 }
 
-.delete-btn:hover {
+.action-btn {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 4px;
+    transition: background-color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-btn:hover {
+    background-color: #2980b9;
+}
+
+.action-btn.delete-action {
+    background-color: #e74c3c;
+}
+
+.action-btn.delete-action:hover {
     background-color: #c0392b;
+}
+
+.action-icon-container {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-icon {
+    width: 18px;
+    height: 18px;
+    fill: white;
 }
 
 .waypoint-marker {
@@ -178,7 +206,6 @@ main {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 20px;
     transition: background-color 0.2s;
 }
 
@@ -188,6 +215,12 @@ main {
 
 .recenter-control:active {
     background-color: #e0e0e0;
+}
+
+.recenter-icon {
+    width: 20px;
+    height: 20px;
+    fill: black;
 }
 
 .search-btn {

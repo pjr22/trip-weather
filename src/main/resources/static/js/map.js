@@ -2,11 +2,34 @@ let map;
 let waypoints = [];
 let waypointMarkers = [];
 let userLocationMarker = null;
+let replacingWaypointId = null;
 
 const DEFAULT_LAT = 39.8283;
 const DEFAULT_LNG = -98.5795;
 const DEFAULT_ZOOM = 4;
 const USER_ZOOM = 13;
+
+async function loadSvgIcon(iconPath, container, className = '') {
+    try {
+        const response = await fetch(iconPath);
+        const svgText = await response.text();
+        const parser = new DOMParser();
+        const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
+        const svg = svgDoc.documentElement;
+        
+        if (className) {
+            svg.classList.add(className);
+        }
+        
+        container.innerHTML = '';
+        container.appendChild(svg);
+        
+        return svg;
+    } catch (error) {
+        console.error('Failed to load SVG icon:', error);
+        return null;
+    }
+}
 
 class Waypoint {
     constructor(id, lat, lng) {
@@ -46,8 +69,9 @@ function addRecenterControl() {
         
         onAdd: function(map) {
             const container = L.DomUtil.create('div', 'leaflet-bar recenter-control');
-            container.innerHTML = '⌖';
             container.title = 'Recenter on my location';
+            
+            loadSvgIcon('icons/crosshair.svg', container, 'recenter-icon');
             
             L.DomEvent.on(container, 'click', function(e) {
                 L.DomEvent.stopPropagation(e);
@@ -97,7 +121,13 @@ function recenterOnUserLocation() {
 }
 
 function onMapClick(e) {
-    addWaypoint(e.latlng.lat, e.latlng.lng);
+    if (replacingWaypointId !== null) {
+        replaceWaypointLocation(replacingWaypointId, e.latlng.lat, e.latlng.lng);
+        replacingWaypointId = null;
+        map.getContainer().style.cursor = '';
+    } else {
+        addWaypoint(e.latlng.lat, e.latlng.lng);
+    }
 }
 
 function addWaypoint(lat, lng) {
@@ -179,7 +209,20 @@ function updateTable() {
             <td><input type="time" value="${waypoint.time}" onchange="updateWaypointField(${waypoint.id}, 'time', this.value)"></td>
             <td><input type="text" value="${waypoint.locationName}" placeholder="Enter location name" onchange="updateWaypointField(${waypoint.id}, 'locationName', this.value)"></td>
             ${weatherHtml}
-            <td><button class="delete-btn" onclick="deleteWaypoint(${waypoint.id})">Delete</button></td>
+            <td class="actions-cell">
+                <button class="action-btn" onclick="centerOnWaypoint(${waypoint.id})" title="Center on waypoint">
+                    <span class="action-icon-container" data-icon="icons/crosshair.svg"></span>
+                </button>
+                <button class="action-btn" onclick="selectNewLocationForWaypoint(${waypoint.id})" title="Select new location on map">
+                    <span class="action-icon-container" data-icon="icons/map_pin.svg"></span>
+                </button>
+                <button class="action-btn" onclick="searchNewLocationForWaypoint(${waypoint.id})" title="Search for new location">
+                    <span class="action-icon-container" data-icon="icons/search.svg"></span>
+                </button>
+                <button class="action-btn delete-action" onclick="deleteWaypoint(${waypoint.id})" title="Delete waypoint">
+                    <span class="action-icon-container" data-icon="icons/delete.svg"></span>
+                </button>
+            </td>
         `;
         
         row.addEventListener('click', function(e) {
@@ -191,6 +234,11 @@ function updateTable() {
                     marker.openPopup();
                 }
             }
+        });
+        
+        row.querySelectorAll('.action-icon-container').forEach(container => {
+            const iconPath = container.dataset.icon;
+            loadSvgIcon(iconPath, container, 'action-icon');
         });
     });
 }
@@ -347,6 +395,57 @@ function highlightTableRow(waypointId) {
     }
 }
 
+function centerOnWaypoint(waypointId) {
+    const waypoint = waypoints.find(w => w.id === waypointId);
+    if (waypoint) {
+        const currentZoom = map.getZoom();
+        map.setView([waypoint.lat, waypoint.lng], currentZoom);
+        
+        const marker = waypointMarkers.find(m => m.waypointId === waypointId);
+        if (marker) {
+            marker.openPopup();
+        }
+        
+        highlightTableRow(waypointId);
+    }
+}
+
+function selectNewLocationForWaypoint(waypointId) {
+    replacingWaypointId = waypointId;
+    map.getContainer().style.cursor = 'crosshair';
+    alert('Click on the map to select a new location for this waypoint.');
+}
+
+function replaceWaypointLocation(waypointId, newLat, newLng) {
+    const waypoint = waypoints.find(w => w.id === waypointId);
+    if (waypoint) {
+        waypoint.lat = newLat.toFixed(6);
+        waypoint.lng = newLng.toFixed(6);
+        waypoint.locationName = '';
+        waypoint.weather = null;
+        
+        const index = waypoints.findIndex(w => w.id === waypointId);
+        if (index !== -1) {
+            const marker = waypointMarkers[index];
+            if (marker) {
+                marker.setLatLng([newLat, newLng]);
+                updateMarkerPopup(marker, waypoint, index + 1);
+            }
+        }
+        
+        updateTable();
+        fetchLocationName(waypoint);
+    }
+}
+
+function searchNewLocationForWaypoint(waypointId) {
+    replacingWaypointId = waypointId;
+    const modal = document.getElementById('search-modal');
+    const searchInput = document.getElementById('search-input');
+    modal.style.display = 'block';
+    searchInput.focus();
+}
+
 function getUserLocation() {
     if ("geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition(
@@ -479,13 +578,30 @@ function selectSearchResult(lat, lng, locationName) {
     document.getElementById('search-input').value = '';
     document.getElementById('search-results').innerHTML = '';
     
-    const id = waypoints.length + 1;
-    const waypoint = new Waypoint(id, lat, lng);
-    waypoint.locationName = locationName;
-    waypoints.push(waypoint);
-    
-    addMarkerToMap(waypoint, id);
-    updateTable();
+    if (replacingWaypointId !== null) {
+        replaceWaypointLocation(replacingWaypointId, lat, lng);
+        const waypoint = waypoints.find(w => w.id === replacingWaypointId);
+        if (waypoint) {
+            waypoint.locationName = locationName;
+            updateTable();
+            const index = waypoints.findIndex(w => w.id === replacingWaypointId);
+            if (index !== -1) {
+                const marker = waypointMarkers[index];
+                if (marker) {
+                    updateMarkerPopup(marker, waypoint, index + 1);
+                }
+            }
+        }
+        replacingWaypointId = null;
+    } else {
+        const id = waypoints.length + 1;
+        const waypoint = new Waypoint(id, lat, lng);
+        waypoint.locationName = locationName;
+        waypoints.push(waypoint);
+        
+        addMarkerToMap(waypoint, id);
+        updateTable();
+    }
     
     map.setView([lat, lng], 13);
 }
