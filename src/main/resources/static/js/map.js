@@ -2,6 +2,7 @@ let map;
 let waypoints = [];
 let waypointMarkers = [];
 let userLocationMarker = null;
+let userLocation = { lat: null, lng: null, name: null };
 let replacingWaypointId = null;
 
 const DEFAULT_LAT = 39.8283;
@@ -52,9 +53,12 @@ function initializeMap(lat, lng, zoom) {
         maxZoom: 19
     }).addTo(map);
 
-    userLocationMarker = L.marker([lat, lng]).addTo(map)
-        .bindPopup('Your location')
-        .openPopup();
+    userLocation.lat = lat.toFixed(6);
+    userLocation.lng = lng.toFixed(6);
+    
+    userLocationMarker = L.marker([lat, lng]).addTo(map);
+    updateUserLocationPopup();
+    userLocationMarker.openPopup();
     
     map.on('click', onMapClick);
     
@@ -88,25 +92,36 @@ function addRecenterControl() {
 
 function recenterOnUserLocation() {
     if ("geolocation" in navigator) {
+        showLocationLoading();
+        
         navigator.geolocation.getCurrentPosition(
             function(position) {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
                 const currentZoom = map.getZoom();
                 
+                userLocation.lat = lat.toFixed(6);
+                userLocation.lng = lng.toFixed(6);
+                
                 map.setView([lat, lng], currentZoom);
                 
                 if (userLocationMarker) {
                     userLocationMarker.setLatLng([lat, lng]);
+                    updateUserLocationPopup();
                     userLocationMarker.openPopup();
                 } else {
-                    userLocationMarker = L.marker([lat, lng]).addTo(map)
-                        .bindPopup('Your location')
-                        .openPopup();
+                    userLocationMarker = L.marker([lat, lng]).addTo(map);
+                    updateUserLocationPopup();
+                    userLocationMarker.openPopup();
                 }
+                
+                fetchUserLocationName().finally(() => {
+                    hideLocationLoading();
+                });
             },
             function(error) {
                 console.warn('Geolocation error:', error.message);
+                hideLocationLoading();
                 alert('Unable to get your current location. Please check your browser permissions.');
             },
             {
@@ -117,6 +132,53 @@ function recenterOnUserLocation() {
         );
     } else {
         alert('Geolocation is not supported by your browser.');
+    }
+}
+
+function showLocationLoading() {
+    const overlay = document.getElementById('location-loading-overlay');
+    if (overlay) {
+        overlay.classList.add('active');
+    }
+}
+
+function hideLocationLoading() {
+    const overlay = document.getElementById('location-loading-overlay');
+    if (overlay) {
+        overlay.classList.remove('active');
+    }
+}
+
+function updateUserLocationPopup() {
+    if (!userLocationMarker) return;
+    
+    let popupContent = '<strong>Your Location</strong><br>';
+    popupContent += `Lat: ${userLocation.lat}<br>`;
+    popupContent += `Lon: ${userLocation.lng}`;
+    
+    if (userLocation.name) {
+        popupContent += `<br><br><strong>${userLocation.name}</strong>`;
+    }
+    
+    userLocationMarker.bindPopup(popupContent);
+}
+
+async function fetchUserLocationName() {
+    try {
+        const params = new URLSearchParams({
+            latitude: userLocation.lat,
+            longitude: userLocation.lng
+        });
+        
+        const response = await fetch(`/api/location/reverse?${params}`);
+        const data = await response.json();
+        
+        if (data.locationName) {
+            userLocation.name = data.locationName;
+            updateUserLocationPopup();
+        }
+    } catch (error) {
+        console.warn('Failed to fetch user location name:', error);
     }
 }
 
@@ -448,15 +510,22 @@ function searchNewLocationForWaypoint(waypointId) {
 
 function getUserLocation() {
     if ("geolocation" in navigator) {
+        showLocationLoading();
+        
         navigator.geolocation.getCurrentPosition(
             function(position) {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
                 initializeMap(lat, lng, USER_ZOOM);
+                
+                fetchUserLocationName().finally(() => {
+                    hideLocationLoading();
+                });
             },
             function(error) {
                 console.warn('Geolocation error:', error.message);
                 console.log('Using default location (center of USA)');
+                hideLocationLoading();
                 initializeMap(DEFAULT_LAT, DEFAULT_LNG, DEFAULT_ZOOM);
             },
             {
