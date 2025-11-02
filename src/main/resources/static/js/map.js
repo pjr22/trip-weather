@@ -266,6 +266,7 @@ function updateTable() {
         const weatherHtml = getWeatherHtml(waypoint);
         
         row.innerHTML = `
+            <td class="drag-handle" title="Drag to reorder">☰</td>
             <td>${index + 1}</td>
             <td><input type="date" value="${waypoint.date}" onchange="updateWaypointField(${waypoint.id}, 'date', this.value)"></td>
             <td><input type="time" value="${waypoint.time}" onchange="updateWaypointField(${waypoint.id}, 'time', this.value)"></td>
@@ -287,6 +288,9 @@ function updateTable() {
             </td>
         `;
         
+        const dragHandle = row.querySelector('.drag-handle');
+        dragHandle.draggable = true;
+        
         row.addEventListener('click', function(e) {
             if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
                 highlightTableRow(waypoint.id);
@@ -302,6 +306,79 @@ function updateTable() {
             const iconPath = container.dataset.icon;
             loadSvgIcon(iconPath, container, 'action-icon');
         });
+        
+        setupDragAndDrop(row);
+    });
+}
+
+let draggedRow = null;
+
+function setupDragAndDrop(row) {
+    const dragHandle = row.querySelector('.drag-handle');
+    
+    dragHandle.addEventListener('dragstart', function(e) {
+        draggedRow = row;
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', row.dataset.waypointId);
+    });
+    
+    dragHandle.addEventListener('dragend', function(e) {
+        row.classList.remove('dragging');
+        document.querySelectorAll('#waypoints-tbody tr').forEach(r => {
+            r.classList.remove('drag-over');
+        });
+        draggedRow = null;
+    });
+    
+    row.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        if (draggedRow && draggedRow !== row) {
+            row.classList.add('drag-over');
+        }
+        return false;
+    });
+    
+    row.addEventListener('dragleave', function(e) {
+        row.classList.remove('drag-over');
+    });
+    
+    row.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (draggedRow && draggedRow !== row) {
+            const draggedId = parseInt(draggedRow.dataset.waypointId);
+            const targetId = parseInt(row.dataset.waypointId);
+            
+            reorderWaypoints(draggedId, targetId);
+        }
+        
+        return false;
+    });
+}
+
+function reorderWaypoints(draggedId, targetId) {
+    const draggedIndex = waypoints.findIndex(w => w.id === draggedId);
+    const targetIndex = waypoints.findIndex(w => w.id === targetId);
+    
+    if (draggedIndex === -1 || targetIndex === -1) return;
+    
+    const [removed] = waypoints.splice(draggedIndex, 1);
+    waypoints.splice(targetIndex, 0, removed);
+    
+    updateMarkersAfterReorder();
+    updateTable();
+}
+
+function updateMarkersAfterReorder() {
+    waypointMarkers.forEach(marker => map.removeLayer(marker));
+    waypointMarkers = [];
+    
+    waypoints.forEach((waypoint, index) => {
+        addMarkerToMap(waypoint, index + 1);
     });
 }
 

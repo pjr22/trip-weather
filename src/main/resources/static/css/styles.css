@@ -403,3 +403,37 @@ main {
     font-size: 16px;
     font-weight: 500;
 }
+
+.drag-handle-header {
+    width: 30px;
+    padding: 12px 8px !important;
+}
+
+.drag-handle {
+    cursor: move;
+    cursor: grab;
+    color: #95a5a6;
+    font-size: 18px;
+    user-select: none;
+    padding: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.drag-handle:hover {
+    color: #7f8c8d;
+}
+
+.dragging {
+    opacity: 0.5;
+    background-color: #ecf0f1;
+}
+
+.drag-over {
+    border-top: 3px solid #3498db;
+}
