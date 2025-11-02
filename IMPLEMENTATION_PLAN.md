@@ -21,9 +21,12 @@ The application currently implements the three core stages described in the orig
 ## Next Steps (Enhancements)
 
 1. **Intelligent Routing**
+   - Add a button to trigger routing. Something like "Calculate Route" or "Optimize Route".
    - Use OpenRouteService “directions” endpoint to compute optimal routes between consecutive waypoints.
    - Draw polylines on the map representing the route.
    - Store route geometry for later export or distance calculations.
+   - If waypoints are re-ordered or deleted, remove the old route, but don't recalculate until the user clicks the "Calculate Route" button.
+   - If the user clicks "Calculate Route" again, recalculate the route and update the map.
 
 2. **Automatic Arrival Time Calculation**
    - After routing, compute travel time between waypoints.

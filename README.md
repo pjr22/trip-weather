@@ -30,13 +30,13 @@ Trip Weather is a Spring Boot web application that helps users plan road trips b
 - **Frontend**: HTML5, CSS, JavaScript, Leaflet.js
 - **APIs**:
   - Weather: `https://api.weather.gov`
-  - Geocoding / Search: OpenRouteService (`openrouteservice.org`) – API key stored in `openRouteService_api_key.txt`
+  - Geocoding / Search: OpenRouteService (`openrouteservice.org`)
 - **Build**: Gradle
 
 ## Getting Started
 
-1. Ensure Java 21 and Gradle are installed.
-2. Place your OpenRouteService API key in `src/main/resources/application.properties` as `openrouteservice.api.key=YOUR_KEY`.
+1. Ensure Java 21 is installed. Gradle wrapper is included in the project.
+2. Set your OpenRouteService API key as an environment variable, `OPENROUTESERVICE_API_KEY`, or in `src/main/resources/application.properties` as `openrouteservice.api.key=YOUR_KEY`.
 3. Run the application:
 
    ```bash
@@ -47,6 +47,6 @@ Trip Weather is a Spring Boot web application that helps users plan road trips b
 
 ## Future Enhancements (see updated IMPLEMENTATION_PLAN.md)
 
-- Intelligent routing between waypoints using OpenRouteService.
-- Automatic arrival time calculation based on departure time and routing distances.
-- Persisting routes to a database, exporting to PDF, dark mode, etc.
+1. Intelligent routing between waypoints using OpenRouteService.
+2. Automatic arrival time calculation based on departure time and routing distances.
+3. Persisting routes to a database, exporting to PDF, dark mode, etc.
