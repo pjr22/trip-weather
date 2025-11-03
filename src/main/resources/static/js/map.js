@@ -4,6 +4,8 @@ let waypointMarkers = [];
 let userLocationMarker = null;
 let userLocation = { lat: null, lng: null, name: null };
 let replacingWaypointId = null;
+let routePolylines = [];
+let currentRoute = null;
 
 const DEFAULT_LAT = 39.8283;
 const DEFAULT_LNG = -98.5795;
@@ -199,6 +201,8 @@ function addWaypoint(lat, lng) {
     
     addMarkerToMap(waypoint, id);
     updateTable();
+    updateRouteButtonState();
+    clearRouteOnWaypointChange();
     
     fetchLocationName(waypoint);
 }
@@ -371,6 +375,7 @@ function reorderWaypoints(draggedId, targetId) {
     
     updateMarkersAfterReorder();
     updateTable();
+    clearRouteOnWaypointChange();
 }
 
 function updateMarkersAfterReorder() {
@@ -520,6 +525,8 @@ function deleteWaypoint(id) {
         });
         
         updateTable();
+        updateRouteButtonState();
+        clearRouteOnWaypointChange();
     }
 }
 
@@ -573,6 +580,7 @@ function replaceWaypointLocation(waypointId, newLat, newLng) {
         }
         
         updateTable();
+        clearRouteOnWaypointChange();
         fetchLocationName(waypoint);
     }
 }
@@ -620,6 +628,7 @@ function getUserLocation() {
 document.addEventListener('DOMContentLoaded', function() {
     getUserLocation();
     initializeSearch();
+    initializeRouting();
 });
 
 let searchDebounceTimer = null;
@@ -747,7 +756,169 @@ function selectSearchResult(lat, lng, locationName) {
         
         addMarkerToMap(waypoint, id);
         updateTable();
+        updateRouteButtonState();
+        clearRouteOnWaypointChange();
     }
     
     map.setView([lat, lng], 13);
+}
+
+// ==================== ROUTING FUNCTIONS ====================
+
+function initializeRouting() {
+    const calculateRouteBtn = document.getElementById('calculate-route-btn');
+    if (calculateRouteBtn) {
+        calculateRouteBtn.addEventListener('click', calculateRoute);
+    }
+    
+    updateRouteButtonState();
+}
+
+function showRouteLoading() {
+    const overlay = document.getElementById('route-loading-overlay');
+    if (overlay) {
+        overlay.classList.add('active');
+    }
+}
+
+function hideRouteLoading() {
+    const overlay = document.getElementById('route-loading-overlay');
+    if (overlay) {
+        overlay.classList.remove('active');
+    }
+}
+
+function updateRouteButtonState() {
+    const calculateRouteBtn = document.getElementById('calculate-route-btn');
+    if (calculateRouteBtn) {
+        if (waypoints.length < 2) {
+            calculateRouteBtn.disabled = true;
+            calculateRouteBtn.title = 'Add at least 2 waypoints to calculate route';
+        } else {
+            calculateRouteBtn.disabled = false;
+            calculateRouteBtn.title = 'Calculate optimal route between waypoints';
+        }
+    }
+}
+
+async function calculateRoute() {
+    if (waypoints.length < 2) {
+        alert('Please add at least 2 waypoints to calculate a route.');
+        return;
+    }
+
+    showRouteLoading();
+
+    try {
+        // Prepare waypoints for API request
+        const waypointData = waypoints.map(wp => ({
+            latitude: parseFloat(wp.lat),
+            longitude: parseFloat(wp.lng),
+            name: wp.locationName || `Waypoint ${wp.id}`
+        }));
+
+        const response = await fetch('/api/route/calculate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(waypointData)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const routeData = await response.json();
+
+        if (routeData && routeData.geometry && routeData.geometry.length > 0) {
+            displayRoute(routeData);
+            currentRoute = routeData;
+        } else {
+            throw new Error('No route geometry returned from API');
+        }
+
+    } catch (error) {
+        console.error('Route calculation error:', error);
+        alert('Failed to calculate route: ' + error.message);
+        clearRoute();
+    } finally {
+        hideRouteLoading();
+    }
+}
+
+function displayRoute(routeData) {
+    // Clear existing route
+    clearRoute();
+
+    if (!routeData.geometry || routeData.geometry.length === 0) {
+        console.warn('No route geometry to display');
+        return;
+    }
+
+    // Convert geometry coordinates for Leaflet (Leaflet expects [lat, lng])
+    const routeCoordinates = routeData.geometry.map(coord => [coord[1], coord[0]]);
+
+    // Create polyline for the route - changed color from green (#27ae60) to blue (#0066cc)
+    const routePolyline = L.polyline(routeCoordinates, {
+        color: '#0066cc',
+        weight: 4,
+        opacity: 0.8,
+        smoothFactor: 1
+    }).addTo(map);
+
+    routePolylines.push(routePolyline);
+
+    // Fit map to show the entire route
+    const bounds = L.latLngBounds(routeCoordinates);
+    map.fitBounds(bounds, { padding: [50, 50] });
+
+    // Log route information
+    console.log('Route calculated:', {
+        distance: routeData.distance ? (routeData.distance / 1000).toFixed(1) + ' km' : 'Unknown',
+        duration: routeData.duration ? formatDuration(routeData.duration) : 'Unknown',
+        waypoints: routeData.waypoints ? routeData.waypoints.length : 0
+    });
+
+    // Update button text to show route is active
+    const calculateRouteBtn = document.getElementById('calculate-route-btn');
+    if (calculateRouteBtn) {
+        calculateRouteBtn.textContent = '🔄 Recalculate Route';
+    }
+}
+
+function clearRoute() {
+    // Remove all route polylines from the map
+    routePolylines.forEach(polyline => {
+        map.removeLayer(polyline);
+    });
+    routePolylines = [];
+    currentRoute = null;
+
+    // Reset button text
+    const calculateRouteBtn = document.getElementById('calculate-route-btn');
+    if (calculateRouteBtn) {
+        calculateRouteBtn.textContent = '🛣️ Calculate Route';
+    }
+}
+
+function formatDuration(seconds) {
+    if (!seconds) return 'Unknown';
+    
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    } else {
+        return `${minutes}m`;
+    }
+}
+
+// Clear route when waypoints are reordered or deleted
+function clearRouteOnWaypointChange() {
+    if (currentRoute) {
+        clearRoute();
+        console.log('Route cleared due to waypoint changes');
+    }
 }

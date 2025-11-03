@@ -26,6 +26,12 @@
                     <p>Updating your location...</p>
                 </div>
             </div>
+            <div id="route-loading-overlay" class="loading-overlay">
+                <div class="loading-content">
+                    <div class="loading-spinner"></div>
+                    <p>Calculating route...</p>
+                </div>
+            </div>
             
             <div class="waypoints-section">
                 <div class="waypoints-header">
@@ -33,7 +39,10 @@
                         <h2>Waypoints</h2>
                         <p class="instructions">Click on the map to add waypoints</p>
                     </div>
-                    <button id="search-btn" class="search-btn">🔍 Search Location</button>
+                    <div class="header-buttons">
+                        <button id="calculate-route-btn" class="route-btn">🛣️ Calculate Route</button>
+                        <button id="search-btn" class="search-btn">🔍 Search Location</button>
+                    </div>
                 </div>
                 
                 <div class="table-container">

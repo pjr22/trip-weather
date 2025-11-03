@@ -60,6 +60,33 @@ main {
     margin-bottom: 15px;
 }
 
+.header-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.route-btn {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background-color 0.2s;
+}
+
+.route-btn:hover {
+    background-color: #229954;
+}
+
+.route-btn:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+}
+
 .waypoints-section h2 {
     color: #2c3e50;
     margin-bottom: 5px;
