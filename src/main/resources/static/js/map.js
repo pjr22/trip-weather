@@ -313,6 +313,16 @@ function updateTable() {
         
         setupDragAndDrop(row);
     });
+    
+    // Add a drop zone row at the bottom for dragging to the last position
+    if (waypoints.length > 0) {
+        const dropZoneRow = tbody.insertRow();
+        dropZoneRow.className = 'drop-zone-row';
+        dropZoneRow.innerHTML = `
+            <td colspan="10" class="drop-zone-cell"></td>
+        `;
+        setupDropZone(dropZoneRow);
+    }
 }
 
 let draggedRow = null;
@@ -364,14 +374,65 @@ function setupDragAndDrop(row) {
     });
 }
 
+function setupDropZone(dropZoneRow) {
+    dropZoneRow.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        if (draggedRow) {
+            dropZoneRow.classList.add('drag-over');
+        }
+        return false;
+    });
+    
+    dropZoneRow.addEventListener('dragleave', function(e) {
+        dropZoneRow.classList.remove('drag-over');
+    });
+    
+    dropZoneRow.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (draggedRow) {
+            const draggedId = parseInt(draggedRow.dataset.waypointId);
+            moveToEnd(draggedId);
+        }
+        
+        return false;
+    });
+}
+
+function moveToEnd(draggedId) {
+    const draggedIndex = waypoints.findIndex(w => w.id === draggedId);
+    
+    if (draggedIndex === -1) return;
+    
+    // Don't do anything if already at the end
+    if (draggedIndex === waypoints.length - 1) return;
+    
+    const [removed] = waypoints.splice(draggedIndex, 1);
+    waypoints.push(removed);
+    
+    updateMarkersAfterReorder();
+    updateTable();
+    clearRouteOnWaypointChange('reorder');
+}
+
 function reorderWaypoints(draggedId, targetId) {
     const draggedIndex = waypoints.findIndex(w => w.id === draggedId);
     const targetIndex = waypoints.findIndex(w => w.id === targetId);
     
     if (draggedIndex === -1 || targetIndex === -1) return;
     
+    // Don't do anything if dragging to the same position
+    if (draggedIndex === targetIndex) return;
+    
     const [removed] = waypoints.splice(draggedIndex, 1);
-    waypoints.splice(targetIndex, 0, removed);
+    
+    // If we removed an item before the target, the target index shifts left by 1
+    const adjustedTargetIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    
+    waypoints.splice(adjustedTargetIndex, 0, removed);
     
     updateMarkersAfterReorder();
     updateTable();
