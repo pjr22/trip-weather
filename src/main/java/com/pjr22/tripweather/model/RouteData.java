@@ -112,6 +112,9 @@ public class RouteData {
         @JsonProperty("name")
         private String name;
         
+        @JsonProperty("arrivalTime")
+        private String arrivalTime;
+        
         public WaypointCoordinates() {}
         
         public WaypointCoordinates(List<Double> location, String name) {
@@ -133,6 +136,14 @@ public class RouteData {
         
         public void setName(String name) {
             this.name = name;
+        }
+        
+        public String getArrivalTime() {
+            return arrivalTime;
+        }
+        
+        public void setArrivalTime(String arrivalTime) {
+            this.arrivalTime = arrivalTime;
         }
     }
 }

@@ -22,6 +22,23 @@ public class RouteController {
     @PostMapping("/calculate")
     public ResponseEntity<RouteData> calculateRoute(@RequestBody List<Map<String, Object>> waypoints) {
         try {
+            // Extract departure date/time if provided, or use current time as default
+            String departureDateTime = null;
+            if (!waypoints.isEmpty()) {
+                Map<String, Object> firstWaypoint = waypoints.get(0);
+                String date = firstWaypoint.get("date") != null ? firstWaypoint.get("date").toString() : "";
+                String time = firstWaypoint.get("time") != null ? firstWaypoint.get("time").toString() : "";
+                
+                if (!date.isEmpty() && !time.isEmpty()) {
+                    departureDateTime = date + " " + time;
+                } else {
+                    // Use current time as default departure time
+                    java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                    java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+                    departureDateTime = now.format(formatter);
+                }
+            }
+
             // Convert request waypoints to RouteService waypoints
             List<RouteService.RouteRequest.Waypoint> routeWaypoints = waypoints.stream()
                     .map(wp -> {
@@ -32,7 +49,7 @@ public class RouteController {
                     })
                     .toList();
 
-            RouteData routeData = routeService.calculateRoute(routeWaypoints);
+            RouteData routeData = routeService.calculateRouteWithArrivalTimes(routeWaypoints, departureDateTime);
 
             // Check if route calculation was successful
             if (routeData.getGeometry() != null && !routeData.getGeometry().isEmpty()) {

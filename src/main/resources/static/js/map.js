@@ -202,7 +202,7 @@ function addWaypoint(lat, lng) {
     addMarkerToMap(waypoint, id);
     updateTable();
     updateRouteButtonState();
-    clearRouteOnWaypointChange();
+    clearRouteOnWaypointChange('add', waypoints.length - 1);
     
     fetchLocationName(waypoint);
 }
@@ -375,7 +375,7 @@ function reorderWaypoints(draggedId, targetId) {
     
     updateMarkersAfterReorder();
     updateTable();
-    clearRouteOnWaypointChange();
+    clearRouteOnWaypointChange('reorder');
 }
 
 function updateMarkersAfterReorder() {
@@ -526,7 +526,7 @@ function deleteWaypoint(id) {
         
         updateTable();
         updateRouteButtonState();
-        clearRouteOnWaypointChange();
+        clearRouteOnWaypointChange('delete');
     }
 }
 
@@ -580,7 +580,7 @@ function replaceWaypointLocation(waypointId, newLat, newLng) {
         }
         
         updateTable();
-        clearRouteOnWaypointChange();
+        clearRouteOnWaypointChange('modify');
         fetchLocationName(waypoint);
     }
 }
@@ -757,7 +757,7 @@ function selectSearchResult(lat, lng, locationName) {
         addMarkerToMap(waypoint, id);
         updateTable();
         updateRouteButtonState();
-        clearRouteOnWaypointChange();
+        clearRouteOnWaypointChange('add', waypoints.length - 1);
     }
     
     map.setView([lat, lng], 13);
@@ -810,11 +810,13 @@ async function calculateRoute() {
     showRouteLoading();
 
     try {
-        // Prepare waypoints for API request
+        // Prepare waypoints for API request with date and time
         const waypointData = waypoints.map(wp => ({
             latitude: parseFloat(wp.lat),
             longitude: parseFloat(wp.lng),
-            name: wp.locationName || `Waypoint ${wp.id}`
+            name: wp.locationName || `Waypoint ${wp.id}`,
+            date: wp.date || '',
+            time: wp.time || ''
         }));
 
         const response = await fetch('/api/route/calculate', {
@@ -873,6 +875,11 @@ function displayRoute(routeData) {
     const bounds = L.latLngBounds(routeCoordinates);
     map.fitBounds(bounds, { padding: [50, 50] });
 
+    // Update waypoint arrival times if provided
+    if (routeData.waypoints && routeData.waypoints.length > 0) {
+        updateWaypointArrivalTimes(routeData.waypoints);
+    }
+
     // Log route information
     console.log('Route calculated:', {
         distance: routeData.distance ? (routeData.distance / 1000).toFixed(1) + ' km' : 'Unknown',
@@ -885,6 +892,31 @@ function displayRoute(routeData) {
     if (calculateRouteBtn) {
         calculateRouteBtn.textContent = '🔄 Recalculate Route';
     }
+}
+
+function updateWaypointArrivalTimes(routeWaypoints) {
+    routeWaypoints.forEach((routeWaypoint, index) => {
+        if (index < waypoints.length) {
+            const waypoint = waypoints[index];
+            
+            // Update arrival time if provided by the route calculation
+            if (routeWaypoint.arrivalTime) {
+                const arrivalDateTime = routeWaypoint.arrivalTime.split(' ');
+                if (arrivalDateTime.length === 2) {
+                    waypoint.date = arrivalDateTime[0];
+                    waypoint.time = arrivalDateTime[1];
+                    
+                    // Fetch weather for the updated arrival time
+                    if (waypoint.date && waypoint.time) {
+                        fetchWeatherForWaypoint(waypoint);
+                    }
+                }
+            }
+        }
+    });
+    
+    // Update the table to show the new arrival times
+    updateTable();
 }
 
 function clearRoute() {
@@ -915,10 +947,55 @@ function formatDuration(seconds) {
     }
 }
 
-// Clear route when waypoints are reordered or deleted
-function clearRouteOnWaypointChange() {
-    if (currentRoute) {
+// Clear route when waypoints are reordered or deleted, but not when adding waypoints at the end
+function clearRouteOnWaypointChange(changeType, waypointIndex = null) {
+    if (!currentRoute) {
+        return;
+    }
+    
+    let shouldClearRoute = false;
+    
+    switch (changeType) {
+        case 'delete':
+            // Any deletion affects the route
+            shouldClearRoute = true;
+            break;
+            
+        case 'reorder':
+            // Any reordering affects the route
+            shouldClearRoute = true;
+            break;
+            
+        case 'add':
+            // Only clear if adding at a position that affects existing waypoints
+            if (waypointIndex !== null && waypointIndex < waypoints.length - 1) {
+                shouldClearRoute = true;
+            }
+            break;
+            
+        case 'modify':
+            // Any modification to existing waypoint affects the route
+            shouldClearRoute = true;
+            break;
+    }
+    
+    if (shouldClearRoute) {
         clearRoute();
         console.log('Route cleared due to waypoint changes');
     }
+}
+
+// Helper function to determine if a change affects existing route
+function changeAffectsExistingRoute(changeType, waypointIndex) {
+    if (!currentRoute || waypointIndex === null) {
+        return true;
+    }
+    
+    // For additions, only affects route if not at the end
+    if (changeType === 'add') {
+        return waypointIndex < currentRoute.getWaypoints().length;
+    }
+    
+    // For all other changes, it affects the route
+    return true;
 }
