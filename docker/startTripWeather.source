@@ -1,0 +1,3 @@
+OPENROUTESERVICE_API_KEY=`cat ../openRouteService_api_key.txt`
+echo "Using API key: $OPENROUTESERVICE_API_KEY"
+docker run --name trip-weather -p 9080:8080 -d -e OPENROUTESERVICE_API_KEY=${OPENROUTESERVICE_API_KEY} org.pjr22/trip-weather:latest 
