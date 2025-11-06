@@ -10,13 +10,14 @@ public class LocationService {
 
     private final RestClient restClient;
     private final String apiKey;
-    
-    private static final String BASE_URL = "https://api.openrouteservice.org";
+    private final String baseUrl;
 
-    public LocationService(@Value("${openrouteservice.api.key}") String apiKey) {
+    public LocationService(@Value("${openrouteservice.api.key}") String apiKey,
+                          @Value("${openrouteservice.base.url:https://api.openrouteservice.org}") String baseUrl) {
         this.apiKey = apiKey;
+        this.baseUrl = baseUrl;
         this.restClient = RestClient.builder()
-                .baseUrl(BASE_URL)
+                .baseUrl(this.baseUrl)
                 .build();
     }
 

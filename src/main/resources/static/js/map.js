@@ -41,6 +41,7 @@ class Waypoint {
         this.lng = lng.toFixed(6);
         this.date = '';
         this.time = '';
+        this.duration = 0; // duration in minutes, default to 0
         this.locationName = '';
         this.weather = null;
         this.weatherLoading = false;
@@ -239,6 +240,10 @@ function updateMarkerPopup(marker, waypoint, orderNumber) {
         popupContent += `<br><strong>${waypoint.locationName}</strong><br>`;
     }
     
+    if (waypoint.duration > 0) {
+        popupContent += `Duration: ${waypoint.duration} minutes<br>`;
+    }
+    
     if (waypoint.weather && !waypoint.weather.error) {
         popupContent += `<br>`;
         if (waypoint.weather.iconUrl) {
@@ -274,6 +279,7 @@ function updateTable() {
             <td>${index + 1}</td>
             <td><input type="date" value="${waypoint.date}" onchange="updateWaypointField(${waypoint.id}, 'date', this.value)"></td>
             <td><input type="time" value="${waypoint.time}" onchange="updateWaypointField(${waypoint.id}, 'time', this.value)"></td>
+            <td><input type="number" value="${waypoint.duration}" min="0" placeholder="0" onchange="updateWaypointField(${waypoint.id}, 'duration', this.value)" class="duration-input"></td>
             <td><input type="text" value="${waypoint.locationName}" placeholder="Enter location name" onchange="updateWaypointField(${waypoint.id}, 'locationName', this.value)"></td>
             ${weatherHtml}
             <td class="actions-cell">
@@ -319,7 +325,7 @@ function updateTable() {
         const dropZoneRow = tbody.insertRow();
         dropZoneRow.className = 'drop-zone-row';
         dropZoneRow.innerHTML = `
-            <td colspan="10" class="drop-zone-cell"></td>
+            <td colspan="11" class="drop-zone-cell"></td>
         `;
         setupDropZone(dropZoneRow);
     }
@@ -492,7 +498,11 @@ function getWeatherHtml(waypoint) {
 function updateWaypointField(id, field, value) {
     const waypoint = waypoints.find(w => w.id === id);
     if (waypoint) {
-        waypoint[field] = value;
+        if (field === 'duration') {
+            waypoint[field] = parseInt(value) || 0;
+        } else {
+            waypoint[field] = value;
+        }
         
         if ((field === 'date' || field === 'time') && waypoint.date && waypoint.time) {
             fetchWeatherForWaypoint(waypoint);
@@ -871,13 +881,14 @@ async function calculateRoute() {
     showRouteLoading();
 
     try {
-        // Prepare waypoints for API request with date and time
+        // Prepare waypoints for API request with date, time, and duration
         const waypointData = waypoints.map(wp => ({
             latitude: parseFloat(wp.lat),
             longitude: parseFloat(wp.lng),
             name: wp.locationName || `Waypoint ${wp.id}`,
             date: wp.date || '',
-            time: wp.time || ''
+            time: wp.time || '',
+            duration: wp.duration || 0
         }));
 
         const response = await fetch('/api/route/calculate', {
@@ -936,9 +947,9 @@ function displayRoute(routeData) {
     const bounds = L.latLngBounds(routeCoordinates);
     map.fitBounds(bounds, { padding: [50, 50] });
 
-    // Update waypoint arrival times if provided
+    // Update waypoint arrival times, durations, and timezones if provided
     if (routeData.waypoints && routeData.waypoints.length > 0) {
-        updateWaypointArrivalTimes(routeData.waypoints);
+        updateWaypointWithRouteData(routeData.waypoints);
     }
 
     // Log route information
@@ -955,7 +966,7 @@ function displayRoute(routeData) {
     }
 }
 
-function updateWaypointArrivalTimes(routeWaypoints) {
+function updateWaypointWithRouteData(routeWaypoints) {
     routeWaypoints.forEach((routeWaypoint, index) => {
         if (index < waypoints.length) {
             const waypoint = waypoints[index];
@@ -973,10 +984,20 @@ function updateWaypointArrivalTimes(routeWaypoints) {
                     }
                 }
             }
+            
+            // Update duration if provided
+            if (routeWaypoint.duration !== undefined && routeWaypoint.duration !== null) {
+                waypoint.duration = routeWaypoint.duration;
+            }
+            
+            // Store timezone information
+            if (routeWaypoint.timezone) {
+                waypoint.timezone = routeWaypoint.timezone;
+            }
         }
     });
     
-    // Update the table to show the new arrival times
+    // Update the table to show the new arrival times and durations
     updateTable();
 }
 

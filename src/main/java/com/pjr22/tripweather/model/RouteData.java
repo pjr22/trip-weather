@@ -115,11 +115,21 @@ public class RouteData {
         @JsonProperty("arrivalTime")
         private String arrivalTime;
         
+        @JsonProperty("duration")
+        private Integer duration; // minutes spent at waypoint
+        
+        @JsonProperty("timezone")
+        private String timezone; // timezone identifier
+        
+        @JsonProperty("departureTime")
+        private String departureTime; // calculated departure time
+        
         public WaypointCoordinates() {}
         
         public WaypointCoordinates(List<Double> location, String name) {
             this.location = location;
             this.name = name;
+            this.duration = 0; // default duration
         }
         
         public List<Double> getLocation() {
@@ -144,6 +154,30 @@ public class RouteData {
         
         public void setArrivalTime(String arrivalTime) {
             this.arrivalTime = arrivalTime;
+        }
+        
+        public Integer getDuration() {
+            return duration;
+        }
+        
+        public void setDuration(Integer duration) {
+            this.duration = duration;
+        }
+        
+        public String getTimezone() {
+            return timezone;
+        }
+        
+        public void setTimezone(String timezone) {
+            this.timezone = timezone;
+        }
+        
+        public String getDepartureTime() {
+            return departureTime;
+        }
+        
+        public void setDepartureTime(String departureTime) {
+            this.departureTime = departureTime;
         }
     }
 }

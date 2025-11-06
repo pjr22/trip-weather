@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/route")
@@ -39,17 +40,29 @@ public class RouteController {
                 }
             }
 
-            // Convert request waypoints to RouteService waypoints
-            List<RouteService.RouteRequest.Waypoint> routeWaypoints = waypoints.stream()
-                    .map(wp -> {
-                        Double lat = ((Number) wp.get("latitude")).doubleValue();
-                        Double lng = ((Number) wp.get("longitude")).doubleValue();
-                        String name = wp.get("name") != null ? wp.get("name").toString() : "";
-                        return new RouteService.RouteRequest.Waypoint(lat, lng, name);
-                    })
-                    .toList();
+            // Convert request waypoints to RouteService waypoints and extract durations
+            List<RouteService.RouteRequest.Waypoint> routeWaypoints = new ArrayList<>();
+            List<Integer> durations = new ArrayList<>();
+            
+            for (Map<String, Object> wp : waypoints) {
+                Double lat = ((Number) wp.get("latitude")).doubleValue();
+                Double lng = ((Number) wp.get("longitude")).doubleValue();
+                String name = wp.get("name") != null ? wp.get("name").toString() : "";
+                routeWaypoints.add(new RouteService.RouteRequest.Waypoint(lat, lng, name));
+                
+                // Extract duration (in minutes), default to 0 if not provided
+                Integer duration = 0;
+                if (wp.get("duration") != null) {
+                    try {
+                        duration = Integer.parseInt(wp.get("duration").toString());
+                    } catch (NumberFormatException e) {
+                        duration = 0;
+                    }
+                }
+                durations.add(duration);
+            }
 
-            RouteData routeData = routeService.calculateRouteWithArrivalTimes(routeWaypoints, departureDateTime);
+            RouteData routeData = routeService.calculateRouteWithArrivalTimesAndDurations(routeWaypoints, departureDateTime, durations);
 
             // Check if route calculation was successful
             if (routeData.getGeometry() != null && !routeData.getGeometry().isEmpty()) {

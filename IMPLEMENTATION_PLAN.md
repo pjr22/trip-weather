@@ -20,7 +20,7 @@ The application currently implements the three core stages described in the orig
 
 ## Next Steps (Enhancements)
 
-1. **Intelligent Routing**
+1. **Intelligent Routing - COMPLETE**
    - Add a button to trigger routing. Something like "Calculate Route" or "Optimize Route".
    - Use OpenRouteService “directions” endpoint to compute optimal routes between consecutive waypoints.
    - Draw polylines on the map representing the route.
@@ -32,6 +32,8 @@ The application currently implements the three core stages described in the orig
    - After routing, compute travel time between waypoints.
    - Propagate arrival times forward from the first waypoint’s departure date/time.
    - Allow user to edit the first waypoint’s departure; subsequent waypoints update automatically.
+   - Allow user to add a Duration to each waypoint, representing the amount of time to spend at that location. Use this to calculate the next waypoint’s departure time. Use minutes as the unit of measurement. Use 0 as the default value.
+   - Make sure times at each waypoint reflect the timezone of that location.
 
 3. **Persist Routes**
    - Add a simple JPA entity (`Route`) with waypoints and timestamps.

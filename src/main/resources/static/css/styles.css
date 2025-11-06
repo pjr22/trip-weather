@@ -146,6 +146,11 @@ main {
     border-color: #3498db;
 }
 
+.duration-input {
+    width: 80px;
+    text-align: center;
+}
+
 .actions-cell {
     white-space: nowrap;
 }
