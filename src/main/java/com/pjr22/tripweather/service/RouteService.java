@@ -2,6 +2,7 @@ package com.pjr22.tripweather.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pjr22.tripweather.model.LocationData;
 import com.pjr22.tripweather.model.RouteData;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -18,20 +19,78 @@ public class RouteService {
     private final String apiKey;
     private final String baseUrl;
     private final ObjectMapper objectMapper;
-    private final TimezoneService timezoneService;
+    private final LocationService locationService;
     
     private static final String DIRECTIONS_ENDPOINT = "/v2/directions/driving-car/geojson";
 
+    /**
+     * Get timezone information for a coordinate using LocationService
+     */
+    private String getTimezone(Double latitude, Double longitude) {
+        try {
+            LocationData locationData = locationService.reverseGeocode(latitude, longitude);
+            if (locationData.getFeatures() != null && !locationData.getFeatures().isEmpty()) {
+                LocationData.Timezone timezone = locationData.getFeatures().get(0).getProperties().getTimezone();
+                if (timezone != null) {
+                    return timezone.getName();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error getting timezone for coordinates " + latitude + ", " + longitude + ": " + e.getMessage());
+        }
+        return "UTC"; // Fallback
+    }
+
+    /**
+     * Convert datetime string from one timezone to another using LocationService timezone data
+     */
+    private String convertDateTime(String dateTimeStr, String fromTimezone, String toTimezone) {
+        try {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+            java.time.LocalDateTime localDateTime = java.time.LocalDateTime.parse(dateTimeStr, formatter);
+            
+            java.time.ZoneId fromZoneId = java.time.ZoneId.of(fromTimezone);
+            java.time.ZoneId toZoneId = java.time.ZoneId.of(toTimezone);
+            
+            java.time.ZonedDateTime fromZonedDateTime = localDateTime.atZone(fromZoneId);
+            java.time.ZonedDateTime toZonedDateTime = fromZonedDateTime.withZoneSameInstant(toZoneId);
+            
+            return toZonedDateTime.format(formatter);
+        } catch (Exception e) {
+            System.err.println("Error converting datetime from " + fromTimezone + " to " + toTimezone + ": " + e.getMessage());
+            return dateTimeStr; // Return original if conversion fails
+        }
+    }
+
+    /**
+     * Add minutes to a datetime string in the specified timezone
+     */
+    private String addMinutesToDateTime(String dateTimeStr, String timezone, Integer minutes) {
+        try {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+            java.time.LocalDateTime localDateTime = java.time.LocalDateTime.parse(dateTimeStr, formatter);
+            
+            java.time.ZoneId zoneId = java.time.ZoneId.of(timezone);
+            java.time.ZonedDateTime zonedDateTime = localDateTime.atZone(zoneId);
+            java.time.ZonedDateTime resultZonedDateTime = zonedDateTime.plusMinutes(minutes);
+            
+            return resultZonedDateTime.format(formatter);
+        } catch (Exception e) {
+            System.err.println("Error adding minutes to datetime: " + e.getMessage());
+            return dateTimeStr; // Return original if addition fails
+        }
+    }
+
     public RouteService(@Value("${openrouteservice.api.key}") String apiKey, 
                        @Value("${openrouteservice.base.url:https://api.openrouteservice.org}") String baseUrl,
-                       TimezoneService timezoneService) {
+                       LocationService locationService) {
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
         this.restClient = RestClient.builder()
                 .baseUrl(this.baseUrl)
                 .build();
         this.objectMapper = new ObjectMapper();
-        this.timezoneService = timezoneService;
+        this.locationService = locationService;
     }
 
     public RouteData calculateRoute(List<RouteRequest.Waypoint> waypoints) {
@@ -155,7 +214,7 @@ public class RouteService {
                     List<Double> location = List.of(wp.getLongitude(), wp.getLatitude());
                     RouteData.WaypointCoordinates waypoint = new RouteData.WaypointCoordinates(location, wp.getName());
                     // Add timezone even if no departure time is set
-                    String timezone = timezoneService.getTimezone(wp.getLatitude(), wp.getLongitude());
+                    String timezone = getTimezone(wp.getLatitude(), wp.getLongitude());
                     waypoint.setTimezone(timezone);
                     waypointInfo.add(waypoint);
                 }
@@ -191,7 +250,7 @@ public class RouteService {
                 RouteRequest.Waypoint originalWaypoint = originalWaypoints.get(i);
                 
                 // Get timezone for this waypoint
-                String timezone = timezoneService.getTimezone(originalWaypoint.getLatitude(), originalWaypoint.getLongitude());
+                String timezone = getTimezone(originalWaypoint.getLatitude(), originalWaypoint.getLongitude());
                 
                 // Create waypoint coordinates with location and name
                 List<Double> location = List.of(originalWaypoint.getLongitude(), originalWaypoint.getLatitude());
@@ -211,15 +270,15 @@ public class RouteService {
                 } else {
                     // Convert previous waypoint's departure time to current waypoint's timezone
                     RouteRequest.Waypoint previousWaypoint = originalWaypoints.get(i - 1);
-                    String previousTimezone = timezoneService.getTimezone(previousWaypoint.getLatitude(), previousWaypoint.getLongitude());
+                    String previousTimezone = getTimezone(previousWaypoint.getLatitude(), previousWaypoint.getLongitude());
                     
-                    String arrivalTimeInCurrentTimezone = timezoneService.convertDateTime(currentTimeStr, previousTimezone, timezone);
+                    String arrivalTimeInCurrentTimezone = convertDateTime(currentTimeStr, previousTimezone, timezone);
                     waypoint.setArrivalTime(arrivalTimeInCurrentTimezone);
                     currentTimeStr = arrivalTimeInCurrentTimezone;
                 }
                 
                 // Calculate departure time (arrival time + duration)
-                String departureTime = timezoneService.addMinutesToDateTime(currentTimeStr, timezone, waypointDuration);
+                String departureTime = addMinutesToDateTime(currentTimeStr, timezone, waypointDuration);
                 waypoint.setDepartureTime(departureTime);
                 
                 // Update current time for next segment (convert to next waypoint's timezone when we get there)
@@ -229,7 +288,7 @@ public class RouteService {
                         RouteData.RouteSegment segment = segments.get(i);
                         if (segment.getDuration() != null) {
                             // Add travel time (duration is in seconds)
-                            currentTimeStr = timezoneService.addMinutesToDateTime(departureTime, timezone, (int)(segment.getDuration().longValue() / 60));
+                            currentTimeStr = addMinutesToDateTime(departureTime, timezone, (int)(segment.getDuration().longValue() / 60));
                         }
                     }
                 }
@@ -247,7 +306,7 @@ public class RouteService {
             for (RouteRequest.Waypoint wp : originalWaypoints) {
                 List<Double> location = List.of(wp.getLongitude(), wp.getLatitude());
                 RouteData.WaypointCoordinates waypoint = new RouteData.WaypointCoordinates(location, wp.getName());
-                String timezone = timezoneService.getTimezone(wp.getLatitude(), wp.getLongitude());
+                String timezone = getTimezone(wp.getLatitude(), wp.getLongitude());
                 waypoint.setTimezone(timezone);
                 fallbackWaypoints.add(waypoint);
             }

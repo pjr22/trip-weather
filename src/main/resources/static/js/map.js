@@ -219,11 +219,16 @@ async function fetchUserLocationName() {
 
 async function fetchUserTimezone() {
     try {
-        const response = await fetch(`/api/timezone?latitude=${userLocation.lat}&longitude=${userLocation.lng}`);
+        const params = new URLSearchParams({
+            latitude: userLocation.lat,
+            longitude: userLocation.lng
+        });
+        
+        const response = await fetch(`/api/location/reverse?${params}`);
         const data = await response.json();
         
-        if (data.timezone) {
-            userLocation.timezone = getTimezoneAbbr(data.timezone);
+        if (data.zoneStandard) {
+            userLocation.timezone = data.zoneStandard;
         }
     } catch (error) {
         console.warn('Failed to fetch user timezone:', error);
@@ -232,11 +237,16 @@ async function fetchUserTimezone() {
 
 async function fetchWaypointTimezone(waypoint) {
     try {
-        const response = await fetch(`/api/timezone?latitude=${waypoint.lat}&longitude=${waypoint.lng}`);
+        const params = new URLSearchParams({
+            latitude: waypoint.lat,
+            longitude: waypoint.lng
+        });
+        
+        const response = await fetch(`/api/location/reverse?${params}`);
         const data = await response.json();
         
-        if (data.timezone) {
-            waypoint.timezone = getTimezoneAbbr(data.timezone, waypoint.date && waypoint.time ? `${waypoint.date} ${waypoint.time}` : null);
+        if (data.zoneStandard) {
+            waypoint.timezone = data.zoneStandard;
         }
     } catch (error) {
         console.warn('Failed to fetch waypoint timezone:', error);

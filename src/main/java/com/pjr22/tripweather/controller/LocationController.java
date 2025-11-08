@@ -36,9 +36,11 @@ public class LocationController {
         Map<String, String> response = new HashMap<>();
         if (data.getFeatures() == null || data.getFeatures().isEmpty()) {
            log.warn("No locations found at LAT {}, LON {}", latitude, longitude);
-           response.put("locationName", "unknown");
+           response.put("locationName", "Unknown");
            response.put("zoneStandard", "UNK");
+           response.put("offsetStandard", "-00:00");
            response.put("zoneDaylight", "UNK");
+           response.put("offsetDaylight", "-00:00");
 
            return response;
         }
@@ -47,17 +49,21 @@ public class LocationController {
            response.put("locationName", data.getFeatures().get(0).getProperties().getFormatted());
         } catch (Exception e) {
            log.error("Failed to find location name in locationData: {}", data);
-           response.put("locationName", "unknown");
+           response.put("locationName", "Unknown");
         }
 
         try {
            Timezone timezone = data.getFeatures().get(0).getProperties().getTimezone();
            response.put("zoneStandard", timezone.getAbbreviationStd());
+           response.put("offsetStandard", timezone.getOffsetStd());
            response.put("zoneDaylight", timezone.getAbbreviationDst());
+           response.put("offsetDaylight", timezone.getOffsetDst());
         } catch (Exception e) {
            log.error("Failed to find timezone in locationData: {}", data);
            response.put("zoneStandard", "UNK");
+           response.put("offsetStandard", "-00:00");
            response.put("zoneDaylight", "UNK");
+           response.put("offsetDaylight", "-00:00");
         }
 
         return response;

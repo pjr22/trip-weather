@@ -51,7 +51,7 @@ The application currently implements the three core stages described in the orig
 ## Identified Issues / Suggested Fixes
 
 - **OpenRouteService API key handling**: Currently read from `application.properties`; consider externalizing to an environment variable for security.
-- **Weather time‑zone handling**: `WeatherService` parses target date/time as a local `LocalDateTime` and then applies the timezone of the first forecast period. This may cause mismatches for waypoints in different time zones. Suggest normalising all times to UTC before comparison.
+- ~~**Weather time‑zone handling**: `WeatherService` parses target date/time as a local `LocalDateTime` and then applies the timezone of the first forecast period. This may cause mismatches for waypoints in different time zones. Suggest normalising all times to UTC before comparison.~~ (RESOLVED - Timezone handling is now integrated into LocationService, which provides timezone data directly from GeoApify reverse geocode responses, eliminating separate timezone service dependencies)
 - ~~**No route visualization**: Waypoints are independent; users cannot see the path between them. Implement polyline drawing as part of the routing enhancement.~~ (RESOLVED - Route visualization with polylines is now implemented)
 - **No persistence**: All data is lost on server restart. Adding a simple persistence layer will improve usability.
 

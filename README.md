@@ -14,8 +14,9 @@ Trip Weather is a Spring Boot web application that helps users plan road trips b
   - Add, delete, reorder (drag‑and‑drop) waypoints.
   - Edit waypoint metadata (date, time, custom location name).
 - **Location services**:
-  - Reverse‑geocode waypoint coordinates via OpenRouteService.
+  - Reverse‑geocode waypoint coordinates via OpenRouteService with timezone information.
   - Search for locations by name/address using OpenRouteService.
+  - Timezone data automatically included in location responses for accurate time calculations.
 - **Weather integration**:
   - Fetch hourly forecasts for a waypoint’s latitude/longitude, date, and time.
   - Display condition, temperature, wind, precipitation probability, and icon.
