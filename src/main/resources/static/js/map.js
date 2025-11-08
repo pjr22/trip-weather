@@ -2,7 +2,7 @@ let map;
 let waypoints = [];
 let waypointMarkers = [];
 let userLocationMarker = null;
-let userLocation = { lat: null, lng: null, name: null };
+let userLocation = { lat: null, lng: null, name: null, timezone: '' };
 let replacingWaypointId = null;
 let routePolylines = [];
 let currentRoute = null;
@@ -41,10 +41,34 @@ class Waypoint {
         this.lng = lng.toFixed(6);
         this.date = '';
         this.time = '';
+        this.timezone = ''; // timezone abbreviation (MST, MDT, etc.)
         this.duration = 0; // duration in minutes, default to 0
         this.locationName = '';
         this.weather = null;
         this.weatherLoading = false;
+    }
+}
+
+function getTimezoneAbbr(timezoneId, date = null) {
+    // If no timezone provided, return empty
+    if (!timezoneId) {
+        return '';
+    }
+    
+    try {
+        const now = date ? new Date(date) : new Date();
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: timezoneId,
+            timeZoneName: 'short'
+        });
+        
+        const parts = formatter.formatToParts(now);
+        const timeZoneName = parts.find(part => part.type === 'timeZoneName');
+        
+        return timeZoneName ? timeZoneName.value : timezoneId.split('/').pop().replace(/_/g, ' ');
+    } catch (error) {
+        console.warn('Error getting timezone abbreviation:', error);
+        return timezoneId.split('/').pop().replace(/_/g, ' ');
     }
 }
 
@@ -163,6 +187,10 @@ function updateUserLocationPopup() {
         popupContent += `<br><br><strong>${userLocation.name}</strong>`;
     }
     
+    if (userLocation.timezone) {
+        popupContent += `<br>Timezone: ${userLocation.timezone}`;
+    }
+    
     userLocationMarker.bindPopup(popupContent);
 }
 
@@ -178,10 +206,40 @@ async function fetchUserLocationName() {
         
         if (data.locationName) {
             userLocation.name = data.locationName;
-            updateUserLocationPopup();
         }
+        
+        // Fetch timezone for user location
+        await fetchUserTimezone();
+        
+        updateUserLocationPopup();
     } catch (error) {
         console.warn('Failed to fetch user location name:', error);
+    }
+}
+
+async function fetchUserTimezone() {
+    try {
+        const response = await fetch(`/api/timezone?latitude=${userLocation.lat}&longitude=${userLocation.lng}`);
+        const data = await response.json();
+        
+        if (data.timezone) {
+            userLocation.timezone = getTimezoneAbbr(data.timezone);
+        }
+    } catch (error) {
+        console.warn('Failed to fetch user timezone:', error);
+    }
+}
+
+async function fetchWaypointTimezone(waypoint) {
+    try {
+        const response = await fetch(`/api/timezone?latitude=${waypoint.lat}&longitude=${waypoint.lng}`);
+        const data = await response.json();
+        
+        if (data.timezone) {
+            waypoint.timezone = getTimezoneAbbr(data.timezone, waypoint.date && waypoint.time ? `${waypoint.date} ${waypoint.time}` : null);
+        }
+    } catch (error) {
+        console.warn('Failed to fetch waypoint timezone:', error);
     }
 }
 
@@ -206,6 +264,7 @@ function addWaypoint(lat, lng) {
     clearRouteOnWaypointChange('add', waypoints.length - 1);
     
     fetchLocationName(waypoint);
+    fetchWaypointTimezone(waypoint);
 }
 
 function addMarkerToMap(waypoint, orderNumber) {
@@ -238,6 +297,10 @@ function updateMarkerPopup(marker, waypoint, orderNumber) {
     
     if (waypoint.locationName) {
         popupContent += `<br><strong>${waypoint.locationName}</strong><br>`;
+    }
+    
+    if (waypoint.timezone) {
+        popupContent += `Timezone: ${waypoint.timezone}<br>`;
     }
     
     if (waypoint.duration > 0) {
@@ -279,6 +342,7 @@ function updateTable() {
             <td>${index + 1}</td>
             <td><input type="date" value="${waypoint.date}" onchange="updateWaypointField(${waypoint.id}, 'date', this.value)"></td>
             <td><input type="time" value="${waypoint.time}" onchange="updateWaypointField(${waypoint.id}, 'time', this.value)"></td>
+            <td>${waypoint.timezone || '-'}</td>
             <td><input type="number" value="${waypoint.duration}" min="0" placeholder="0" onchange="updateWaypointField(${waypoint.id}, 'duration', this.value)" class="duration-input"></td>
             <td><input type="text" value="${waypoint.locationName}" placeholder="Enter location name" onchange="updateWaypointField(${waypoint.id}, 'locationName', this.value)"></td>
             ${weatherHtml}
@@ -325,7 +389,7 @@ function updateTable() {
         const dropZoneRow = tbody.insertRow();
         dropZoneRow.className = 'drop-zone-row';
         dropZoneRow.innerHTML = `
-            <td colspan="11" class="drop-zone-cell"></td>
+            <td colspan="12" class="drop-zone-cell"></td>
         `;
         setupDropZone(dropZoneRow);
     }
@@ -640,6 +704,7 @@ function replaceWaypointLocation(waypointId, newLat, newLng) {
         waypoint.lng = newLng.toFixed(6);
         waypoint.locationName = '';
         waypoint.weather = null;
+        waypoint.timezone = '';
         
         const index = waypoints.findIndex(w => w.id === waypointId);
         if (index !== -1) {
@@ -653,6 +718,7 @@ function replaceWaypointLocation(waypointId, newLat, newLng) {
         updateTable();
         clearRouteOnWaypointChange('modify');
         fetchLocationName(waypoint);
+        fetchWaypointTimezone(waypoint);
     }
 }
 
@@ -829,6 +895,8 @@ function selectSearchResult(lat, lng, locationName) {
         updateTable();
         updateRouteButtonState();
         clearRouteOnWaypointChange('add', waypoints.length - 1);
+        
+        fetchWaypointTimezone(waypoint);
     }
     
     map.setView([lat, lng], 13);
@@ -992,12 +1060,12 @@ function updateWaypointWithRouteData(routeWaypoints) {
             
             // Store timezone information
             if (routeWaypoint.timezone) {
-                waypoint.timezone = routeWaypoint.timezone;
+                waypoint.timezone = getTimezoneAbbr(routeWaypoint.timezone, waypoint.date && waypoint.time ? `${waypoint.date} ${waypoint.time}` : null);
             }
         }
     });
     
-    // Update the table to show the new arrival times and durations
+    // Update the table to show the new arrival times, durations, and timezones
     updateTable();
 }
 

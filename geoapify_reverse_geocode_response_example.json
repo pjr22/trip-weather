@@ -1,0 +1,68 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "datasource": {
+          "sourcename": "openstreetmap",
+          "attribution": "© OpenStreetMap contributors",
+          "license": "Open Database License",
+          "url": "https://www.openstreetmap.org/copyright"
+        },
+        "country": "United States",
+        "country_code": "us",
+        "state": "Colorado",
+        "city": "Denver",
+        "postcode": "80204",
+        "district": "Golden Triangle",
+        "street": "West 12th Avenue",
+        "housenumber": "99",
+        "iso3166_2": "US-CO",
+        "lon": -104.98843520861423,
+        "lat": 39.73550305,
+        "state_code": "CO",
+        "distance": 0,
+        "result_type": "building",
+        "formatted": "99 West 12th Avenue, Denver, CO 80204, United States of America",
+        "address_line1": "99 West 12th Avenue",
+        "address_line2": "Denver, CO 80204, United States of America",
+        "category": "building.public_and_civil",
+        "timezone": {
+          "name": "America/Denver",
+          "offset_STD": "-07:00",
+          "offset_STD_seconds": -25200,
+          "offset_DST": "-06:00",
+          "offset_DST_seconds": -21600,
+          "abbreviation_STD": "MST",
+          "abbreviation_DST": "MDT"
+        },
+        "plus_code": "85FQP2P6+6J",
+        "plus_code_short": "P6+6J, 80204 Denver, United States",
+        "rank": {
+          "importance": 0.00000999999999995449,
+          "popularity": 6.798448060553615
+        },
+        "place_id": "51a3cdbf85423f5ac059dbedc4f624de4340f00102f901db53d11200000000c00203"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.98843520861423,
+          39.73550305
+        ]
+      },
+      "bbox": [
+        -104.9887286,
+        39.7353708,
+        -104.9880304,
+        39.7356258
+      ]
+    }
+  ],
+  "query": {
+    "lat": 39.735457,
+    "lon": -104.988349,
+    "plus_code": "85FQP2P6+5M"
+  }
+}

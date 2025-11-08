@@ -140,4 +140,104 @@ public class TimezoneService {
             return false;
         }
     }
+    
+    /**
+     * Get timezone abbreviation (3-letter code) considering daylight savings time
+     */
+    public String getTimezoneAbbreviation(String timezoneId, String dateTimeStr) {
+        try {
+            ZoneId zoneId = ZoneId.of(timezoneId);
+            ZonedDateTime zonedDateTime;
+            
+            if (dateTimeStr != null && !dateTimeStr.isEmpty()) {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+                LocalDateTime localDateTime = LocalDateTime.parse(dateTimeStr, formatter);
+                zonedDateTime = localDateTime.atZone(zoneId);
+            } else {
+                zonedDateTime = ZonedDateTime.now(zoneId);
+            }
+            
+            // Get the timezone abbreviation that accounts for DST
+            return zonedDateTime.getZone().getRules().isDaylightSavings(zonedDateTime.toInstant()) 
+                ? getDaylightAbbreviation(timezoneId)
+                : getStandardAbbreviation(timezoneId);
+        } catch (Exception e) {
+            System.err.println("Error getting timezone abbreviation for " + timezoneId + ": " + e.getMessage());
+            return timezoneId.split("/").length > 1 ? timezoneId.split("/")[1].replace("_", " ") : timezoneId;
+        }
+    }
+    
+    /**
+     * Get standard time abbreviation for common US timezones
+     */
+    private String getStandardAbbreviation(String timezoneId) {
+        switch (timezoneId) {
+            case "America/Los_Angeles":
+                return "PST";
+            case "America/Denver":
+                return "MST";
+            case "America/Chicago":
+                return "CST";
+            case "America/New_York":
+                return "EST";
+            case "America/Halifax":
+                return "AST";
+            case "America/Phoenix":
+                return "MST"; // Phoenix doesn't observe DST
+            case "America/Anchorage":
+                return "AKST";
+            case "Pacific/Honolulu":
+                return "HST";
+            case "America/Vancouver":
+                return "PST";
+            case "America/Winnipeg":
+                return "CST";
+            case "America/Toronto":
+                return "EST";
+            case "America/Montreal":
+                return "EST";
+            case "America/Mexico_City":
+                return "CST";
+            default:
+                // For other timezones, try to extract a reasonable abbreviation
+                if (timezoneId.contains("/")) {
+                    String city = timezoneId.split("/")[1].replace("_", " ");
+                    return city.length() >= 3 ? city.substring(0, 3).toUpperCase() : city.toUpperCase();
+                }
+                return timezoneId.length() >= 3 ? timezoneId.substring(0, 3).toUpperCase() : timezoneId.toUpperCase();
+        }
+    }
+    
+    /**
+     * Get daylight savings time abbreviation for common US timezones
+     */
+    private String getDaylightAbbreviation(String timezoneId) {
+        switch (timezoneId) {
+            case "America/Los_Angeles":
+                return "PDT";
+            case "America/Denver":
+                return "MDT";
+            case "America/Chicago":
+                return "CDT";
+            case "America/New_York":
+                return "EDT";
+            case "America/Halifax":
+                return "ADT";
+            case "America/Anchorage":
+                return "AKDT";
+            case "America/Vancouver":
+                return "PDT";
+            case "America/Winnipeg":
+                return "CDT";
+            case "America/Toronto":
+                return "EDT";
+            case "America/Montreal":
+                return "EDT";
+            case "America/Mexico_City":
+                return "CDT";
+            default:
+                // For other timezones, fall back to standard abbreviation
+                return getStandardAbbreviation(timezoneId);
+        }
+    }
 }

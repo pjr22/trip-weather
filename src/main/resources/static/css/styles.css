@@ -184,50 +184,53 @@ main {
     min-width: 120px;
 }
 
-#waypoints-table th:nth-child(5), /* Duration column */
+#waypoints-table th:nth-child(5), /* Zone column */
 #waypoints-table td:nth-child(5) {
+    width: 90px;
+    min-width: 90px;
+    text-align: center;
+}
+
+#waypoints-table th:nth-child(6), /* Duration column */
+#waypoints-table td:nth-child(6) {
     width: 80px;
     min-width: 80px;
     text-align: center;
 }
 
-#waypoints-table th:nth-child(5) {
-    text-align: center;
-}
-
-#waypoints-table th:nth-child(6), /* Location Name column */
-#waypoints-table td:nth-child(6) {
-    min-width: 200px;
-}
-
-#waypoints-table th:nth-child(7), /* Weather column */
+#waypoints-table th:nth-child(7), /* Location Name column */
 #waypoints-table td:nth-child(7) {
     min-width: 200px;
 }
 
-#waypoints-table th:nth-child(8), /* Temp column */
+#waypoints-table th:nth-child(8), /* Weather column */
 #waypoints-table td:nth-child(8) {
+    min-width: 200px;
+}
+
+#waypoints-table th:nth-child(9), /* Temp column */
+#waypoints-table td:nth-child(9) {
     width: 60px;
     min-width: 60px;
     text-align: center;
 }
 
-#waypoints-table th:nth-child(9), /* Wind column */
-#waypoints-table td:nth-child(9) {
+#waypoints-table th:nth-child(10), /* Wind column */
+#waypoints-table td:nth-child(10) {
     width: 105px;
     min-width: 105px;
     text-align: center;
 }
 
-#waypoints-table th:nth-child(10), /* Precip column */
-#waypoints-table td:nth-child(10) {
+#waypoints-table th:nth-child(11), /* Precip column */
+#waypoints-table td:nth-child(11) {
     width: 70px;
     min-width: 70px;
     text-align: center;
 }
 
-#waypoints-table th:nth-child(11), /* Actions column */
-#waypoints-table td:nth-child(11) {
+#waypoints-table th:nth-child(12), /* Actions column */
+#waypoints-table td:nth-child(12) {
     width: 180px;
     min-width: 180px;
     text-align: center;
