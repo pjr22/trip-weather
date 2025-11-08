@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -82,88 +81,6 @@ public class RouteService {
             coordinates.add(coord);
         }
         return coordinates;
-    }
-
-    private RouteData parseRouteResponse(JsonNode response, List<RouteRequest.Waypoint> originalWaypoints) {
-        try {
-            // OpenRouteService returns a GeoJSON FeatureCollection
-            JsonNode features = response.get("features");
-            if (features == null || !features.isArray() || features.size() == 0) {
-                return createErrorRoute("No features found in response");
-            }
-
-            JsonNode firstFeature = features.get(0);
-            
-            // Extract geometry from the feature
-            JsonNode geometryNode = firstFeature.get("geometry");
-            List<List<Double>> geometry = new ArrayList<>();
-            if (geometryNode != null && geometryNode.has("coordinates")) {
-                JsonNode coordinates = geometryNode.get("coordinates");
-                if (coordinates.isArray()) {
-                    for (JsonNode coord : coordinates) {
-                        if (coord.isArray() && coord.size() >= 2) {
-                            List<Double> point = new ArrayList<>();
-                            point.add(coord.get(0).asDouble()); // longitude
-                            point.add(coord.get(1).asDouble()); // latitude
-                            geometry.add(point);
-                        }
-                    }
-                }
-            }
-
-            // Extract summary from properties
-            JsonNode properties = firstFeature.get("properties");
-            Double distance = null;
-            Double duration = null;
-            List<RouteData.RouteSegment> segments = new ArrayList<>();
-            
-            if (properties != null) {
-                // Extract summary
-                JsonNode summary = properties.get("summary");
-                if (summary != null) {
-                    if (summary.has("distance")) {
-                        distance = summary.get("distance").asDouble();
-                    }
-                    if (summary.has("duration")) {
-                        duration = summary.get("duration").asDouble();
-                    }
-                }
-                
-                // Extract segments
-                JsonNode segmentsNode = properties.get("segments");
-                if (segmentsNode != null && segmentsNode.isArray()) {
-                    for (JsonNode segmentNode : segmentsNode) {
-                        RouteData.RouteSegment segment = new RouteData.RouteSegment();
-                        if (segmentNode.has("distance")) {
-                            segment.setDistance(segmentNode.get("distance").asDouble());
-                        }
-                        if (segmentNode.has("duration")) {
-                            segment.setDuration(segmentNode.get("duration").asDouble());
-                        }
-                        segments.add(segment);
-                    }
-                }
-            }
-
-            // Create waypoint information
-            List<RouteData.WaypointCoordinates> waypointInfo = new ArrayList<>();
-            for (RouteRequest.Waypoint wp : originalWaypoints) {
-                List<Double> location = List.of(wp.getLongitude(), wp.getLatitude());
-                waypointInfo.add(new RouteData.WaypointCoordinates(location, wp.getName()));
-            }
-
-            RouteData routeData = new RouteData();
-            routeData.setGeometry(geometry);
-            routeData.setDistance(distance);
-            routeData.setDuration(duration);
-            routeData.setSegments(segments);
-            routeData.setWaypoints(waypointInfo);
-
-            return routeData;
-
-        } catch (Exception e) {
-            return createErrorRoute("Failed to parse route response: " + e.getMessage());
-        }
     }
 
     private RouteData parseRouteResponseWithArrivalTimesAndDurations(JsonNode response, List<RouteRequest.Waypoint> originalWaypoints, String departureDateTime, List<Integer> durations) {
