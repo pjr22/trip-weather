@@ -72,6 +72,126 @@ function getTimezoneAbbr(timezoneId, date = null) {
     }
 }
 
+// ==================== DURATION UTILITY FUNCTIONS ====================
+
+/**
+ * Parse duration string like "2h10m", "1.5h", "45m" into minutes
+ * @param {string} durationStr - Duration string to parse
+ * @returns {number} - Total minutes
+ */
+function parseDuration(durationStr) {
+    if (!durationStr || typeof durationStr !== 'string') {
+        return 0;
+    }
+    
+    const trimmed = durationStr.trim().toLowerCase();
+    if (!trimmed) {
+        return 0;
+    }
+    
+    // Handle pure numbers (treat as minutes)
+    if (/^\d+$/.test(trimmed)) {
+        return parseInt(trimmed, 10);
+    }
+    
+    let totalMinutes = 0;
+    
+    // Parse hours (supports decimal hours like "1.5h")
+    const hoursMatch = trimmed.match(/(\d+\.?\d*)\s*h/);
+    if (hoursMatch) {
+        totalMinutes += Math.round(parseFloat(hoursMatch[1]) * 60);
+    }
+    
+    // Parse minutes
+    const minutesMatch = trimmed.match(/(\d+)\s*m/);
+    if (minutesMatch) {
+        totalMinutes += parseInt(minutesMatch[1], 10);
+    }
+    
+    // If no explicit units found, try to parse as minutes
+    if (totalMinutes === 0 && /^\d+\.?\d*$/.test(trimmed)) {
+        totalMinutes = Math.round(parseFloat(trimmed));
+    }
+    
+    return Math.max(0, totalMinutes);
+}
+
+/**
+ * Format minutes into duration string with consistent format (e.g., "0h00m", "11h20m", "3d12h00m")
+ * @param {number} minutes - Total minutes
+ * @returns {string} - Formatted duration string
+ */
+function formatDuration(minutes) {
+    if (!minutes || minutes <= 0) {
+        return '0h00m';
+    }
+    
+    const totalMinutes = Math.round(minutes);
+    
+    // Calculate days, hours, minutes
+    const days = Math.floor(totalMinutes / (24 * 60));
+    const remainingMinutes = totalMinutes % (24 * 60);
+    const hours = Math.floor(remainingMinutes / 60);
+    const mins = remainingMinutes % 60;
+    
+    // Format hours: 1 digit for 0-9 hours, 2 digits for 10+ hours
+    const formattedHours = hours.toString();
+    
+    // Format minutes with 2 digits (always)
+    const formattedMinutes = mins.toString().padStart(2, '0');
+    
+    let result = '';
+    
+    if (days > 0) {
+        result += `${days}d`;
+    }
+    
+    // Always show hours and minutes
+    result += `${formattedHours}h${formattedMinutes}m`;
+    
+    return result;
+}
+
+/**
+ * Increment duration by specified minutes
+ * @param {string} currentDurationStr - Current duration string
+ * @param {number} incrementMinutes - Minutes to increment (can be negative)
+ * @returns {string} - New duration string
+ */
+function incrementDuration(currentDurationStr, incrementMinutes) {
+    const currentMinutes = parseDuration(currentDurationStr);
+    const newMinutes = Math.max(0, currentMinutes + incrementMinutes);
+    return formatDuration(newMinutes);
+}
+
+/**
+ * Validate duration input and return corrected version
+ * @param {string} input - User input string
+ * @returns {object} - { isValid: boolean, correctedValue: string, minutes: number }
+ */
+function validateDurationInput(input) {
+    if (!input || typeof input !== 'string') {
+        return { isValid: true, correctedValue: '', minutes: 0 };
+    }
+    
+    const trimmed = input.trim();
+    if (!trimmed) {
+        return { isValid: true, correctedValue: '', minutes: 0 };
+    }
+    
+    const minutes = parseDuration(trimmed);
+    const formatted = formatDuration(minutes);
+    
+    // Check if the input was already in correct format
+    const isValid = trimmed === formatted || /^\d+$/.test(trimmed);
+    
+    return {
+        isValid: isValid,
+        correctedValue: formatted,
+        minutes: minutes
+    };
+}
+
 function initializeMap(lat, lng, zoom) {
     map = L.map('map').setView([lat, lng], zoom);
 
@@ -314,7 +434,22 @@ function updateMarkerPopup(marker, waypoint, orderNumber) {
     }
     
     if (waypoint.duration > 0) {
-        popupContent += `Duration: ${waypoint.duration} minutes<br>`;
+        const totalMinutes = Math.round(waypoint.duration);
+        const days = Math.floor(totalMinutes / (24 * 60));
+        const remainingMinutes = totalMinutes % (24 * 60);
+        const hours = Math.floor(remainingMinutes / 60);
+        const mins = remainingMinutes % 60;
+        
+        let durationText = 'Duration: ';
+        if (days > 0) {
+            durationText += `${days} days, `;
+        }
+        if (hours > 0 || days > 0) {
+            durationText += `${hours} hours, `;
+        }
+        durationText += `${mins} minutes`;
+        
+        popupContent += `${durationText}<br>`;
     }
     
     if (waypoint.weather && !waypoint.weather.error) {
@@ -353,7 +488,21 @@ function updateTable() {
             <td><input type="date" value="${waypoint.date}" onchange="updateWaypointField(${waypoint.id}, 'date', this.value)"></td>
             <td><input type="time" value="${waypoint.time}" onchange="updateWaypointField(${waypoint.id}, 'time', this.value)"></td>
             <td>${waypoint.timezone || '-'}</td>
-            <td><input type="number" value="${waypoint.duration}" min="0" placeholder="0" onchange="updateWaypointField(${waypoint.id}, 'duration', this.value)" class="duration-input"></td>
+            <td>
+                <div class="duration-input-container">
+                    <input type="text" 
+                           value="${formatDuration(waypoint.duration)}" 
+                           placeholder="2h10m" 
+                           onblur="validateAndUpdateDuration(${waypoint.id}, this.value)"
+                           onkeydown="handleDurationKeydown(event, ${waypoint.id}, this.value)"
+                           class="duration-input"
+                           title="Enter duration like 2h10m, 1.5h, or 45m">
+                    <div class="duration-arrows">
+                        <button class="duration-arrow-up" onclick="incrementDurationValue(${waypoint.id}, 10)" title="Add 10 minutes">▲</button>
+                        <button class="duration-arrow-down" onclick="incrementDurationValue(${waypoint.id}, -10)" title="Subtract 10 minutes">▼</button>
+                    </div>
+                </div>
+            </td>
             <td><input type="text" value="${waypoint.locationName}" placeholder="Enter location name" onchange="updateWaypointField(${waypoint.id}, 'locationName', this.value)"></td>
             ${weatherHtml}
             <td class="actions-cell">
@@ -569,11 +718,92 @@ function getWeatherHtml(waypoint) {
     `;
 }
 
+/**
+ * Validate and update duration field
+ * @param {number} waypointId - ID of the waypoint
+ * @param {string} inputValue - User input value
+ */
+function validateAndUpdateDuration(waypointId, inputValue) {
+    const waypoint = waypoints.find(w => w.id === waypointId);
+    if (!waypoint) return;
+    
+    const validation = validateDurationInput(inputValue);
+    
+    // Update the input field with corrected value if needed
+    const inputElement = document.querySelector(`tr[data-waypoint-id="${waypointId}"] .duration-input`);
+    if (inputElement && !validation.isValid) {
+        inputElement.value = validation.correctedValue;
+    }
+    
+    // Update waypoint duration (convert to minutes for backend)
+    waypoint.duration = validation.minutes;
+    
+    // Update marker popup to show new duration
+    const marker = waypointMarkers.find(m => m.waypointId === waypointId);
+    if (marker) {
+        const index = waypoints.findIndex(w => w.id === waypointId);
+        updateMarkerPopup(marker, waypoint, index + 1);
+    }
+}
+
+/**
+ * Handle keyboard input for duration field
+ * @param {Event} event - Keyboard event
+ * @param {number} waypointId - ID of the waypoint
+ * @param {string} currentValue - Current input value
+ */
+function handleDurationKeydown(event, waypointId, currentValue) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        validateAndUpdateDuration(waypointId, currentValue);
+        event.target.blur();
+    } else if (event.key === 'Escape') {
+        event.preventDefault();
+        // Revert to current waypoint value
+        const waypoint = waypoints.find(w => w.id === waypointId);
+        if (waypoint) {
+            event.target.value = formatDuration(waypoint.duration);
+        }
+        event.target.blur();
+    }
+}
+
+/**
+ * Increment duration value using arrow buttons
+ * @param {number} waypointId - ID of the waypoint
+ * @param {number} incrementMinutes - Minutes to increment (can be negative)
+ */
+function incrementDurationValue(waypointId, incrementMinutes) {
+    const waypoint = waypoints.find(w => w.id === waypointId);
+    if (!waypoint) return;
+    
+    const currentFormatted = formatDuration(waypoint.duration);
+    const newFormatted = incrementDuration(currentFormatted, incrementMinutes);
+    const newMinutes = parseDuration(newFormatted);
+    
+    // Update waypoint
+    waypoint.duration = newMinutes;
+    
+    // Update input field
+    const inputElement = document.querySelector(`tr[data-waypoint-id="${waypointId}"] .duration-input`);
+    if (inputElement) {
+        inputElement.value = newFormatted;
+    }
+    
+    // Update marker popup
+    const marker = waypointMarkers.find(m => m.waypointId === waypointId);
+    if (marker) {
+        const index = waypoints.findIndex(w => w.id === waypointId);
+        updateMarkerPopup(marker, waypoint, index + 1);
+    }
+}
+
 function updateWaypointField(id, field, value) {
     const waypoint = waypoints.find(w => w.id === id);
     if (waypoint) {
         if (field === 'duration') {
-            waypoint[field] = parseInt(value) || 0;
+            // This is now handled by validateAndUpdateDuration
+            return;
         } else {
             waypoint[field] = value;
         }
@@ -1094,18 +1324,6 @@ function clearRoute() {
     }
 }
 
-function formatDuration(seconds) {
-    if (!seconds) return 'Unknown';
-    
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    
-    if (hours > 0) {
-        return `${hours}h ${minutes}m`;
-    } else {
-        return `${minutes}m`;
-    }
-}
 
 // Clear route when waypoints are reordered or deleted, but not when adding waypoints at the end
 function clearRouteOnWaypointChange(changeType, waypointIndex = null) {

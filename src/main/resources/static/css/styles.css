@@ -148,9 +148,66 @@ main {
     border-color: #3498db;
 }
 
+.duration-input-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+}
+
 .duration-input {
-    width: 80px;
+    width: 90px;
     text-align: center;
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    transition: border-color 0.2s;
+}
+
+.duration-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.duration-arrows {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.duration-arrow-up,
+.duration-arrow-down {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 10px;
+    line-height: 1;
+    padding: 2px 4px;
+    min-width: 20px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    color: #6c757d;
+}
+
+.duration-arrow-up:hover,
+.duration-arrow-down:hover {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+    color: #495057;
+}
+
+.duration-arrow-up:active,
+.duration-arrow-down:active {
+    background-color: #dee2e6;
+    transform: scale(0.95);
 }
 
 /* Optimize column widths */
@@ -193,8 +250,8 @@ main {
 
 #waypoints-table th:nth-child(6), /* Duration column */
 #waypoints-table td:nth-child(6) {
-    width: 80px;
-    min-width: 80px;
+    width: 110px;
+    min-width: 110px;
     text-align: center;
 }
 
