@@ -275,7 +275,7 @@ function updateTable() {
         const weatherHtml = getWeatherHtml(waypoint);
         
         row.innerHTML = `
-            <td class="drag-handle" title="Drag to reorder">☰</td>
+            <td class="drag-handle-cell"><span class="drag-handle" title="Drag to reorder">☰</span></td>
             <td>${index + 1}</td>
             <td><input type="date" value="${waypoint.date}" onchange="updateWaypointField(${waypoint.id}, 'date', this.value)"></td>
             <td><input type="time" value="${waypoint.time}" onchange="updateWaypointField(${waypoint.id}, 'time', this.value)"></td>

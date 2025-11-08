@@ -107,13 +107,15 @@ main {
     width: 100%;
     border-collapse: collapse;
     margin-top: 10px;
+    table-layout: fixed;
 }
 
 #waypoints-table th,
 #waypoints-table td {
-    padding: 5px;
+    padding: 8px 5px;
     text-align: left;
     border-bottom: 1px solid #e0e0e0;
+    vertical-align: middle;
 }
 
 #waypoints-table th {
@@ -152,26 +154,82 @@ main {
 }
 
 /* Optimize column widths */
+#waypoints-table th:nth-child(1), /* Drag handle column */
+#waypoints-table td:nth-child(1) {
+    width: 40px;
+    min-width: 40px;
+    text-align: center;
+}
+
+.drag-handle-cell {
+    text-align: center;
+}
+
+#waypoints-table th:nth-child(2), /* # column */
+#waypoints-table td:nth-child(2) {
+    width: 40px;
+    min-width: 40px;
+    text-align: center;
+}
+
 #waypoints-table th:nth-child(3), /* Date column */
 #waypoints-table td:nth-child(3) {
-    width: 90px;
-    min-width: 90px;
+    width: 125px;
+    min-width: 125px;
 }
 
 #waypoints-table th:nth-child(4), /* Time column */
 #waypoints-table td:nth-child(4) {
-    width: 90px;
-    min-width: 90px;
+    width: 120px;
+    min-width: 120px;
 }
 
 #waypoints-table th:nth-child(5), /* Duration column */
 #waypoints-table td:nth-child(5) {
-    width: 90px;
-    min-width: 90px;
+    width: 80px;
+    min-width: 80px;
     text-align: center;
 }
 
 #waypoints-table th:nth-child(5) {
+    text-align: center;
+}
+
+#waypoints-table th:nth-child(6), /* Location Name column */
+#waypoints-table td:nth-child(6) {
+    min-width: 200px;
+}
+
+#waypoints-table th:nth-child(7), /* Weather column */
+#waypoints-table td:nth-child(7) {
+    min-width: 200px;
+}
+
+#waypoints-table th:nth-child(8), /* Temp column */
+#waypoints-table td:nth-child(8) {
+    width: 60px;
+    min-width: 60px;
+    text-align: center;
+}
+
+#waypoints-table th:nth-child(9), /* Wind column */
+#waypoints-table td:nth-child(9) {
+    width: 105px;
+    min-width: 105px;
+    text-align: center;
+}
+
+#waypoints-table th:nth-child(10), /* Precip column */
+#waypoints-table td:nth-child(10) {
+    width: 70px;
+    min-width: 70px;
+    text-align: center;
+}
+
+#waypoints-table th:nth-child(11), /* Actions column */
+#waypoints-table td:nth-child(11) {
+    width: 180px;
+    min-width: 180px;
     text-align: center;
 }
 
@@ -193,20 +251,23 @@ main {
 
 .actions-cell {
     white-space: nowrap;
+    padding: 4px 2px !important;
 }
 
 .action-btn {
     background-color: #3498db;
     color: white;
     border: none;
-    padding: 6px 8px;
+    padding: 6px 6px;
     border-radius: 4px;
     cursor: pointer;
-    margin-right: 4px;
+    margin: 0 1px;
     transition: background-color 0.2s;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-width: 32px;
+    height: 32px;
 }
 
 .action-btn:hover {
@@ -228,8 +289,8 @@ main {
 }
 
 .action-icon {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     fill: white;
 }
 
@@ -477,15 +538,16 @@ main {
 }
 
 .drag-handle-header {
-    width: 30px;
-    padding: 12px 8px !important;
+    width: 40px;
+    padding: 8px 5px !important;
+    text-align: center;
 }
 
 .drag-handle {
     cursor: move;
     cursor: grab;
     color: #95a5a6;
-    font-size: 18px;
+    font-size: 16px;
     user-select: none;
     padding: 4px;
     display: inline-flex;
@@ -495,10 +557,6 @@ main {
 
 .drag-handle:active {
     cursor: grabbing;
-}
-
-.drag-handle:hover {
-    color: #7f8c8d;
 }
 
 .dragging {
