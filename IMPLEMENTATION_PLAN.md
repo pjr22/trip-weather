@@ -28,11 +28,11 @@ The application currently implements the three core stages described in the orig
    - If waypoints are re-ordered or deleted, remove the old route, but don't recalculate until the user clicks the "Calculate Route" button.
    - If the user clicks "Calculate Route" again, recalculate the route and update the map.
 
-2. **Automatic Arrival Time Calculation**
+2. **Automatic Arrival Time Calculation - COMPLETE**
    - After routing, compute travel time between waypoints.
-   - Propagate arrival times forward from the first waypoint’s departure date/time.
-   - Allow user to edit the first waypoint’s departure; subsequent waypoints update automatically.
-   - Allow user to add a Duration to each waypoint, representing the amount of time to spend at that location. Use this to calculate the next waypoint’s departure time. Use minutes as the unit of measurement. Use 0 as the default value.
+   - Propagate arrival times forward from the first waypoint's departure date/time.
+   - Allow user to edit the first waypoint's departure; subsequent waypoints update automatically.
+   - Allow user to add a Duration to each waypoint, representing the amount of time to spend at that location. Use this to calculate the next waypoint's departure time. Use minutes as the unit of measurement. Use 0 as the default value.
    - Make sure times at each waypoint reflect the timezone of that location.
 
 3. **Persist Routes**
@@ -52,11 +52,11 @@ The application currently implements the three core stages described in the orig
 
 - **OpenRouteService API key handling**: Currently read from `application.properties`; consider externalizing to an environment variable for security.
 - **Weather time‑zone handling**: `WeatherService` parses target date/time as a local `LocalDateTime` and then applies the timezone of the first forecast period. This may cause mismatches for waypoints in different time zones. Suggest normalising all times to UTC before comparison.
-- **No route visualization**: Waypoints are independent; users cannot see the path between them. Implement polyline drawing as part of the routing enhancement.
+- ~~**No route visualization**: Waypoints are independent; users cannot see the path between them. Implement polyline drawing as part of the routing enhancement.~~ (RESOLVED - Route visualization with polylines is now implemented)
 - **No persistence**: All data is lost on server restart. Adding a simple persistence layer will improve usability.
 
 ## Development Notes
 
 - The project builds with Gradle (`./gradlew bootRun`).
 - Ensure the OpenRouteService API key is present in `src/main/resources/application.properties` as `openrouteservice.api.key=YOUR_KEY`.
-- The backend runs on port 8080 by default; the frontend is served from `src/main/resources/static`.
+- The backend runs on port 8090 by default; the frontend is served from `src/main/resources/static`.

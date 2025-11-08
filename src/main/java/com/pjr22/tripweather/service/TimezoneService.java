@@ -2,10 +2,6 @@ package com.pjr22.tripweather.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.ZonedDateTime;
 import java.time.ZoneId;
@@ -17,17 +13,11 @@ import java.util.Map;
 @Service
 public class TimezoneService {
 
-    private final RestClient restClient;
-    private final ObjectMapper objectMapper;
-    
     // Cache for timezone lookups to avoid repeated API calls
     private final Map<String, String> timezoneCache = new HashMap<>();
     
     public TimezoneService(@Value("${timezone.api.baseUrl:https://api.timezonedb.com/v2.1}") String baseUrl) {
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .build();
-        this.objectMapper = new ObjectMapper();
+        // baseUrl parameter kept for potential future API integration
     }
 
     /**
