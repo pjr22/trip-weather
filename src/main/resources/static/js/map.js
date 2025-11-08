@@ -328,48 +328,14 @@ async function fetchUserLocationName() {
             userLocation.name = data.locationName;
         }
         
-        // Fetch timezone for user location
-        await fetchUserTimezone();
+        // Set timezone from the same response - use standard timezone abbreviation
+        if (data.zoneStandard) {
+            userLocation.timezone = data.zoneStandard;
+        }
         
         updateUserLocationPopup();
     } catch (error) {
         console.warn('Failed to fetch user location name:', error);
-    }
-}
-
-async function fetchUserTimezone() {
-    try {
-        const params = new URLSearchParams({
-            latitude: userLocation.lat,
-            longitude: userLocation.lng
-        });
-        
-        const response = await fetch(`/api/location/reverse?${params}`);
-        const data = await response.json();
-        
-        if (data.zoneStandard) {
-            userLocation.timezone = data.zoneStandard;
-        }
-    } catch (error) {
-        console.warn('Failed to fetch user timezone:', error);
-    }
-}
-
-async function fetchWaypointTimezone(waypoint) {
-    try {
-        const params = new URLSearchParams({
-            latitude: waypoint.lat,
-            longitude: waypoint.lng
-        });
-        
-        const response = await fetch(`/api/location/reverse?${params}`);
-        const data = await response.json();
-        
-        if (data.zoneStandard) {
-            waypoint.timezone = data.zoneStandard;
-        }
-    } catch (error) {
-        console.warn('Failed to fetch waypoint timezone:', error);
     }
 }
 
@@ -394,7 +360,6 @@ function addWaypoint(lat, lng) {
     clearRouteOnWaypointChange('add', waypoints.length - 1);
     
     fetchLocationName(waypoint);
-    fetchWaypointTimezone(waypoint);
 }
 
 function addMarkerToMap(waypoint, orderNumber) {
@@ -863,9 +828,15 @@ async function fetchLocationName(waypoint) {
         
         if (data.locationName) {
             waypoint.locationName = data.locationName;
-            updateTable();
-            updateMarkerWithLocation(waypoint);
         }
+        
+        // Set timezone from the same response - use standard timezone abbreviation
+        if (data.zoneStandard) {
+            waypoint.timezone = data.zoneStandard;
+        }
+        
+        updateTable();
+        updateMarkerWithLocation(waypoint);
     } catch (error) {
         console.warn('Failed to fetch location name:', error);
     }
@@ -958,7 +929,6 @@ function replaceWaypointLocation(waypointId, newLat, newLng) {
         updateTable();
         clearRouteOnWaypointChange('modify');
         fetchLocationName(waypoint);
-        fetchWaypointTimezone(waypoint);
     }
 }
 
@@ -1135,8 +1105,6 @@ function selectSearchResult(lat, lng, locationName) {
         updateTable();
         updateRouteButtonState();
         clearRouteOnWaypointChange('add', waypoints.length - 1);
-        
-        fetchWaypointTimezone(waypoint);
     }
     
     map.setView([lat, lng], 13);
