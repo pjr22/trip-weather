@@ -10,7 +10,7 @@ description = 'Trip Weather application for forcasting weather along a driven ro
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(21)
+		languageVersion = JavaLanguageVersion.of(17)
 	}
 }
 
