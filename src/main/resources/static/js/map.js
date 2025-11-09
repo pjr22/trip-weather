@@ -1055,11 +1055,12 @@ function displaySearchResults(data) {
         const resultItem = document.createElement('div');
         resultItem.className = 'search-result-item';
         
-        const label = properties.label || properties.name || 'Unknown';
+        // Use the formatted field as the location name
+        const label = properties.formatted || properties.name || 'Unknown';
         const details = [];
         
-        if (properties.locality) details.push(properties.locality);
-        if (properties.region) details.push(properties.region);
+        if (properties.city) details.push(properties.city);
+        if (properties.state) details.push(properties.state);
         if (properties.country) details.push(properties.country);
         
         resultItem.innerHTML = `
@@ -1067,47 +1068,100 @@ function displaySearchResults(data) {
             <div class="result-details">${details.join(', ')}</div>
         `;
         
+        // Pass the complete feature data to avoid redundant geocode calls
         resultItem.onclick = function() {
-            selectSearchResult(coordinates[1], coordinates[0], label);
+            selectSearchResult(coordinates[1], coordinates[0], label, feature);
         };
         
         resultsContainer.appendChild(resultItem);
     });
 }
 
-function selectSearchResult(lat, lng, locationName) {
+function selectSearchResult(lat, lng, locationName, feature = null) {
     document.getElementById('search-modal').style.display = 'none';
     document.getElementById('search-input').value = '';
     document.getElementById('search-results').innerHTML = '';
     
     if (replacingWaypointId !== null) {
-        replaceWaypointLocation(replacingWaypointId, lat, lng);
-        const waypoint = waypoints.find(w => w.id === replacingWaypointId);
-        if (waypoint) {
-            waypoint.locationName = locationName;
-            updateTable();
-            const index = waypoints.findIndex(w => w.id === replacingWaypointId);
-            if (index !== -1) {
-                const marker = waypointMarkers[index];
-                if (marker) {
-                    updateMarkerPopup(marker, waypoint, index + 1);
-                }
-            }
-        }
+        replaceWaypointLocationFromSearch(replacingWaypointId, lat, lng, locationName, feature);
         replacingWaypointId = null;
     } else {
-        const id = waypoints.length + 1;
-        const waypoint = new Waypoint(id, lat, lng);
-        waypoint.locationName = locationName;
-        waypoints.push(waypoint);
-        
-        addMarkerToMap(waypoint, id);
-        updateTable();
-        updateRouteButtonState();
-        clearRouteOnWaypointChange('add', waypoints.length - 1);
+        addWaypointFromSearch(lat, lng, locationName, feature);
     }
     
     map.setView([lat, lng], 13);
+}
+
+function addWaypointFromSearch(lat, lng, locationName, feature) {
+    const id = waypoints.length + 1;
+    const waypoint = new Waypoint(id, lat, lng);
+    
+    // Extract all available data from the search result
+    waypoint.locationName = locationName;
+    
+    if (feature && feature.properties) {
+        const properties = feature.properties;
+        
+        // Extract timezone information if available
+        if (properties.timezone && properties.timezone.abbreviationStd) {
+            waypoint.timezone = properties.timezone.abbreviationStd;
+        }
+    }
+    
+    waypoints.push(waypoint);
+    
+    addMarkerToMap(waypoint, id);
+    updateTable();
+    updateRouteButtonState();
+    clearRouteOnWaypointChange('add', waypoints.length - 1);
+    
+    // No need to call fetchLocationName since we already have all the data
+    const index = waypoints.findIndex(w => w.id === id);
+    if (index !== -1) {
+        const marker = waypointMarkers[index];
+        if (marker) {
+            updateMarkerPopup(marker, waypoint, index + 1);
+        }
+    }
+}
+
+function replaceWaypointLocationFromSearch(waypointId, newLat, newLng, locationName, feature) {
+    const waypoint = waypoints.find(w => w.id === waypointId);
+    if (waypoint) {
+        waypoint.lat = newLat.toFixed(6);
+        waypoint.lng = newLng.toFixed(6);
+        waypoint.weather = null;
+        
+        // Extract all available data from the search result
+        waypoint.locationName = locationName;
+        
+        if (feature && feature.properties) {
+            const properties = feature.properties;
+            
+            // Extract timezone information if available
+            if (properties.timezone && properties.timezone.abbreviationStd) {
+                waypoint.timezone = properties.timezone.abbreviationStd;
+            } else {
+                waypoint.timezone = '';
+            }
+        } else {
+            waypoint.timezone = '';
+        }
+        
+        const index = waypoints.findIndex(w => w.id === waypointId);
+        if (index !== -1) {
+            const marker = waypointMarkers[index];
+            if (marker) {
+                marker.setLatLng([newLat, newLng]);
+                updateMarkerPopup(marker, waypoint, index + 1);
+            }
+        }
+        
+        updateTable();
+        clearRouteOnWaypointChange('modify');
+        
+        // No need to call fetchLocationName since we already have all the data
+    }
 }
 
 // ==================== ROUTING FUNCTIONS ====================
