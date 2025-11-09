@@ -49,6 +49,74 @@ class Waypoint {
     }
 }
 
+// Enhanced function to get timezone abbreviation considering DST
+function getTimezoneAbbrWithDst(timezoneData, date = null) {
+    if (!timezoneData) {
+        return '';
+    }
+    
+    const targetDate = date ? new Date(date) : new Date();
+    
+    // If we have timezone name, use the more accurate Intl.DateTimeFormat method
+    if (timezoneData.name) {
+        return getTimezoneAbbr(timezoneData.name, targetDate);
+    }
+    
+    // Fallback to manual STD/DST detection if we have the data
+    if (timezoneData.abbreviation_STD && timezoneData.abbreviation_DST) {
+        const isDst = isDaylightSavingTime(targetDate, timezoneData.name);
+        return isDst ? timezoneData.abbreviation_DST : timezoneData.abbreviation_STD;
+    }
+    
+    // Final fallback to STD abbreviation only
+    return timezoneData.abbreviation_STD || '';
+}
+
+// Helper function to determine if a date is in DST for a given timezone
+function isDaylightSavingTime(date, timezoneId) {
+    if (!timezoneId) {
+        return false;
+    }
+    
+    try {
+        // Create dates for January and July to compare timezone offsets
+        const jan = new Date(date.getFullYear(), 0, 1);
+        const jul = new Date(date.getFullYear(), 6, 1);
+        
+        const janFormatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: timezoneId,
+            timeZoneName: 'short'
+        });
+        
+        const julFormatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: timezoneId,
+            timeZoneName: 'short'
+        });
+        
+        const janParts = janFormatter.formatToParts(jan);
+        const julParts = julFormatter.formatToParts(jul);
+        
+        const janTzName = janParts.find(part => part.type === 'timeZoneName')?.value || '';
+        const julTzName = julParts.find(part => part.type === 'timeZoneName')?.value || '';
+        
+        // Get current date timezone name
+        const currentFormatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: timezoneId,
+            timeZoneName: 'short'
+        });
+        const currentParts = currentFormatter.formatToParts(date);
+        const currentTzName = currentParts.find(part => part.type === 'timeZoneName')?.value || '';
+        
+        // If current timezone matches July's timezone, it's likely DST
+        // This works for most northern hemisphere locations
+        return currentTzName === julTzName && janTzName !== julTzName;
+        
+    } catch (error) {
+        console.warn('Error determining DST status:', error);
+        return false;
+    }
+}
+
 function getTimezoneAbbr(timezoneId, date = null) {
     // If no timezone provided, return empty
     if (!timezoneId) {
@@ -351,11 +419,12 @@ function parseLocationData(data) {
         locationName = properties.formatted.trim();
     }
     
-    // Extract timezone information
+    // Extract timezone information using DST-aware function
     let timezone = '';
     let timezoneName = '';
     if (properties.timezone) {
-        timezone = properties.timezone.abbreviation_STD || '';
+        // Use the enhanced function that considers DST
+        timezone = getTimezoneAbbrWithDst(properties.timezone);
         timezoneName = properties.timezone.name || '';
     }
     
@@ -1147,9 +1216,9 @@ function addWaypointFromSearch(lat, lng, locationName, feature) {
     if (feature && feature.properties) {
         const properties = feature.properties;
         
-        // Extract timezone information if available - use the correct field name abbreviation_STD
-        if (properties.timezone && properties.timezone.abbreviation_STD) {
-            waypoint.timezone = properties.timezone.abbreviation_STD;
+        // Extract timezone information using DST-aware function
+        if (properties.timezone) {
+            waypoint.timezone = getTimezoneAbbrWithDst(properties.timezone);
         }
     }
     
@@ -1183,9 +1252,9 @@ function replaceWaypointLocationFromSearch(waypointId, newLat, newLng, locationN
         if (feature && feature.properties) {
             const properties = feature.properties;
             
-            // Extract timezone information if available - use the correct field name abbreviation_STD
-            if (properties.timezone && properties.timezone.abbreviation_STD) {
-                waypoint.timezone = properties.timezone.abbreviation_STD;
+            // Extract timezone information using DST-aware function
+            if (properties.timezone) {
+                waypoint.timezone = getTimezoneAbbrWithDst(properties.timezone);
             } else {
                 waypoint.timezone = '';
             }
