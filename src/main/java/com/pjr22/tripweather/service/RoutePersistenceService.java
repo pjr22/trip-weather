@@ -5,13 +5,17 @@ import com.pjr22.tripweather.dto.WaypointDto;
 import com.pjr22.tripweather.model.Route;
 import com.pjr22.tripweather.model.User;
 import com.pjr22.tripweather.model.Waypoint;
+import com.pjr22.tripweather.repository.RouteRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -22,83 +26,139 @@ public class RoutePersistenceService {
     
     private static final Logger logger = LoggerFactory.getLogger(RoutePersistenceService.class);
     
+    @Autowired
+    private RouteRepository routeRepository;
+    
+    @Autowired
+    private UserManagementService userManagementService;
+    
     /**
-     * Save a route (for now just log the data and return a mock response)
+     * Save a route (create new or update existing)
      * @param routeDto Route data to save
      * @return Saved route data
      */
+    @Transactional
     public RouteDto saveRoute(RouteDto routeDto) {
         logger.info("=== SAVE ROUTE REQUEST ===");
         logger.info("Route Name: {}", routeDto.getName());
+        logger.info("Route ID: {}", routeDto.getId());
         logger.info("User ID: {}", routeDto.getUserId());
-        logger.info("Created: {}", routeDto.getCreated());
         
-        // Handle null userId by generating a default one
-        UUID userId = routeDto.getUserId() != null ? routeDto.getUserId() : UUID.randomUUID();
+        // Get the user (guest if userId is null or user not found)
+        User user = userManagementService.getUserByIdOrGuest(routeDto.getUserId());
+        logger.info("Using user: {} (ID: {})", user.getName(), user.getId());
         
-        if (routeDto.getWaypoints() != null) {
-            logger.info("Number of waypoints: {}", routeDto.getWaypoints().size());
+        // Determine if this is a new route or an update
+        boolean isNewRoute = (routeDto.getId() == null);
+        Route route;
+        
+        if (isNewRoute) {
+            // Create new route
+            logger.info("Creating new route");
+            route = new Route();
+            route.setName(routeDto.getName());
+            route.setUser(user);
+            // UUID and timestamp will be set by @PrePersist
+        } else {
+            // Update existing route
+            logger.info("Updating existing route with ID: {}", routeDto.getId());
+            Optional<Route> existingRouteOpt = routeRepository.findById(routeDto.getId());
+            if (existingRouteOpt.isPresent()) {
+                route = existingRouteOpt.get();
+                route.setName(routeDto.getName());
+                // Verify the route belongs to the user (security check)
+                if (!route.getUser().getId().equals(user.getId())) {
+                    logger.warn("Route ID {} belongs to user {}, but requested by user {}. Using guest user.", 
+                        route.getId(), route.getUser().getId(), user.getId());
+                    user = userManagementService.getOrCreateGuestUser();
+                    route.setUser(user);
+                }
+            } else {
+                logger.warn("Route with ID {} not found, creating new route instead", routeDto.getId());
+                route = new Route();
+                route.setId(routeDto.getId()); // Use the requested ID
+                route.setName(routeDto.getName());
+                route.setUser(user);
+                route.setCreated(routeDto.getCreated() != null ? routeDto.getCreated() : ZonedDateTime.now());
+            }
+        }
+        
+        // Handle waypoints
+        if (routeDto.getWaypoints() != null && !routeDto.getWaypoints().isEmpty()) {
+            logger.info("Processing {} waypoints", routeDto.getWaypoints().size());
+            
+            // Clear existing waypoints for updates
+            if (!isNewRoute && route.getWaypoints() != null) {
+                route.getWaypoints().clear();
+            }
+            
+            // Create new list of waypoints
+            List<Waypoint> waypoints = new ArrayList<>();
             for (int i = 0; i < routeDto.getWaypoints().size(); i++) {
-                WaypointDto waypoint = routeDto.getWaypoints().get(i);
+                WaypointDto waypointDto = routeDto.getWaypoints().get(i);
                 
-                // Handle null durationMin by setting it to 0
-                Integer durationMin = waypoint.getDurationMin() != null ? waypoint.getDurationMin() : 0;
+                Waypoint waypoint = convertToEntity(waypointDto);
+                waypoint.setSequence(i + 1); // Ensure proper sequence
+                waypoint.setRoute(route);
                 
-                // Log waypoint details
-                logger.info("Waypoint {}: {} ({}, {}) - {} min at {}", 
+                waypoints.add(waypoint);
+                
+                logger.debug("Added waypoint {}: {} ({}, {})", 
                     i + 1,
                     waypoint.getLocationName(),
                     waypoint.getLatitude(),
-                    waypoint.getLongitude(),
-                    durationMin,
-                    waypoint.getDateTime()
+                    waypoint.getLongitude()
                 );
             }
+            route.setWaypoints(waypoints);
         } else {
             logger.info("No waypoints provided");
+            if (route.getWaypoints() != null) {
+                route.getWaypoints().clear();
+            }
         }
         
-        // For now, just return the input with a generated ID and timestamp
-        RouteDto savedRoute = new RouteDto();
-        savedRoute.setId(UUID.randomUUID());
-        savedRoute.setName(routeDto.getName());
-        savedRoute.setCreated(ZonedDateTime.now());
-        savedRoute.setUserId(userId);
-        savedRoute.setWaypoints(routeDto.getWaypoints());
+        // Save the route (this will also save waypoints due to cascade)
+        Route savedRoute = routeRepository.save(route);
         
         logger.info("=== SAVE ROUTE COMPLETED ===");
-        logger.info("Generated route ID: {}", savedRoute.getId());
+        logger.info("Route saved with ID: {}", savedRoute.getId());
+        logger.info("Is new route: {}", isNewRoute);
         
-        return savedRoute;
+        return convertToDto(savedRoute);
     }
     
     /**
-     * Load a route by ID (for now just log the request and return a mock response)
+     * Load a route by ID
      * @param routeId UUID of the route to load
      * @return Route data or null if not found
      */
+    @Transactional(readOnly = true)
     public RouteDto loadRoute(UUID routeId) {
         logger.info("=== LOAD ROUTE REQUEST ===");
         logger.info("Route ID requested: {}", routeId);
         
-        // For now, just log the request and return null (simulating not found)
-        // In a real implementation, this would query the database
-        logger.info("Database query would be executed here to find route with ID: {}", routeId);
+        Optional<Route> routeOpt = routeRepository.findById(routeId);
         
-        // Return null for now to simulate route not found
-        // TODO: Implement actual database lookup when repositories are available
-        RouteDto route = null;
-        
-        if (route != null) {
+        if (routeOpt.isPresent()) {
+            Route route = routeOpt.get();
             logger.info("Route found: {}", route.getName());
-            logger.info("Route has {} waypoints", route.getWaypoints() != null ? route.getWaypoints().size() : 0);
+            logger.info("Route belongs to user: {} (ID: {})", route.getUser().getName(), route.getUser().getId());
+            
+            if (route.getWaypoints() != null) {
+                logger.info("Route has {} waypoints", route.getWaypoints().size());
+            } else {
+                logger.info("Route has no waypoints");
+            }
+            
+            RouteDto routeDto = convertToDto(route);
+            logger.info("=== LOAD ROUTE COMPLETED ===");
+            return routeDto;
         } else {
             logger.info("Route not found with ID: {}", routeId);
+            logger.info("=== LOAD ROUTE COMPLETED ===");
+            return null;
         }
-        
-        logger.info("=== LOAD ROUTE COMPLETED ===");
-        
-        return route;
     }
     
     /**

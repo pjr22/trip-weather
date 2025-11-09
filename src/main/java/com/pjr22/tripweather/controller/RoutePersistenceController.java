@@ -1,14 +1,23 @@
 package com.pjr22.tripweather.controller;
 
-import com.pjr22.tripweather.dto.RouteDto;
-import com.pjr22.tripweather.service.RoutePersistenceService;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
+import com.pjr22.tripweather.dto.RouteDto;
+import com.pjr22.tripweather.dto.RouteSearchResultDto;
+import com.pjr22.tripweather.service.RoutePersistenceService;
 
 /**
  * REST Controller for route persistence operations
@@ -25,7 +34,7 @@ public class RoutePersistenceController {
     /**
      * Save a route
      * @param routeDto Route data to save
-     * @return Saved route data
+     * @return Saved route data with appropriate HTTP status
      */
     @PostMapping
     public ResponseEntity<RouteDto> saveRoute(@RequestBody RouteDto routeDto) {
@@ -33,9 +42,18 @@ public class RoutePersistenceController {
         logger.info("Route contains {} waypoints", routeDto.getWaypoints() != null ? routeDto.getWaypoints().size() : 0);
         
         try {
+            // Check if this is a new route (null ID) or an update
+            boolean isNewRoute = (routeDto.getId() == null);
+            
             RouteDto savedRoute = routePersistenceService.saveRoute(routeDto);
             logger.info("Successfully saved route with ID: {}", savedRoute.getId());
-            return ResponseEntity.ok(savedRoute);
+            
+            // Return 201 Created for new routes, 200 OK for updates
+            if (isNewRoute) {
+                return ResponseEntity.status(201).body(savedRoute);
+            } else {
+                return ResponseEntity.ok(savedRoute);
+            }
         } catch (Exception e) {
             logger.error("Error saving route", e);
             return ResponseEntity.internalServerError().build();
@@ -43,24 +61,35 @@ public class RoutePersistenceController {
     }
     
     /**
-     * Load a route by ID
-     * @param routeId UUID of the route to load
+     * Search for routes with a name matching the searchText
+     * 
+     * @param searchText
+     * @return
+     */
+    @GetMapping("/search/{searchText}")
+    public ResponseEntity<List<RouteSearchResultDto>> searchForRoutes(@PathVariable String searchText) {
+       List<RouteSearchResultDto> results = new ArrayList<>();
+       // TODO - find matching routes by name, populate and return results
+       
+       return ResponseEntity.ok(results);
+    }
+
+    /**
+     * Load a route by UUID
+     * @param routeUuid UUID of the route to load
      * @return Route data
      */
-    @GetMapping("/{routeId}")
-    public ResponseEntity<RouteDto> loadRoute(@PathVariable String routeId) {
-       
-        logger.info("Received request to load route with ID: {}", routeId);
-        
+    @GetMapping("/{routeUuid}")
+    public ResponseEntity<RouteDto> loadRoute(@PathVariable UUID routeUuid) {
+               
         try {
-            UUID routeUuid = UUID.fromString(routeId);
             RouteDto route = routePersistenceService.loadRoute(routeUuid);
             if (route != null) {
                 logger.info("Successfully loaded route: {}", route.getName());
                 logger.info("Route contains {} waypoints", route.getWaypoints() != null ? route.getWaypoints().size() : 0);
                 return ResponseEntity.ok(route);
             } else {
-                logger.warn("Route not found with ID: {}", routeId);
+                logger.warn("Route not found with ID: {}", routeUuid);
                 return ResponseEntity.notFound().build();
             }
         } catch (Exception e) {
