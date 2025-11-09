@@ -1,0 +1,200 @@
+/**
+ * Weather Service
+ * Handles weather data fetching and processing
+ */
+
+window.TripWeather = window.TripWeather || {};
+window.TripWeather.Services = window.TripWeather.Services || {};
+
+window.TripWeather.Services.Weather = {
+    
+    /**
+     * Fetch weather forecast for a specific location and time
+     * @param {number} latitude - Latitude coordinate
+     * @param {number} longitude - Longitude coordinate
+     * @param {string} date - Date in YYYY-MM-DD format
+     * @param {string} time - Time in HH:MM format
+     * @returns {Promise<object>} - Promise that resolves to weather data
+     */
+    getWeatherForecast: function(latitude, longitude, date, time) {
+        const params = {
+            latitude: latitude,
+            longitude: longitude
+        };
+        
+        if (date) params.date = date;
+        if (time) params.time = time;
+        
+        const url = '/api/weather/forecast?' + window.TripWeather.Utils.Helpers.createQueryString(params);
+        
+        return window.TripWeather.Utils.Helpers.httpGet(url)
+            .catch(function(error) {
+                console.warn('Failed to fetch weather data:', error);
+                return { error: 'Failed to fetch weather data' };
+            });
+    },
+
+    /**
+     * Get weather for a waypoint with caching
+     * @param {object} waypoint - Waypoint object with lat, lng, date, time
+     * @returns {Promise<object>} - Promise that resolves to weather data
+     */
+    getWeatherForWaypoint: function(waypoint) {
+        if (!waypoint || !waypoint.lat || !waypoint.lng) {
+            return Promise.resolve({ error: 'Invalid waypoint coordinates' });
+        }
+        
+        // Create cache key based on location and time
+        const cacheKey = this._createWeatherCacheKey(waypoint);
+        
+        // Check cache first
+        if (this._weatherCache && this._weatherCache[cacheKey]) {
+            return Promise.resolve(this._weatherCache[cacheKey]);
+        }
+        
+        return this.getWeatherForecast(waypoint.lat, waypoint.lng, waypoint.date, waypoint.time)
+            .then(function(weatherData) {
+                // Cache the result
+                if (!window.TripWeather.Services.Weather._weatherCache) {
+                    window.TripWeather.Services.Weather._weatherCache = {};
+                }
+                window.TripWeather.Services.Weather._weatherCache[cacheKey] = weatherData;
+                return weatherData;
+            });
+    },
+
+    /**
+     * Format weather data for display in UI
+     * @param {object} weather - Weather data object
+     * @returns {object} - Formatted weather information
+     */
+    formatWeatherDisplay: function(weather) {
+        if (!weather || weather.error) {
+            return {
+                condition: weather?.error || 'No data',
+                temperature: '-',
+                wind: '-',
+                precipitation: '-',
+                iconUrl: null
+            };
+        }
+        
+        const tempDisplay = weather.temperature ? 
+            `${weather.temperature}°${weather.temperatureUnit}` : 'N/A';
+        const windDisplay = `${weather.windSpeed} ${weather.windDirection}`;
+        const precipDisplay = weather.precipitationProbability !== null ? 
+            `${weather.precipitationProbability}%` : '-';
+        
+        return {
+            condition: weather.condition || 'Unknown',
+            temperature: tempDisplay,
+            wind: windDisplay,
+            precipitation: precipDisplay,
+            iconUrl: weather.iconUrl || null
+        };
+    },
+
+    /**
+     * Generate HTML for weather display in table cells
+     * @param {object} weather - Weather data object
+     * @param {boolean} isLoading - Whether weather is currently loading
+     * @returns {string} - HTML string for weather cells
+     */
+    generateWeatherHtml: function(weather, isLoading) {
+        if (isLoading) {
+            return `
+                <td colspan="4" class="weather-loading">Loading weather...</td>
+            `;
+        }
+        
+        if (weather && weather.error) {
+            return `
+                <td colspan="4" class="weather-error">${weather.error}</td>
+            `;
+        }
+        
+        if (weather) {
+            const formatted = this.formatWeatherDisplay(weather);
+            
+            let weatherIcon = '';
+            if (formatted.iconUrl) {
+                weatherIcon = `<img src="${formatted.iconUrl}" alt="${formatted.condition}" class="weather-icon"> `;
+            }
+            
+            return `
+                <td>${weatherIcon}${formatted.condition}</td>
+                <td>${formatted.temperature}</td>
+                <td>${formatted.wind}</td>
+                <td>${formatted.precipitation}</td>
+            `;
+        }
+        
+        return `
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+        `;
+    },
+
+    /**
+     * Generate HTML for weather display in popup
+     * @param {object} weather - Weather data object
+     * @returns {string} - HTML string for weather popup content
+     */
+    generateWeatherPopupHtml: function(weather) {
+        if (!weather || weather.error) {
+            return weather?.error || 'No weather data available';
+        }
+        
+        let html = '';
+        
+        if (weather.iconUrl) {
+            html += `<img src="${weather.iconUrl}" alt="${weather.condition}" class="weather-icon"> `;
+        }
+        
+        html += `${weather.condition}<br>`;
+        
+        if (weather.temperature) {
+            html += `Temp: ${weather.temperature}°${weather.temperatureUnit}<br>`;
+        }
+        
+        html += `Wind: ${weather.windSpeed} ${weather.windDirection}<br>`;
+        
+        if (weather.precipitationProbability !== null) {
+            html += `Precip: ${weather.precipitationProbability}%`;
+        }
+        
+        return html;
+    },
+
+    /**
+     * Clear the weather cache
+     */
+    clearCache: function() {
+        this._weatherCache = {};
+    },
+
+    /**
+     * Create a cache key for weather data
+     * @param {object} waypoint - Waypoint object
+     * @returns {string} - Cache key
+     * @private
+     */
+    _createWeatherCacheKey: function(waypoint) {
+        const key = `${waypoint.lat},${waypoint.lng}`;
+        if (waypoint.date) {
+            return key + '_' + waypoint.date;
+        }
+        if (waypoint.time) {
+            return key + '_' + waypoint.time;
+        }
+        return key;
+    },
+
+    /**
+     * Private cache for weather data
+     * @private
+     */
+    _weatherCache: {}
+};

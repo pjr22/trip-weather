@@ -89,6 +89,28 @@
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
             crossorigin=""></script>
     
-    <script src="js/map.js"></script>
+    <!-- Utilities (no dependencies) -->
+    <script src="js/utils/DurationUtils.js"></script>
+    <script src="js/utils/TimezoneUtils.js"></script>
+    <script src="js/utils/IconLoader.js"></script>
+    <script src="js/utils/Helpers.js"></script>
+    
+    <!-- Services (depend on utils) -->
+    <script src="js/services/LocationService.js"></script>
+    <script src="js/services/WeatherService.js"></script>
+    
+    <!-- Managers (depend on utils and services) -->
+    <script src="js/managers/MapManager.js"></script>
+    <script src="js/managers/WaypointManager.js"></script>
+    <script src="js/managers/WaypointRenderer.js"></script>
+    <script src="js/managers/SearchManager.js"></script>
+    <script src="js/managers/UIManager.js"></script>
+    <script src="js/managers/RouteManager.js"></script>
+    
+    <!-- Main Application (coordinates everything) -->
+    <script src="js/app.js"></script>
+    
+    <!-- Legacy map.js (kept for reference, can be removed after testing) -->
+    <!-- <script src="js/map.js"></script> -->
 </body>
 </html>
