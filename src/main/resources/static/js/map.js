@@ -143,7 +143,7 @@ function getTimezoneAbbr(timezoneId, date = null) {
 // ==================== DURATION UTILITY FUNCTIONS ====================
 
 /**
- * Parse duration string like "2h10m", "1.5h", "45m" into minutes
+ * Parse duration string like "3d2h10m", "2h10m", "1.5h", "45m" into minutes
  * @param {string} durationStr - Duration string to parse
  * @returns {number} - Total minutes
  */
@@ -163,6 +163,12 @@ function parseDuration(durationStr) {
     }
     
     let totalMinutes = 0;
+    
+    // Parse days
+    const daysMatch = trimmed.match(/(\d+)\s*d/);
+    if (daysMatch) {
+        totalMinutes += parseInt(daysMatch[1], 10) * 24 * 60;
+    }
     
     // Parse hours (supports decimal hours like "1.5h")
     const hoursMatch = trimmed.match(/(\d+\.?\d*)\s*h/);
@@ -573,11 +579,11 @@ function updateTable() {
                 <div class="duration-input-container">
                     <input type="text" 
                            value="${formatDuration(waypoint.duration)}" 
-                           placeholder="2h10m" 
+                           placeholder="3d2h10m" 
                            onblur="validateAndUpdateDuration(${waypoint.id}, this.value)"
                            onkeydown="handleDurationKeydown(event, ${waypoint.id}, this.value)"
                            class="duration-input"
-                           title="Enter duration like 2h10m, 1.5h, or 45m">
+                           title="Enter duration like 3d2h10m, 48h22m, 1000m, 1.5h">
                     <div class="duration-arrows">
                         <button class="duration-arrow-up" onclick="incrementDurationValue(${waypoint.id}, 10)" title="Add 10 minutes">▲</button>
                         <button class="duration-arrow-down" onclick="incrementDurationValue(${waypoint.id}, -10)" title="Subtract 10 minutes">▼</button>
@@ -740,7 +746,7 @@ function reorderWaypoints(draggedId, targetId) {
     const [removed] = waypoints.splice(draggedIndex, 1);
     
     // If we removed an item before the target, the target index shifts left by 1
-    const adjustedTargetIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    const adjustedTargetIndex = draggedIndex < targetId ? targetIndex - 1 : targetIndex;
     
     waypoints.splice(adjustedTargetIndex, 0, removed);
     
