@@ -81,7 +81,7 @@ The application currently implements all core stages with a modern, modular Java
 
 1. **Data Persistence**
    - Add JPA entities for Route and Waypoint persistence
-   - Embedded H2 database for route storage
+   - Add Spring Boot configuration to use a PostGIS database
    - "Save" and "Load" functionality for trip management
 
 2. **Export / Reporting**

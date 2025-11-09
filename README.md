@@ -37,7 +37,7 @@ Trip Weather is a Spring Boot web application that helps users plan road trips b
 
 ## Technology Stack
 
-- **Backend**: Spring Boot 3.5.7, Java 21
+- **Backend**: Spring Boot 3.5.7, Java 17
 - **Frontend**: HTML5, CSS, JavaScript (ES6+), Leaflet.js
 - **Architecture**: Modular JavaScript with separation of concerns
   - Utilities (DurationUtils, TimezoneUtils, IconLoader, Helpers)
@@ -51,7 +51,7 @@ Trip Weather is a Spring Boot web application that helps users plan road trips b
 
 ## Getting Started
 
-1. Ensure Java 21 is installed. Gradle wrapper is included in the project.
+1. Ensure Java 17 is installed. Gradle wrapper is included in the project.
 2. Set your GeoApify API key as an environment variable, `GEOAPIFY_API_KEY`, or in `src/main/resources/application.properties` as `geoapify.api.key=YOUR_KEY`.
 3. Run the application:
 
