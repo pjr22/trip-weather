@@ -314,6 +314,58 @@ function updateUserLocationPopup() {
     userLocationMarker.bindPopup(popupContent);
 }
 
+// Common function to parse location data from both reverse geocode and search responses
+function parseLocationData(data) {
+    if (!data || !data.features || data.features.length === 0) {
+        return {
+            locationName: 'Unknown',
+            timezone: '',
+            timezoneName: ''
+        };
+    }
+    
+    const feature = data.features[0];
+    const properties = feature.properties;
+    
+    // Build location name from address components (same logic as server-side generateLocationName)
+    let locationName = '';
+    if (properties.address_line1) {
+        locationName = properties.address_line1.trim();
+    }
+    if (properties.city) {
+        if (locationName) locationName += ', ';
+        locationName += properties.city.trim();
+    }
+    if (properties.state_code) {
+        if (locationName) locationName += ', ';
+        locationName += properties.state_code.trim();
+    }
+    
+    // Fallback to address_line2 if we still don't have anything
+    if (!locationName && properties.address_line2) {
+        locationName = properties.address_line2.trim();
+    }
+    
+    // Final fallback to formatted field
+    if (!locationName && properties.formatted) {
+        locationName = properties.formatted.trim();
+    }
+    
+    // Extract timezone information
+    let timezone = '';
+    let timezoneName = '';
+    if (properties.timezone) {
+        timezone = properties.timezone.abbreviation_STD || '';
+        timezoneName = properties.timezone.name || '';
+    }
+    
+    return {
+        locationName: locationName || 'Unknown',
+        timezone: timezone,
+        timezoneName: timezoneName
+    };
+}
+
 async function fetchUserLocationName() {
     try {
         const params = new URLSearchParams({
@@ -324,14 +376,9 @@ async function fetchUserLocationName() {
         const response = await fetch(`/api/location/reverse?${params}`);
         const data = await response.json();
         
-        if (data.locationName) {
-            userLocation.name = data.locationName;
-        }
-        
-        // Set timezone from the same response - use standard timezone abbreviation
-        if (data.zoneStandard) {
-            userLocation.timezone = data.zoneStandard;
-        }
+        const locationInfo = parseLocationData(data);
+        userLocation.name = locationInfo.locationName;
+        userLocation.timezone = locationInfo.timezone;
         
         updateUserLocationPopup();
     } catch (error) {
@@ -826,14 +873,9 @@ async function fetchLocationName(waypoint) {
         const response = await fetch(`/api/location/reverse?${params}`);
         const data = await response.json();
         
-        if (data.locationName) {
-            waypoint.locationName = data.locationName;
-        }
-        
-        // Set timezone from the same response - use standard timezone abbreviation
-        if (data.zoneStandard) {
-            waypoint.timezone = data.zoneStandard;
-        }
+        const locationInfo = parseLocationData(data);
+        waypoint.locationName = locationInfo.locationName;
+        waypoint.timezone = locationInfo.timezone;
         
         updateTable();
         updateMarkerWithLocation(waypoint);
@@ -1055,8 +1097,11 @@ function displaySearchResults(data) {
         const resultItem = document.createElement('div');
         resultItem.className = 'search-result-item';
         
-        // Use the formatted field as the location name
-        const label = properties.formatted || properties.name || 'Unknown';
+        // Use the common parseLocationData function to get consistent location naming
+        // Create a temporary data object with just this feature
+        const tempData = { features: [feature] };
+        const locationInfo = parseLocationData(tempData);
+        const label = locationInfo.locationName;
         const details = [];
         
         if (properties.city) details.push(properties.city);
@@ -1102,9 +1147,9 @@ function addWaypointFromSearch(lat, lng, locationName, feature) {
     if (feature && feature.properties) {
         const properties = feature.properties;
         
-        // Extract timezone information if available
-        if (properties.timezone && properties.timezone.abbreviationStd) {
-            waypoint.timezone = properties.timezone.abbreviationStd;
+        // Extract timezone information if available - use the correct field name abbreviation_STD
+        if (properties.timezone && properties.timezone.abbreviation_STD) {
+            waypoint.timezone = properties.timezone.abbreviation_STD;
         }
     }
     
@@ -1138,9 +1183,9 @@ function replaceWaypointLocationFromSearch(waypointId, newLat, newLng, locationN
         if (feature && feature.properties) {
             const properties = feature.properties;
             
-            // Extract timezone information if available
-            if (properties.timezone && properties.timezone.abbreviationStd) {
-                waypoint.timezone = properties.timezone.abbreviationStd;
+            // Extract timezone information if available - use the correct field name abbreviation_STD
+            if (properties.timezone && properties.timezone.abbreviation_STD) {
+                waypoint.timezone = properties.timezone.abbreviation_STD;
             } else {
                 waypoint.timezone = '';
             }

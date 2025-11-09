@@ -70,44 +70,51 @@ public class LocationService {
     }
 
     /**
-     * Simplifies a location name by removing zip code and country information.
-     * Keeps the address up to and including the state abbreviation.
+     * Generates a location name from address components.
+     * Combines addressLine1, addressLine2, city, and state_code to create a formatted location name.
      * 
-     * @param locationData LocationData object containing location information
-     * @return Simplified location name (e.g., "99 West 12th Avenue, Denver, CO")
-     *         or original formatted name if no state is found, or null if locationData is invalid
+     * @param properties LocationData.Properties object containing address information
+     * @return Generated location name (e.g., "99 West 12th Avenue, Denver, CO")
+     *         or null if properties is invalid
      */
-    public String getSimplifiedLocationName(LocationData locationData) {
-        if (locationData == null || locationData.getFeatures() == null || locationData.getFeatures().isEmpty()) {
+    public String generateLocationName(LocationData.Properties properties) {
+        if (properties == null) {
             return null;
         }
 
-        String formatted = locationData.getFeatures().get(0).getProperties().getFormatted();
-        if (formatted == null || formatted.trim().isEmpty()) {
-            return null;
-        }
-
-        // Pattern to match state abbreviation (2 uppercase letters) followed by optional space and numbers/characters
-        // This will match "CO 80204" or "CO" and stop there
-        Pattern pattern = Pattern.compile(",\\s*([A-Z]{2})(?:\\s+[^,]+)?$");
-        Matcher matcher = pattern.matcher(formatted);
-
-        if (matcher.find()) {
-            // Find the end position of the state abbreviation
-            int stateEnd = matcher.end(1);
-            return formatted.substring(0, stateEnd);
-        }
-
-        // If no state pattern is found, try a simpler approach - look for 2-letter state code
-        Pattern statePattern = Pattern.compile(",\\s*([A-Z]{2})");
-        Matcher stateMatcher = statePattern.matcher(formatted);
+        StringBuilder locationName = new StringBuilder();
         
-        if (stateMatcher.find()) {
-            int stateEnd = stateMatcher.end(1);
-            return formatted.substring(0, stateEnd);
+        // Add addressLine1 if available
+        if (properties.getAddressLine1() != null && !properties.getAddressLine1().trim().isEmpty()) {
+            locationName.append(properties.getAddressLine1().trim());
         }
-
-        // If no state is found, return the original formatted string
-        return formatted;
+        
+        // Add city if available
+        if (properties.getCity() != null && !properties.getCity().trim().isEmpty()) {
+            if (locationName.length() > 0) {
+                locationName.append(", ");
+            }
+            locationName.append(properties.getCity().trim());
+        }
+        
+        // Add state_code if available
+        if (properties.getStateCode() != null && !properties.getStateCode().trim().isEmpty()) {
+            if (locationName.length() > 0) {
+                locationName.append(", ");
+            }
+            locationName.append(properties.getStateCode().trim());
+        }
+        
+        // If we still don't have anything, try using addressLine2 as a fallback
+        if (locationName.length() == 0 && properties.getAddressLine2() != null && !properties.getAddressLine2().trim().isEmpty()) {
+            locationName.append(properties.getAddressLine2().trim());
+        }
+        
+        // Final fallback to formatted field if nothing else worked
+        if (locationName.length() == 0 && properties.getFormatted() != null && !properties.getFormatted().trim().isEmpty()) {
+            locationName.append(properties.getFormatted().trim());
+        }
+        
+        return locationName.length() > 0 ? locationName.toString() : null;
     }
 }
