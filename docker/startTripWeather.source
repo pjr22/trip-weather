@@ -1,3 +1,5 @@
 OPENROUTESERVICE_API_KEY=`cat ../openRouteService_api_key.txt`
-echo "Using API key: $OPENROUTESERVICE_API_KEY"
-docker run --name trip-weather -p 9080:8080 -d -e OPENROUTESERVICE_API_KEY=${OPENROUTESERVICE_API_KEY} org.pjr22/trip-weather:latest 
+GEOAPIFY_API_KEY=`cat ../geoApify_api_key.txt`
+echo "Using OpenRouteService API key: $OPENROUTESERVICE_API_KEY"
+echo "Using GeoApify API key: $GEOAPIFY_API_KEY"
+docker run --name trip-weather -p 9080:8090 -d -e OPENROUTESERVICE_API_KEY=${OPENROUTESERVICE_API_KEY} -e GEOAPIFY_API_KEY=${GEOAPIFY_API_KEY} org.pjr22/trip-weather:latest 
