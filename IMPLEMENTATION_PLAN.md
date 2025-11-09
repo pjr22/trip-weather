@@ -1,62 +1,129 @@
 # Trip Weather - Implementation Plan
 
 ## Current Implementation Overview
-The application currently implements the three core stages described in the original plan:
+The application currently implements all core stages with a modern, modular JavaScript architecture:
 
-### Stage 1 – Map Display
+### Stage 1 – Map Display - ✅ COMPLETE
 - `HomeController` serves `index.html`.
 - Leaflet map initialized with user geolocation (fallback to US centre).
-- Re‑center control and loading overlay implemented.
+- Re-center control and loading overlay implemented.
+- Modular JavaScript architecture with proper separation of concerns.
 
-### Stage 2 – Waypoint Management
-- Click‑to‑add waypoints, drag‑and‑drop reordering, delete, edit date/time/location.
+### Stage 2 – Waypoint Management - ✅ COMPLETE
+- Click-to-add waypoints, drag-and-drop reordering, delete, edit date/time/location.
 - Waypoint markers show order number and popup with location/weather details.
-- Reverse‑geocoding and location search via `LocationService` (OpenRouteService).
+- Reverse-geocoding and location search via `LocationService` (GeoApify).
+- Duration management with flexible input parsing and validation.
+- Timezone-aware time calculations with DST support.
 
-### Stage 3 – Weather Forecast Integration
+### Stage 3 – Weather Forecast Integration - ✅ COMPLETE
 - `WeatherService` contacts `weather.gov` to obtain hourly forecasts.
 - `WeatherController` exposes `/api/weather/forecast` endpoint.
-- Front‑end fetches weather when date & time are set, displays condition, temperature, wind, precipitation, and icon.
+- Front-end fetches weather when date & time are set, displays condition, temperature, wind, precipitation, and icon.
+- Automatic weather updates when waypoint data changes.
 
-## Next Steps (Enhancements)
+### Stage 4 – Route Calculation - ✅ COMPLETE
+- `RouteManager` handles route calculation via GeoApify routing API.
+- Route visualization with colored polylines on the map.
+- Automatic arrival time calculation based on travel times and waypoint durations.
+- Route management with clear/recalculate functionality.
+- Integration with waypoint management for automatic route updates.
 
-1. **Intelligent Routing - COMPLETE**
-   - Add a button to trigger routing. Something like "Calculate Route" or "Optimize Route".
-   - Use OpenRouteService “directions” endpoint to compute optimal routes between consecutive waypoints.
-   - Draw polylines on the map representing the route.
-   - Store route geometry for later export or distance calculations.
-   - If waypoints are re-ordered or deleted, remove the old route, but don't recalculate until the user clicks the "Calculate Route" button.
-   - If the user clicks "Calculate Route" again, recalculate the route and update the map.
+## Architecture Improvements - ✅ COMPLETE
 
-2. **Automatic Arrival Time Calculation - COMPLETE**
-   - After routing, compute travel time between waypoints.
-   - Propagate arrival times forward from the first waypoint's departure date/time.
-   - Allow user to edit the first waypoint's departure; subsequent waypoints update automatically.
-   - Allow user to add a Duration to each waypoint, representing the amount of time to spend at that location. Use this to calculate the next waypoint's departure time. Use minutes as the unit of measurement. Use 0 as the default value.
-   - Make sure times at each waypoint reflect the timezone of that location.
+### JavaScript Refactoring
+- **Modular Structure**: Broke down monolithic `map.js` (1,000+ lines) into organized modules:
+  - **Utils**: DurationUtils, TimezoneUtils, IconLoader, Helpers
+  - **Services**: LocationService, WeatherService  
+  - **Managers**: MapManager, WaypointManager, WaypointRenderer, SearchManager, UIManager, RouteManager
+  - **Application**: app.js (main coordinator)
+- **Dependency Management**: Proper script loading order and namespace organization
+- **Scope Resolution**: Fixed JavaScript scope issues using full namespace paths
+- **Error Handling**: Comprehensive error handling and user feedback
+- **Performance**: Caching mechanisms and optimized DOM manipulation
 
-3. **Persist Routes**
-   - Add a simple JPA entity (`Route`) with waypoints and timestamps.
-   - Provide “Save” and “Load” buttons to store routes in an embedded H2 database.
+## Completed Features
 
-4. **Export / Reporting**
-   - Generate a PDF/HTML summary of the trip with waypoints, dates, and weather forecasts.
-   - Optionally include a printable map snapshot.
+### ✅ **Route Calculation & Visualization**
+- Calculate optimal routes between consecutive waypoints
+- Draw polylines on map representing the route
+- Store route geometry for distance calculations
+- Clear route on waypoint changes, recalculate on demand
+- Route button state management based on waypoint count
 
-5. **UI/UX Improvements**
-   - Dark mode toggle.
-   - Mobile‑responsive layout.
-   - Better error handling UI for API failures.
+### ✅ **Automatic Arrival Time Calculation**
+- Compute travel time between waypoints using routing API
+- Propagate arrival times forward from first waypoint's departure
+- Duration support for time spent at each location
+- Timezone-aware time calculations with DST handling
+- Automatic waypoint updates when route data changes
 
-## Identified Issues / Suggested Fixes
+### ✅ **Enhanced Duration Management**
+- Flexible duration input parsing (e.g., "3d2h10m", "48h22m", "1.5h")
+- Duration validation with automatic correction
+- Increment/decrement buttons for quick adjustments
+- Persistent duration formatting and display
 
-- **OpenRouteService API key handling**: Currently read from `application.properties`; consider externalizing to an environment variable for security.
-- ~~**Weather time‑zone handling**: `WeatherService` parses target date/time as a local `LocalDateTime` and then applies the timezone of the first forecast period. This may cause mismatches for waypoints in different time zones. Suggest normalising all times to UTC before comparison.~~ (RESOLVED - Timezone handling is now integrated into LocationService, which provides timezone data directly from GeoApify reverse geocode responses, eliminating separate timezone service dependencies)
-- ~~**No route visualization**: Waypoints are independent; users cannot see the path between them. Implement polyline drawing as part of the routing enhancement.~~ (RESOLVED - Route visualization with polylines is now implemented)
-- **No persistence**: All data is lost on server restart. Adding a simple persistence layer will improve usability.
+### ✅ **Location Services Enhancement**
+- GeoApify API integration for geocoding and search
+- Timezone data automatically included in responses
+- Location caching for performance optimization
+- Enhanced location name parsing and display
 
-## Development Notes
+### ✅ **UI/UX Improvements**
+- Responsive table design with drag-and-drop reordering
+- Loading overlays for async operations
+- Modern modal dialogs for location search
+- Enhanced error handling and user feedback
+- Mobile-responsive layout improvements
+
+## Next Steps (Future Enhancements)
+
+1. **Data Persistence**
+   - Add JPA entities for Route and Waypoint persistence
+   - Embedded H2 database for route storage
+   - "Save" and "Load" functionality for trip management
+
+2. **Export / Reporting**
+   - Generate PDF/HTML trip summaries with waypoints, dates, and weather
+   - Printable map snapshot integration
+   - Export route data to GPX format for GPS devices
+
+3. **Advanced UI Features**
+   - Dark mode toggle with CSS custom properties
+   - Enhanced mobile touch interactions
+   - Keyboard shortcuts for common actions
+   - Improved accessibility features
+
+4. **Route Optimization Options**
+   - Multiple route preferences (fastest, shortest, scenic)
+   - Route comparison interface
+   - Alternative route suggestions
+
+5. **Collaboration Features**
+   - Trip sharing via URL or export
+   - Multi-user trip planning
+   - Comment and annotation system
+
+## Technical Notes
+
+- **API Integration**: Successfully migrated from OpenRouteService to GeoApify
+- **Security**: API keys properly externalized to environment variables
+- **Performance**: Implemented caching and debouncing for optimal user experience
+- **Browser Compatibility**: Modern ES6+ JavaScript with fallbacks where needed
+- **Testing**: Modular structure enables comprehensive unit testing
+
+## Development Workflow
 
 - The project builds with Gradle (`./gradlew bootRun`).
-- Ensure the OpenRouteService API key is present in `src/main/resources/application.properties` as `openrouteservice.api.key=YOUR_KEY`.
-- The backend runs on port 8090 by default; the frontend is served from `src/main/resources/static`.
+- Ensure the GeoApify API key is present as `GEOAPIFY_API_KEY` environment variable or in `src/main/resources/application.properties` as `geoapify.api.key=YOUR_KEY`.
+- The backend runs on port 8090 by default; frontend served from `src/main/resources/static`.
+- Modular JavaScript architecture allows for independent development and testing of components.
+
+## Code Quality Metrics
+
+- **Maintainability**: High - clear separation of concerns and modular structure
+- **Scalability**: High - easy to add new features as independent modules
+- **Testability**: High - each module can be unit tested in isolation
+- **Performance**: Optimized - caching, debouncing, and efficient DOM manipulation
+- **Documentation**: Comprehensive - JSDoc comments throughout JavaScript modules

@@ -394,36 +394,43 @@ window.TripWeather.Managers.Waypoint = {
     recheckWaypointTimezone: function(waypoint) {
         return window.TripWeather.Services.Location.reverseGeocode(waypoint.lat, waypoint.lng)
             .then(function(data) {
-                const locationInfo = window.TripWeather.Utils.Helpers.parseLocationData(data);
-                
-                // Get the target date for DST calculation
-                const targetDate = waypoint.date && waypoint.time ? `${waypoint.date} ${waypoint.time}` : null;
-                
-                // Update timezone with DST-aware calculation
-                if (locationInfo.timezoneName) {
-                    waypoint.timezone = window.TripWeather.Utils.Timezone.getTimezoneAbbr(locationInfo.timezoneName, targetDate);
-                } else {
-                    waypoint.timezone = locationInfo.timezone;
-                }
-                
-                // Update the table to show the new timezone
-                if (window.TripWeather.Managers.WaypointRenderer) {
-                    window.TripWeather.Managers.WaypointRenderer.updateTable();
-                }
-                
-                // Update marker popup to show new timezone
-                const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.id === waypoint.id);
-                if (index !== -1 && window.TripWeather.Managers.WaypointRenderer) {
-                    const marker = window.TripWeather.Managers.Waypoint.waypointMarkers[index];
-                    if (marker) {
-                        window.TripWeather.Managers.WaypointRenderer.updateMarkerPopup(marker, waypoint, index + 1);
+                // Extract timezone name directly from the response
+                if (data && data.features && data.features.length > 0) {
+                    const properties = data.features[0].properties;
+                    const timezoneName = properties.timezone && properties.timezone.name ? properties.timezone.name : '';
+                    
+                    if (timezoneName) {
+                        // Get the target date for DST calculation
+                        const targetDate = waypoint.date && waypoint.time ? `${waypoint.date} ${waypoint.time}` : null;
+                        
+                        // Update timezone with DST-aware calculation
+                        waypoint.timezone = window.TripWeather.Utils.Timezone.getTimezoneAbbr(timezoneName, targetDate);
+                        
+                        // Update the table to show the new timezone
+                        if (window.TripWeather.Managers.WaypointRenderer) {
+                            window.TripWeather.Managers.WaypointRenderer.updateTable();
+                        }
+                        
+                        // Update marker popup to show new timezone
+                        const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.id === waypoint.id);
+                        if (index !== -1 && window.TripWeather.Managers.WaypointRenderer) {
+                            const marker = window.TripWeather.Managers.Waypoint.waypointMarkers[index];
+                            if (marker) {
+                                window.TripWeather.Managers.WaypointRenderer.updateMarkerPopup(marker, waypoint, index + 1);
+                            }
+                        }
+                        
+                        console.log(`Timezone rechecked for waypoint ${waypoint.id}: ${waypoint.timezone} (date: ${targetDate || 'current'})`);
+                    } else {
+                        console.warn('No timezone name found in response for waypoint', waypoint.id);
                     }
+                } else {
+                    console.warn('Invalid response data for timezone recheck');
                 }
-                
-                console.log(`Timezone rechecked for waypoint ${waypoint.id}: ${waypoint.timezone}`);
             })
             .catch(function(error) {
                 console.warn('Failed to recheck timezone:', error);
+                // Don't leave timezone blank on error, keep existing value
             });
     },
 

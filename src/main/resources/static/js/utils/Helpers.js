@@ -49,13 +49,14 @@ window.TripWeather.Utils.Helpers = {
             locationName = properties.formatted.trim();
         }
         
-        // Extract timezone information using DST-aware function
+        // Extract timezone information
         let timezone = '';
         let timezoneName = '';
         if (properties.timezone) {
-            // Use the enhanced function that considers DST
-            timezone = window.TripWeather.Utils.Timezone.getTimezoneAbbrWithDst(properties.timezone);
+            // Extract timezone name for later DST calculation
             timezoneName = properties.timezone.name || '';
+            // For initial display, use current time to get appropriate abbreviation
+            timezone = window.TripWeather.Utils.Timezone.getTimezoneAbbr(timezoneName);
         }
         
         return {
