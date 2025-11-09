@@ -9,6 +9,50 @@ window.TripWeather.Managers = window.TripWeather.Managers || {};
 window.TripWeather.Managers.WaypointRenderer = {
     
     /**
+     * Format date and time for waypoint popup
+     * @param {object} waypoint - Waypoint object
+     * @param {boolean} isDeparture - Whether this is departure time (adds duration)
+     * @returns {string} - Formatted date/time string
+     */
+    formatWaypointTime: function(waypoint, isDeparture = false) {
+        if (!waypoint.date || !waypoint.time || !waypoint.timezone) {
+            return '';
+        }
+        
+        try {
+            // Parse the date and time
+            const dateTimeStr = `${waypoint.date} ${waypoint.time}`;
+            let date = new Date(dateTimeStr);
+            
+            // Add duration if this is departure time
+            if (isDeparture && waypoint.duration > 0) {
+                date = new Date(date.getTime() + (waypoint.duration * 60 * 1000));
+            }
+            
+            // Format date as MM/DD/YY
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            const year = date.getFullYear().toString().slice(-2);
+            const dateStr = `${month}/${day}/${year}`;
+            
+            // Format time as HH:MM AM/PM
+            let hours = date.getHours();
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12; // Convert to 12-hour format, 0 becomes 12
+            const timeStr = `${hours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+            
+            // Get timezone abbreviation
+            const timezoneAbbr = window.TripWeather.Utils.Timezone.getTimezoneAbbr(waypoint.timezone, date);
+            
+            return `${dateStr} ${timeStr} ${timezoneAbbr}`;
+        } catch (error) {
+            console.warn('Error formatting waypoint time:', error);
+            return '';
+        }
+    },
+    
+    /**
      * Add marker to map for waypoint
      * @param {object} waypoint - Waypoint object
      * @param {number} orderNumber - Order number for display
@@ -48,7 +92,11 @@ window.TripWeather.Managers.WaypointRenderer = {
      * @param {number} orderNumber - Order number
      */
     updateMarkerPopup: function(marker, waypoint, orderNumber) {
-        let popupContent = `<strong>Waypoint ${orderNumber}</strong><br>`;
+        const lastWaypointNumber = window.TripWeather.Managers.Waypoint.getLastWaypointNumber();
+        const isStart = orderNumber === 1;
+        const isEnd = orderNumber === lastWaypointNumber;
+        let waypointLabel = isStart ? 'Start' : isEnd ? 'End' : `Waypoint ${orderNumber}`;
+        let popupContent = `<strong>${waypointLabel}</strong><br>`;
         popupContent += `Lat: ${waypoint.lat}<br>`;
         popupContent += `Lon: ${waypoint.lng}<br>`;
         
@@ -56,27 +104,36 @@ window.TripWeather.Managers.WaypointRenderer = {
             popupContent += `<br><strong>${waypoint.locationName}</strong><br>`;
         }
         
-        if (waypoint.timezone) {
-            popupContent += `Timezone: ${waypoint.timezone}<br>`;
+        // Add Arrival Time
+        const arrivalTime = this.formatWaypointTime(waypoint, false);
+        if (!isStart && arrivalTime) {
+            popupContent += `Arrival Time: ${arrivalTime}<br>`;
         }
         
-        if (waypoint.duration > 0) {
+        // Add Departure Time if there's a duration
+        if ((!isEnd && waypoint.duration > 0) || (isStart && arrivalTime)) {
             const totalMinutes = Math.round(waypoint.duration);
             const days = Math.floor(totalMinutes / (24 * 60));
             const remainingMinutes = totalMinutes % (24 * 60);
             const hours = Math.floor(remainingMinutes / 60);
             const mins = remainingMinutes % 60;
-            
-            let durationText = 'Duration: ';
+
+            // Add Departure Time
+            const departureTime = this.formatWaypointTime(waypoint, true);
+            if (departureTime) {
+                popupContent += `Departure Time: ${departureTime}<br>`;
+            }
+
+            // Add Duration
+            let durationText = 'Time spent here: ';
             if (days > 0) {
                 durationText += `${days} days, `;
             }
             if (hours > 0 || days > 0) {
                 durationText += `${hours} hours, `;
             }
-            durationText += `${mins} minutes`;
-            
-            popupContent += `${durationText}<br>`;
+            durationText += `${mins} minutes`;            
+            popupContent += `${durationText}<br>`;            
         }
         
         if (waypoint.weather && !waypoint.weather.error) {

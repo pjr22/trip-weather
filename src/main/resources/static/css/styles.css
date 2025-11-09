@@ -16,12 +16,31 @@ body {
 }
 
 header {
-    text-align: center;
     margin-bottom: 20px;
     background-color: #fff;
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.header-logo {
+    flex-shrink: 0;
+}
+
+.logo-image {
+    height: 60px;
+    width: auto;
+    border-radius: 4px;
+}
+
+.header-text {
+    flex-grow: 1;
 }
 
 header h1 {
@@ -112,7 +131,7 @@ main {
 
 #waypoints-table th,
 #waypoints-table td {
-    padding: 8px 5px;
+    padding: 4px;
     text-align: left;
     border-bottom: 1px solid #e0e0e0;
     vertical-align: middle;
@@ -262,7 +281,11 @@ main {
 
 #waypoints-table th:nth-child(8), /* Weather column */
 #waypoints-table td:nth-child(8) {
-    min-width: 200px;
+    width: 160px;
+    min-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 #waypoints-table th:nth-child(9), /* Temp column */
@@ -274,15 +297,15 @@ main {
 
 #waypoints-table th:nth-child(10), /* Wind column */
 #waypoints-table td:nth-child(10) {
-    width: 105px;
-    min-width: 105px;
+    width: 115px;
+    min-width: 115px;
     text-align: center;
 }
 
 #waypoints-table th:nth-child(11), /* Precip column */
 #waypoints-table td:nth-child(11) {
-    width: 80px;
-    min-width: 80px;
+    width: 70px;
+    min-width: 70px;
     text-align: center;
 }
 
@@ -642,4 +665,51 @@ main {
 .drop-zone-cell {
     padding: 5px !important;
     border: none !important;
+}
+
+/* Popup button styles */
+.leaflet-popup-content {
+    margin: 8px 12px;
+    line-height: 1.4;
+}
+
+.leaflet-popup-content-wrapper {
+    border-radius: 6px;
+}
+
+.leaflet-popup-content button {
+    margin: 0 2px;
+    transition: all 0.2s ease;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.leaflet-popup-content button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.leaflet-popup-content button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    .logo-image {
+        height: 50px;
+    }
+    
+    .container {
+        padding: 10px;
+    }
+    
+    header {
+        padding: 15px;
+    }
 }

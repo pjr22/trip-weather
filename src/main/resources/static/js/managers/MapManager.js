@@ -153,6 +153,12 @@ window.TripWeather.Managers.Map = {
             popupContent += `<br>Timezone: ${this.userLocation.timezone}`;
         }
         
+        // Add action buttons at the bottom
+        popupContent += `<br><br><div style="display: flex; gap: 8px; justify-content: center;">`;
+        popupContent += `<button onclick="window.TripWeather.Managers.Map.refreshUserLocation()" style="background-color: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">Refresh</button>`;
+        popupContent += `<button onclick="window.TripWeather.Managers.Map.addCurrentLocationAsWaypoint()" style="background-color: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">Add To Waypoints</button>`;
+        popupContent += `</div>`;
+        
         this.userLocationMarker.bindPopup(popupContent);
     },
 
@@ -264,5 +270,45 @@ window.TripWeather.Managers.Map = {
      */
     getUserLocation: function() {
         return this.userLocation;
+    },
+
+    /**
+     * Refresh user location (same as recenter behavior)
+     */
+    refreshUserLocation: function() {
+        this.recenterOnUserLocation();
+    },
+
+    /**
+     * Add current location as a waypoint
+     */
+    addCurrentLocationAsWaypoint: function() {
+        if (!this.userLocation.lat || !this.userLocation.lng) {
+            window.TripWeather.Utils.Helpers.showAlert('User location not available. Please refresh your location first.');
+            return;
+        }
+        
+        // Create location info object with current user location data
+        const locationInfo = {
+            locationName: this.userLocation.name || 'Current Location',
+            timezone: this.userLocation.timezone || ''
+        };
+        
+        // Add waypoint using WaypointManager
+        if (window.TripWeather.Managers.Waypoint) {
+            const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(
+                this.userLocation.lat, 
+                this.userLocation.lng, 
+                locationInfo
+            );
+            
+            // Close the popup after adding waypoint
+            if (this.userLocationMarker) {
+                this.userLocationMarker.closePopup();
+            }
+        } else {
+            console.error('WaypointManager not available');
+            window.TripWeather.Utils.Helpers.showAlert('Unable to add waypoint. Please try again.');
+        }
     }
 };

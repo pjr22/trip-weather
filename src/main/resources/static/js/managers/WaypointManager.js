@@ -539,5 +539,13 @@ window.TripWeather.Managers.Waypoint = {
      */
     setReplacingWaypointId: function(waypointId) {
         this.replacingWaypointId = waypointId;
+    },
+
+    /**
+     * Get the last waypoint number
+     * @returns {number} - Last waypoint number or 0 if no waypoints
+     */
+    getLastWaypointNumber: function() {
+        return this.waypoints.length;
     }
 };

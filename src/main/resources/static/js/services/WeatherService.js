@@ -183,13 +183,16 @@ window.TripWeather.Services.Weather = {
      */
     _createWeatherCacheKey: function(waypoint) {
         const key = `${waypoint.lat},${waypoint.lng}`;
+        const parts = [];
+        
         if (waypoint.date) {
-            return key + '_' + waypoint.date;
+            parts.push(waypoint.date);
         }
         if (waypoint.time) {
-            return key + '_' + waypoint.time;
+            parts.push(waypoint.time);
         }
-        return key;
+        
+        return parts.length > 0 ? key + '_' + parts.join('_') : key;
     },
 
     /**

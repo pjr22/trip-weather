@@ -5,6 +5,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trip Weather</title>
     
+    <!-- Favicons for different platforms and browsers -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="57x57" href="favicon-57x57.png">
+    <link rel="icon" type="image/png" sizes="60x60" href="favicon-60x60.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="favicon-64x64.png">
+    <link rel="icon" type="image/png" sizes="70x70" href="favicon-70x70.png">
+    <link rel="icon" type="image/png" sizes="72x72" href="favicon-72x72.png">
+    <link rel="icon" type="image/png" sizes="76x76" href="favicon-76x76.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="114x114" href="favicon-114x114.png">
+    <link rel="icon" type="image/png" sizes="120x120" href="favicon-120x120.png">
+    <link rel="icon" type="image/png" sizes="128x128" href="favicon-128x128.png">
+    <link rel="icon" type="image/png" sizes="144x144" href="favicon-144x144.png">
+    <link rel="icon" type="image/png" sizes="150x150" href="favicon-150x150.png">
+    <link rel="icon" type="image/png" sizes="152x152" href="favicon-152x152.png">
+    <link rel="icon" type="image/png" sizes="167x167" href="favicon-167x167.png">
+    <link rel="icon" type="image/png" sizes="180x180" href="favicon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="favicon-192x192.png">
+    <link rel="icon" type="image/png" sizes="195x195" href="favicon-195x195.png">
+    <link rel="icon" type="image/png" sizes="196x196" href="favicon-196x196.png">
+    <link rel="icon" type="image/png" sizes="228x228" href="favicon-228x228.png">
+    <link rel="icon" type="image/png" sizes="256x256" href="favicon-256x256.png">
+    <link rel="icon" type="image/png" sizes="310x310" href="favicon-310x310.png">
+    <link rel="icon" type="image/png" sizes="384x384" href="favicon-384x384.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="favicon-512x512.png">
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon-180x180.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="favicon-152x152.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="favicon-144x144.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="favicon-120x120.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="favicon-114x114.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="favicon-76x76.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="favicon-72x72.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="favicon-60x60.png">
+    <link rel="apple-touch-icon" sizes="57x57" href="favicon-57x57.png">
+    <!-- Android Chrome -->
+    <link rel="icon" sizes="192x192" href="favicon-192x192.png">
+    <link rel="icon" sizes="128x128" href="favicon-128x128.png">
+    <!-- Windows Metro -->
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileImage" content="favicon-144x144.png">
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -14,8 +58,15 @@
 <body>
     <div class="container">
         <header>
-            <h1>Trip Weather</h1>
-            <p>Plan your route and view weather forecasts</p>
+            <div class="header-content">
+                <div class="header-logo">
+                    <img src="icons/car_mountain_sunny.png" alt="Trip Weather Logo" class="logo-image">
+                </div>
+                <div class="header-text">
+                    <h1>Trip Weather</h1>
+                    <p>Plan your route and view weather forecasts</p>
+                </div>
+            </div>
         </header>
         
         <main>
@@ -25,7 +76,7 @@
                 <div class="waypoints-header">
                     <div>
                         <h2>Waypoints</h2>
-                        <p class="instructions">Click on map to add waypoints</p>
+                        <p class="instructions">Click on map or search to add waypoints</p>
                     </div>
                     <div class="header-buttons">
                         <button id="calculate-route-btn" class="route-btn">🛣️ Calculate Route</button>
@@ -38,16 +89,16 @@
                         <thead>
                             <tr>
                                 <th class="drag-handle-header"></th>
-                                <th>#</th>
+                                <th>##</th>
                                 <th>Date</th>
                                 <th>Time</th>
                                 <th>Zone</th>
                                 <th>Duration</th>
-                                <th>Location Name</th>
+                                <th>Location</th>
                                 <th>Weather</th>
                                 <th>Temp</th>
                                 <th>Wind</th>
-                                <th>Precip %</th>
+                                <th>Precip</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
