@@ -17,7 +17,7 @@ window.TripWeather.App = {
     },
 
     /**
-     * Initialize the application
+     * Initialize application
      */
     initialize: function() {
         console.log(`Initializing ${this.config.name} v${this.config.version}`);
@@ -301,7 +301,7 @@ window.TripWeather.App = {
                     }
                 })
                 .catch(error => {
-                    window.TripWeather.Managers.UI.hideLoading('route-loading-overlay');
+                    window.TripWeather.Managers.UI.hideLoading('persistence-loading-overlay');
                     window.TripWeather.Managers.UI.showAlert(
                         `Failed to load route: ${error.message}`, 
                         'error'
