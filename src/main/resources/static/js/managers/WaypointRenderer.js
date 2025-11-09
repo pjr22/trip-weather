@@ -70,10 +70,10 @@ window.TripWeather.Managers.WaypointRenderer = {
         const marker = L.marker([waypoint.lat, waypoint.lng], { icon: customIcon })
             .addTo(map);
         
-        marker.waypointId = waypoint.id;
+        marker.waypointSequence = waypoint.sequence;
         
         marker.on('click', function() {
-            this.highlightTableRow(waypoint.id);
+            this.highlightTableRow(waypoint.sequence);
             this.updateMarkerPopup(marker, waypoint, orderNumber);
         }.bind(this));
         
@@ -157,44 +157,44 @@ window.TripWeather.Managers.WaypointRenderer = {
         
         waypoints.forEach((waypoint, index) => {
             const row = tbody.insertRow();
-            row.dataset.waypointId = waypoint.id;
+            row.dataset.waypointSequence = waypoint.sequence;
             
             const weatherHtml = window.TripWeather.Services.Weather.generateWeatherHtml(waypoint.weather, waypoint.weatherLoading);
             
             row.innerHTML = `
                 <td class="drag-handle-cell"><span class="drag-handle" title="Drag to reorder">☰</span></td>
                 <td>${index + 1}</td>
-                <td><input type="date" value="${waypoint.date}" onchange="window.TripWeather.Managers.Waypoint.updateWaypointField(${waypoint.id}, 'date', this.value)"></td>
-                <td><input type="time" value="${waypoint.time}" onchange="window.TripWeather.Managers.Waypoint.updateWaypointField(${waypoint.id}, 'time', this.value)"></td>
+                <td><input type="date" value="${waypoint.date}" onchange="window.TripWeather.Managers.Waypoint.updateWaypointField(${waypoint.sequence}, 'date', this.value)"></td>
+                <td><input type="time" value="${waypoint.time}" onchange="window.TripWeather.Managers.Waypoint.updateWaypointField(${waypoint.sequence}, 'time', this.value)"></td>
                 <td>${waypoint.timezone || '-'}</td>
                 <td>
                     <div class="duration-input-container">
                         <input type="text" 
                                value="${window.TripWeather.Utils.Duration.formatDuration(waypoint.duration)}" 
                                placeholder="3d2h10m" 
-                               onblur="window.TripWeather.Managers.Waypoint.updateWaypointDuration(${waypoint.id}, this.value)"
-                               onkeydown="window.TripWeather.Managers.WaypointRenderer.handleDurationKeydown(event, ${waypoint.id}, this.value)"
+                               onblur="window.TripWeather.Managers.Waypoint.updateWaypointDuration(${waypoint.sequence}, this.value)"
+                               onkeydown="window.TripWeather.Managers.WaypointRenderer.handleDurationKeydown(event, ${waypoint.sequence}, this.value)"
                                class="duration-input"
                                title="Enter duration like 3d2h10m, 48h22m, 1000m, 1.5h">
                         <div class="duration-arrows">
-                            <button class="duration-arrow-up" onclick="window.TripWeather.Managers.Waypoint.incrementWaypointDuration(${waypoint.id}, 10)" title="Add 10 minutes">▲</button>
-                            <button class="duration-arrow-down" onclick="window.TripWeather.Managers.Waypoint.incrementWaypointDuration(${waypoint.id}, -10)" title="Subtract 10 minutes">▼</button>
+                            <button class="duration-arrow-up" onclick="window.TripWeather.Managers.Waypoint.incrementWaypointDuration(${waypoint.sequence}, 10)" title="Add 10 minutes">▲</button>
+                            <button class="duration-arrow-down" onclick="window.TripWeather.Managers.Waypoint.incrementWaypointDuration(${waypoint.sequence}, -10)" title="Subtract 10 minutes">▼</button>
                         </div>
                     </div>
                 </td>
-                <td><input type="text" value="${waypoint.locationName}" placeholder="Enter location name" onchange="window.TripWeather.Managers.Waypoint.updateWaypointField(${waypoint.id}, 'locationName', this.value)"></td>
+                <td><input type="text" value="${waypoint.locationName}" placeholder="Enter location name" onchange="window.TripWeather.Managers.Waypoint.updateWaypointField(${waypoint.sequence}, 'locationName', this.value)"></td>
                 ${weatherHtml}
                 <td class="actions-cell">
-                    <button class="action-btn" onclick="window.TripWeather.Managers.Waypoint.centerOnWaypoint(${waypoint.id})" title="Center on waypoint">
+                    <button class="action-btn" onclick="window.TripWeather.Managers.Waypoint.centerOnWaypoint(${waypoint.sequence})" title="Center on waypoint">
                         <span class="action-icon-container" data-icon="icons/crosshair.svg"></span>
                     </button>
-                    <button class="action-btn" onclick="window.TripWeather.Managers.Waypoint.selectNewLocationForWaypoint(${waypoint.id})" title="Select new location on map">
+                    <button class="action-btn" onclick="window.TripWeather.Managers.Waypoint.selectNewLocationForWaypoint(${waypoint.sequence})" title="Select new location on map">
                         <span class="action-icon-container" data-icon="icons/map_pin.svg"></span>
                     </button>
-                    <button class="action-btn" onclick="window.TripWeather.Managers.Search.searchNewLocationForWaypoint(${waypoint.id})" title="Search for new location">
+                    <button class="action-btn" onclick="window.TripWeather.Managers.Search.searchNewLocationForWaypoint(${waypoint.sequence})" title="Search for new location">
                         <span class="action-icon-container" data-icon="icons/search.svg"></span>
                     </button>
-                    <button class="action-btn delete-action" onclick="window.TripWeather.Managers.Waypoint.deleteWaypoint(${waypoint.id})" title="Delete waypoint">
+                    <button class="action-btn delete-action" onclick="window.TripWeather.Managers.Waypoint.deleteWaypoint(${waypoint.sequence})" title="Delete waypoint">
                         <span class="action-icon-container" data-icon="icons/delete.svg"></span>
                     </button>
                 </td>
@@ -206,8 +206,8 @@ window.TripWeather.Managers.WaypointRenderer = {
             // Setup row click handler
             row.addEventListener('click', function(e) {
                 if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
-                    this.highlightTableRow(waypoint.id);
-                    const marker = window.TripWeather.Managers.Waypoint.waypointMarkers.find(m => m.waypointId === waypoint.id);
+                    this.highlightTableRow(waypoint.sequence);
+                    const marker = window.TripWeather.Managers.Waypoint.waypointMarkers.find(m => m.waypointSequence === waypoint.sequence);
                     if (marker) {
                         const map = window.TripWeather.Managers.Map.getMap();
                         if (map) {
@@ -239,18 +239,18 @@ window.TripWeather.Managers.WaypointRenderer = {
     /**
      * Handle keyboard input for duration field
      * @param {Event} event - Keyboard event
-     * @param {number} waypointId - ID of the waypoint
+     * @param {number} sequence - Waypoint sequence
      * @param {string} currentValue - Current input value
      */
-    handleDurationKeydown: function(event, waypointId, currentValue) {
+    handleDurationKeydown: function(event, sequence, currentValue) {
         if (event.key === 'Enter') {
             event.preventDefault();
-            window.TripWeather.Managers.Waypoint.updateWaypointDuration(waypointId, currentValue);
+            window.TripWeather.Managers.Waypoint.updateWaypointDuration(sequence, currentValue);
             event.target.blur();
         } else if (event.key === 'Escape') {
             event.preventDefault();
             // Revert to current waypoint value
-            const waypoint = window.TripWeather.Managers.Waypoint.getWaypoint(waypointId);
+            const waypoint = window.TripWeather.Managers.Waypoint.getWaypoint(sequence);
             if (waypoint) {
                 event.target.value = window.TripWeather.Utils.Duration.formatDuration(waypoint.duration);
             }
@@ -260,14 +260,14 @@ window.TripWeather.Managers.WaypointRenderer = {
 
     /**
      * Highlight table row for waypoint
-     * @param {number} waypointId - Waypoint ID
+     * @param {number} sequence - Waypoint sequence
      */
-    highlightTableRow: function(waypointId) {
+    highlightTableRow: function(sequence) {
         document.querySelectorAll('#waypoints-tbody tr').forEach(row => {
             row.classList.remove('selected');
         });
         
-        const row = document.querySelector(`#waypoints-tbody tr[data-waypoint-id="${waypointId}"]`);
+        const row = document.querySelector(`#waypoints-tbody tr[data-waypoint-sequence="${sequence}"]`);
         if (row) {
             row.classList.add('selected');
         }
@@ -278,7 +278,7 @@ window.TripWeather.Managers.WaypointRenderer = {
      * @param {object} waypoint - Waypoint object
      */
     updateMarkerWithWeather: function(waypoint) {
-        const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.id === waypoint.id);
+        const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.sequence === waypoint.sequence);
         if (index !== -1) {
             const marker = window.TripWeather.Managers.Waypoint.waypointMarkers[index];
             if (marker) {
@@ -292,7 +292,7 @@ window.TripWeather.Managers.WaypointRenderer = {
      * @param {object} waypoint - Waypoint object
      */
     updateMarkerWithLocation: function(waypoint) {
-        const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.id === waypoint.id);
+        const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.sequence === waypoint.sequence);
         if (index !== -1) {
             const marker = window.TripWeather.Managers.Waypoint.waypointMarkers[index];
             if (marker) {
@@ -318,8 +318,8 @@ window.TripWeather.Managers.WaypointRenderer = {
             window.TripWeather.Managers.WaypointRenderer.draggedRow = row;
             row.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', row.dataset.waypointId);
-            console.log('Drag started for waypoint:', row.dataset.waypointId);
+            e.dataTransfer.setData('text/plain', row.dataset.waypointSequence);
+            console.log('Drag started for waypoint:', row.dataset.waypointSequence);
         });
         
         // Drag end
@@ -354,11 +354,11 @@ window.TripWeather.Managers.WaypointRenderer = {
             e.stopPropagation();
             
             if (window.TripWeather.Managers.WaypointRenderer.draggedRow && window.TripWeather.Managers.WaypointRenderer.draggedRow !== row) {
-                const draggedId = parseInt(window.TripWeather.Managers.WaypointRenderer.draggedRow.dataset.waypointId);
-                const targetId = parseInt(row.dataset.waypointId);
+                const draggedSequence = parseInt(window.TripWeather.Managers.WaypointRenderer.draggedRow.dataset.waypointSequence);
+                const targetSequence = parseInt(row.dataset.waypointSequence);
                 
-                console.log('Drop detected - dragged:', draggedId, 'target:', targetId);
-                window.TripWeather.Managers.Waypoint.reorderWaypoints(draggedId, targetId);
+                console.log('Drop detected - dragged:', draggedSequence, 'target:', targetSequence);
+                window.TripWeather.Managers.Waypoint.reorderWaypoints(draggedSequence, targetSequence);
             }
             
             return false;
@@ -389,8 +389,8 @@ window.TripWeather.Managers.WaypointRenderer = {
             e.stopPropagation();
             
             if (window.TripWeather.Managers.WaypointRenderer.draggedRow) {
-                const draggedId = parseInt(window.TripWeather.Managers.WaypointRenderer.draggedRow.dataset.waypointId);
-                window.TripWeather.Managers.Waypoint.moveToEnd(draggedId);
+                const draggedSequence = parseInt(window.TripWeather.Managers.WaypointRenderer.draggedRow.dataset.waypointSequence);
+                window.TripWeather.Managers.Waypoint.moveToEnd(draggedSequence);
             }
             
             return false;

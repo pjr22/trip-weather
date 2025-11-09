@@ -78,10 +78,12 @@
                         <h2>Waypoints</h2>
                         <p class="instructions">Click on map or search to add waypoints</p>
                     </div>
-                    <div class="header-buttons">
-                        <button id="calculate-route-btn" class="route-btn">🛣️ Calculate Route</button>
-                        <button id="search-btn" class="search-btn">🔍 Search Location</button>
-                    </div>
+                <div class="header-buttons">
+                    <button id="save-route-btn" class="action-btn-primary">💾 Save Route</button>
+                    <button id="load-route-btn" class="action-btn-primary">📁 Load Route</button>
+                    <button id="calculate-route-btn" class="route-btn">🚗 Calculate Route</button>
+                    <button id="search-location-btn" class="search-btn">🔍 Search Location</button>
+                </div>
                 </div>
                 
                 <div class="table-container">
@@ -135,6 +137,12 @@
             <p>Calculating route...</p>
         </div>
     </div>
+    <div id="persistence-loading-overlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p>Saving route...</p>
+        </div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
@@ -149,6 +157,7 @@
     <!-- Services (depend on utils) -->
     <script src="js/services/LocationService.js"></script>
     <script src="js/services/WeatherService.js"></script>
+    <script src="js/services/RoutePersistenceService.js"></script>
     
     <!-- Managers (depend on utils and services) -->
     <script src="js/managers/MapManager.js"></script>

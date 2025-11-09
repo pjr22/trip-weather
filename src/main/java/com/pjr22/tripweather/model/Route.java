@@ -5,7 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,7 +24,7 @@ public class Route {
     private String name;
     
     @Column(name = "created", nullable = false)
-    private LocalDateTime created;
+    private ZonedDateTime created;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, referencedColumnName = "id")
@@ -39,7 +39,7 @@ public class Route {
             id = UUID.randomUUID();
         }
         if (created == null) {
-            created = LocalDateTime.now();
+            created = ZonedDateTime.now();
         }
     }
 }

@@ -90,7 +90,7 @@ window.TripWeather.App = {
         // They attach to window.TripWeather.Services namespace automatically
         
         // Verify services are available
-        const requiredServices = ['Location', 'Weather'];
+        const requiredServices = ['Location', 'Weather', 'RoutePersistence'];
         requiredServices.forEach(function(serviceName) {
             if (!window.TripWeather.Services[serviceName]) {
                 throw new Error(`Required service ${serviceName} not found`);
@@ -158,7 +158,164 @@ window.TripWeather.App = {
         window.addEventListener('error', this.handleGlobalError.bind(this));
         window.addEventListener('unhandledrejection', this.handleUnhandledRejection.bind(this));
         
+        // Setup route persistence buttons
+        this.setupRoutePersistenceButtons();
+        
         console.log('Global events setup complete');
+    },
+
+    /**
+     * Setup route persistence button event listeners
+     */
+    setupRoutePersistenceButtons: function() {
+        console.log('Setting up route persistence buttons...');
+        
+        const saveRouteBtn = document.getElementById('save-route-btn');
+        const loadRouteBtn = document.getElementById('load-route-btn');
+        
+        if (saveRouteBtn) {
+            saveRouteBtn.addEventListener('click', this.handleSaveRoute.bind(this));
+        } else {
+            console.warn('Save route button not found');
+        }
+        
+        if (loadRouteBtn) {
+            loadRouteBtn.addEventListener('click', this.handleLoadRoute.bind(this));
+        } else {
+            console.warn('Load route button not found');
+        }
+        
+        console.log('Route persistence buttons setup complete');
+    },
+
+    /**
+     * Handle save route button click
+     */
+    handleSaveRoute: function() {
+        console.log('Save route button clicked');
+        
+        try {
+            const waypoints = window.TripWeather.Managers.Waypoint.getAllWaypoints();
+            
+            if (waypoints.length === 0) {
+                window.TripWeather.Managers.UI.showAlert('No waypoints to save. Please add waypoints to your route first.', 'warning');
+                return;
+            }
+            
+            // Prompt user for route name
+            const routeName = prompt('Enter a name for this route:');
+            if (!routeName || routeName.trim() === '') {
+                return; // User cancelled or entered empty name
+            }
+            
+            // Convert waypoints to DTO format
+            const waypointDtos = window.TripWeather.Services.RoutePersistence.convertWaypointsToDto(waypoints);
+            
+            // Prepare route data
+            const routeData = {
+                name: routeName.trim(),
+                waypoints: waypointDtos,
+                userId: null // Will use default user on backend
+            };
+            
+            // Show loading indicator
+            window.TripWeather.Managers.UI.showLoading('persistence-loading-overlay');
+            
+            // Save route
+            window.TripWeather.Services.RoutePersistence.saveRoute(routeData)
+                .then(response => {
+                    window.TripWeather.Managers.UI.hideLoading('persistence-loading-overlay');
+                    window.TripWeather.Managers.UI.showNotification(
+                        `Route "${routeName}" saved successfully! Route ID: ${response.id}`, 
+                        5000, 
+                        'success'
+                    );
+                    console.log('Route saved successfully:', response);
+                })
+                .catch(error => {
+                    window.TripWeather.Managers.UI.hideLoading('persistence-loading-overlay');
+                    window.TripWeather.Managers.UI.showAlert(
+                        `Failed to save route: ${error.message}`, 
+                        'error'
+                    );
+                    console.error('Error saving route:', error);
+                });
+                
+        } catch (error) {
+            console.error('Error handling save route:', error);
+            window.TripWeather.Managers.UI.showAlert(
+                `An error occurred while saving the route: ${error.message}`, 
+                'error'
+            );
+        }
+    },
+
+    /**
+     * Handle load route button click
+     */
+    handleLoadRoute: function() {
+        console.log('Load route button clicked');
+        
+        try {
+            // Prompt user for route ID
+            const routeId = prompt('Enter the Route ID to load:');
+            if (!routeId || routeId.trim() === '') {
+                return; // User cancelled or entered empty ID
+            }
+            
+            // Show loading indicator
+            window.TripWeather.Managers.UI.showLoading('persistence-loading-overlay');
+            
+            // Load route
+            window.TripWeather.Services.RoutePersistence.loadRoute(routeId.trim())
+                .then(response => {
+                    window.TripWeather.Managers.UI.hideLoading('persistence-loading-overlay');
+                    
+                    if (response) {
+                        // Convert waypoints from DTO format
+                        const waypoints = window.TripWeather.Services.RoutePersistence.convertWaypointsFromDto(response.waypoints || []);
+                        
+                        // Clear existing waypoints and add loaded ones
+                        window.TripWeather.Managers.Waypoint.clearAllWaypoints();
+                        
+                        waypoints.forEach(waypoint => {
+                            window.TripWeather.Managers.Waypoint.addWaypoint(
+                                waypoint.lat, 
+                                waypoint.lng, 
+                                null, // No location info needed for loaded waypoints
+                                waypoint // Pass the existing waypoint object
+                            );
+                        });
+                        
+                        window.TripWeather.Managers.UI.showNotification(
+                            `Route "${response.name}" loaded successfully with ${waypoints.length} waypoints!`, 
+                            5000, 
+                            'success'
+                        );
+                        console.log('Route loaded successfully:', response);
+                    } else {
+                        window.TripWeather.Managers.UI.showAlert(
+                            'Route not found with the provided ID.', 
+                            'warning'
+                        );
+                    }
+                })
+                .catch(error => {
+                    window.TripWeather.Managers.UI.hideLoading('route-loading-overlay');
+                    window.TripWeather.Managers.UI.showAlert(
+                        `Failed to load route: ${error.message}`, 
+                        'error'
+                    );
+                    console.error('Error loading route:', error);
+                });
+                
+        } catch (error) {
+            console.error('Error handling load route:', error);
+            window.TripWeather.Managers.UI.showAlert(
+                `An error occurred while loading the route: ${error.message}`, 
+                'error'
+            );
+        }
     },
 
     /**

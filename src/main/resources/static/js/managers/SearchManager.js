@@ -16,7 +16,7 @@ window.TripWeather.Managers.Search = {
      */
     initialize: function() {
         const modal = document.getElementById('search-modal');
-        const btn = document.getElementById('search-btn');
+        const btn = document.getElementById('search-location-btn');
         const closeBtn = document.querySelector('.close');
         const searchInput = document.getElementById('search-input');
         
@@ -173,11 +173,11 @@ window.TripWeather.Managers.Search = {
         this.hideModal();
         
         // Check if we're replacing a waypoint
-        const replacingWaypointId = window.TripWeather.Managers.Waypoint.getReplacingWaypointId();
+        const replacingWaypointSequence = window.TripWeather.Managers.Waypoint.getReplacingWaypointSequence();
         
-        if (replacingWaypointId !== null) {
-            this.replaceWaypointLocationFromSearch(replacingWaypointId, lat, lng, locationName, feature);
-            window.TripWeather.Managers.Waypoint.setReplacingWaypointId(null);
+        if (replacingWaypointSequence !== null) {
+            this.replaceWaypointLocationFromSearch(replacingWaypointSequence, lat, lng, locationName, feature);
+            window.TripWeather.Managers.Waypoint.setReplacingWaypointSequence(null);
         } else {
             this.addWaypointFromSearch(lat, lng, locationName, feature);
         }
@@ -201,7 +201,7 @@ window.TripWeather.Managers.Search = {
         const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(lat, lng, locationInfo);
         
         // No need to call fetchLocationName since we already have all the data
-        const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.id === waypoint.id);
+        const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.sequence === waypoint.sequence);
         if (index !== -1) {
             const marker = window.TripWeather.Managers.Waypoint.waypointMarkers[index];
             if (marker && window.TripWeather.Managers.WaypointRenderer) {
@@ -212,26 +212,26 @@ window.TripWeather.Managers.Search = {
 
     /**
      * Replace waypoint location from search result
-     * @param {number} waypointId - ID of waypoint to replace
+     * @param {number} sequence - Sequence of waypoint to replace
      * @param {number} lat - New latitude
      * @param {number} lng - New longitude
      * @param {string} locationName - Location name
      * @param {object} feature - GeoJSON feature object
      */
-    replaceWaypointLocationFromSearch: function(waypointId, lat, lng, locationName, feature) {
+    replaceWaypointLocationFromSearch: function(sequence, lat, lng, locationName, feature) {
         // Extract location information from search result
         const locationInfo = window.TripWeather.Services.Location.extractLocationFromFeature(feature);
         
         // Replace waypoint with pre-fetched location data
-        window.TripWeather.Managers.Waypoint.replaceWaypointLocation(waypointId, lat, lng, locationInfo);
+        window.TripWeather.Managers.Waypoint.replaceWaypointLocation(sequence, lat, lng, locationInfo);
     },
 
     /**
      * Search for new location for specific waypoint
-     * @param {number} waypointId - ID of waypoint to search for
+     * @param {number} sequence - Waypoint sequence to search for
      */
-    searchNewLocationForWaypoint: function(waypointId) {
-        window.TripWeather.Managers.Waypoint.setReplacingWaypointId(waypointId);
+    searchNewLocationForWaypoint: function(sequence) {
+        window.TripWeather.Managers.Waypoint.setReplacingWaypointSequence(sequence);
         this.showModal();
     },
 

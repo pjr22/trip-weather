@@ -64,7 +64,7 @@ window.TripWeather.Managers.Route = {
             return {
                 latitude: parseFloat(waypoint.lat),
                 longitude: parseFloat(waypoint.lng),
-                name: waypoint.locationName || `Waypoint ${waypoint.id}`,
+                name: waypoint.locationName || `Waypoint ${waypoint.sequence}`,
                 date: waypoint.date || '',
                 time: waypoint.time || '',
                 duration: waypoint.duration || 0
@@ -108,7 +108,7 @@ window.TripWeather.Managers.Route = {
             return [coord[1], coord[0]];
         });
 
-        // Create polyline for the route - changed color from green (#27ae60) to blue (#0066cc)
+        // Create polyline for route - changed color from green (#27ae60) to blue (#0066cc)
         const map = window.TripWeather.Managers.Map.getMap();
         const routePolyline = L.polyline(routeCoordinates, {
             color: '#0066cc',
@@ -119,7 +119,7 @@ window.TripWeather.Managers.Route = {
 
         this.routePolylines.push(routePolyline);
 
-        // Fit map to show the entire route
+        // Fit map to show entire route
         window.TripWeather.Managers.Map.fitBounds(routeCoordinates, { padding: [50, 50] });
 
         // Update waypoint arrival times, durations, and timezones if provided
@@ -149,14 +149,14 @@ window.TripWeather.Managers.Route = {
             if (index < waypoints.length) {
                 const waypoint = waypoints[index];
                 
-                // Update arrival time if provided by the route calculation
+                // Update arrival time if provided by route calculation
                 if (routeWaypoint.arrivalTime) {
                     const arrivalDateTime = routeWaypoint.arrivalTime.split(' ');
                     if (arrivalDateTime.length === 2) {
                         waypoint.date = arrivalDateTime[0];
                         waypoint.time = arrivalDateTime[1];
                         
-                        // Fetch weather for the updated arrival time
+                        // Fetch weather for updated arrival time
                         window.TripWeather.Managers.Waypoint.fetchWeatherForWaypoint(waypoint);
                     }
                 }
@@ -176,7 +176,7 @@ window.TripWeather.Managers.Route = {
             }
         });
         
-        // Update the table to show the new arrival times, durations, and timezones
+        // Update table to show new arrival times, durations, and timezones
         window.TripWeather.Managers.WaypointRenderer.updateTable();
     },
 
@@ -212,12 +212,12 @@ window.TripWeather.Managers.Route = {
         
         switch (changeType) {
             case 'delete':
-                // Any deletion affects the route
+                // Any deletion affects route
                 shouldClearRoute = true;
                 break;
                 
             case 'reorder':
-                // Any reordering affects the route
+                // Any reordering affects route
                 shouldClearRoute = true;
                 break;
                 
@@ -229,7 +229,7 @@ window.TripWeather.Managers.Route = {
                 break;
                 
             case 'modify':
-                // Any modification to existing waypoint affects the route
+                // Any modification to existing waypoint affects route
                 shouldClearRoute = true;
                 break;
         }
@@ -256,7 +256,7 @@ window.TripWeather.Managers.Route = {
             return waypointIndex < this.currentRoute.getWaypoints().length;
         }
         
-        // For all other changes, it affects the route
+        // For all other changes, it affects route
         return true;
     },
 

@@ -11,17 +11,19 @@ window.TripWeather.Managers.Waypoint = {
     // Waypoint data and state
     waypoints: [],
     waypointMarkers: [],
-    replacingWaypointId: null,
-    nextId: 1,
+    replacingWaypointSequence: null,
+    nextSequence: 1,
     
     /**
      * Waypoint class constructor
-     * @param {number} id - Unique waypoint identifier
+     * @param {number} sequence - Sequence number for ordering
+     * @param {string} uuid - UUID for entity identification (null for new waypoints)
      * @param {number} lat - Latitude coordinate
      * @param {number} lng - Longitude coordinate
      */
-    Waypoint: function(id, lat, lng) {
-        this.id = id;
+    Waypoint: function(sequence, uuid, lat, lng) {
+        this.sequence = sequence;
+        this.uuid = uuid; // null for new waypoints, will be set by backend
         this.lat = window.TripWeather.Utils.Helpers.formatCoordinate(lat);
         this.lng = window.TripWeather.Utils.Helpers.formatCoordinate(lng);
         this.date = '';
@@ -34,13 +36,13 @@ window.TripWeather.Managers.Waypoint = {
     },
 
     /**
-     * Initialize the waypoint manager
+     * Initialize waypoint manager
      */
     initialize: function() {
         this.waypoints = [];
         this.waypointMarkers = [];
-        this.replacingWaypointId = null;
-        this.nextId = 1;
+        this.replacingWaypointSequence = null;
+        this.nextSequence = 1;
     },
 
     /**
@@ -48,9 +50,9 @@ window.TripWeather.Managers.Waypoint = {
      * @param {L.MouseEvent} e - Leaflet mouse event
      */
     handleMapClick: function(e) {
-        if (this.replacingWaypointId !== null) {
-            this.replaceWaypointLocation(this.replacingWaypointId, e.latlng.lat, e.latlng.lng);
-            this.replacingWaypointId = null;
+        if (this.replacingWaypointSequence !== null) {
+            this.replaceWaypointLocation(this.replacingWaypointSequence, e.latlng.lat, e.latlng.lng);
+            this.replacingWaypointSequence = null;
             window.TripWeather.Managers.Map.setCursor('');
         } else {
             this.addWaypoint(e.latlng.lat, e.latlng.lng);
@@ -58,19 +60,37 @@ window.TripWeather.Managers.Waypoint = {
     },
 
     /**
-     * Add a new waypoint at the specified coordinates
+     * Add a new waypoint at specified coordinates
      * @param {number} lat - Latitude coordinate
      * @param {number} lng - Longitude coordinate
      * @param {object} locationInfo - Optional pre-fetched location information
+     * @param {object} existingWaypoint - Optional existing waypoint object to load
      * @returns {object} - Created waypoint
      */
-    addWaypoint: function(lat, lng, locationInfo) {
-        const waypoint = new this.Waypoint(this.nextId++, lat, lng);
+    addWaypoint: function(lat, lng, locationInfo, existingWaypoint) {
+        let waypoint;
         
-        // If location info is provided, use it
-        if (locationInfo) {
-            waypoint.locationName = locationInfo.locationName;
-            waypoint.timezone = locationInfo.timezone;
+        if (existingWaypoint) {
+            // Use existing waypoint data for loading routes
+            waypoint = new this.Waypoint(
+                existingWaypoint.sequence || this.nextSequence++, 
+                existingWaypoint.uuid, 
+                lat, 
+                lng
+            );
+            waypoint.locationName = existingWaypoint.locationName || '';
+            waypoint.date = existingWaypoint.date || '';
+            waypoint.time = existingWaypoint.time || '';
+            waypoint.duration = existingWaypoint.duration || 0;
+        } else {
+            // Create new waypoint for manual addition
+            waypoint = new this.Waypoint(this.nextSequence++, null, lat, lng);
+            
+            // If location info is provided, use it
+            if (locationInfo) {
+                waypoint.locationName = locationInfo.locationName;
+                waypoint.timezone = locationInfo.timezone;
+            }
         }
         
         this.waypoints.push(waypoint);
@@ -104,18 +124,18 @@ window.TripWeather.Managers.Waypoint = {
     },
 
     /**
-     * Delete a waypoint by ID
-     * @param {number} id - Waypoint ID to delete
+     * Delete a waypoint by sequence
+     * @param {number} sequence - Waypoint sequence to delete
      */
-    deleteWaypoint: function(id) {
-        const index = this.waypoints.findIndex(w => w.id === id);
+    deleteWaypoint: function(sequence) {
+        const index = this.waypoints.findIndex(w => w.sequence === sequence);
         if (index === -1) return;
         
         // Remove from waypoints array
         this.waypoints.splice(index, 1);
         
         // Remove marker from map
-        const markerIndex = this.waypointMarkers.findIndex(m => m.waypointId === id);
+        const markerIndex = this.waypointMarkers.findIndex(m => m.waypointSequence === sequence);
         if (markerIndex !== -1) {
             const map = window.TripWeather.Managers.Map.getMap();
             if (map) {
@@ -145,13 +165,13 @@ window.TripWeather.Managers.Waypoint = {
 
     /**
      * Replace waypoint location
-     * @param {number} waypointId - ID of waypoint to replace
+     * @param {number} sequence - Sequence of waypoint to replace
      * @param {number} newLat - New latitude
      * @param {number} newLng - New longitude
      * @param {object} locationInfo - Optional pre-fetched location information
      */
-    replaceWaypointLocation: function(waypointId, newLat, newLng, locationInfo) {
-        const waypoint = this.waypoints.find(w => w.id === waypointId);
+    replaceWaypointLocation: function(sequence, newLat, newLng, locationInfo) {
+        const waypoint = this.waypoints.find(w => w.sequence === sequence);
         if (!waypoint) return;
         
         waypoint.lat = window.TripWeather.Utils.Helpers.formatCoordinate(newLat);
@@ -168,7 +188,7 @@ window.TripWeather.Managers.Waypoint = {
         }
         
         // Update marker position
-        const index = this.waypoints.findIndex(w => w.id === waypointId);
+        const index = this.waypoints.findIndex(w => w.sequence === sequence);
         if (index !== -1 && window.TripWeather.Managers.WaypointRenderer) {
             const marker = this.waypointMarkers[index];
             if (marker) {
@@ -195,12 +215,12 @@ window.TripWeather.Managers.Waypoint = {
 
     /**
      * Update waypoint field value
-     * @param {number} id - Waypoint ID
+     * @param {number} sequence - Waypoint sequence
      * @param {string} field - Field name to update
      * @param {*} value - New field value
      */
-    updateWaypointField: function(id, field, value) {
-        const waypoint = this.waypoints.find(w => w.id === id);
+    updateWaypointField: function(sequence, field, value) {
+        const waypoint = this.waypoints.find(w => w.sequence === sequence);
         if (!waypoint) return;
         
         if (field === 'date' || field === 'time' || field === 'locationName' || field === 'timezone') {
@@ -225,17 +245,17 @@ window.TripWeather.Managers.Waypoint = {
 
     /**
      * Update waypoint duration
-     * @param {number} waypointId - Waypoint ID
+     * @param {number} sequence - Waypoint sequence
      * @param {string} inputValue - Duration input value
      */
-    updateWaypointDuration: function(waypointId, inputValue) {
-        const waypoint = this.waypoints.find(w => w.id === waypointId);
+    updateWaypointDuration: function(sequence, inputValue) {
+        const waypoint = this.waypoints.find(w => w.sequence === sequence);
         if (!waypoint) return;
         
         const validation = window.TripWeather.Utils.Duration.validateDurationInput(inputValue);
         
-        // Update the input field with corrected value if needed
-        const inputElement = document.querySelector(`tr[data-waypoint-id="${waypointId}"] .duration-input`);
+        // Update input field with corrected value if needed
+        const inputElement = document.querySelector(`tr[data-waypoint-sequence="${sequence}"] .duration-input`);
         if (inputElement && !validation.isValid) {
             inputElement.value = validation.correctedValue;
         }
@@ -244,7 +264,7 @@ window.TripWeather.Managers.Waypoint = {
         waypoint.duration = validation.minutes;
         
         // Update marker popup
-        const index = this.waypoints.findIndex(w => w.id === waypointId);
+        const index = this.waypoints.findIndex(w => w.sequence === sequence);
         if (index !== -1 && window.TripWeather.Managers.WaypointRenderer) {
             const marker = this.waypointMarkers[index];
             if (marker) {
@@ -255,11 +275,11 @@ window.TripWeather.Managers.Waypoint = {
 
     /**
      * Increment waypoint duration
-     * @param {number} waypointId - Waypoint ID
+     * @param {number} sequence - Waypoint sequence
      * @param {number} incrementMinutes - Minutes to increment
      */
-    incrementWaypointDuration: function(waypointId, incrementMinutes) {
-        const waypoint = this.waypoints.find(w => w.id === waypointId);
+    incrementWaypointDuration: function(sequence, incrementMinutes) {
+        const waypoint = this.waypoints.find(w => w.sequence === sequence);
         if (!waypoint) return;
         
         const currentFormatted = window.TripWeather.Utils.Duration.formatDuration(waypoint.duration);
@@ -270,13 +290,13 @@ window.TripWeather.Managers.Waypoint = {
         waypoint.duration = newMinutes;
         
         // Update input field
-        const inputElement = document.querySelector(`tr[data-waypoint-id="${waypointId}"] .duration-input`);
+        const inputElement = document.querySelector(`tr[data-waypoint-sequence="${sequence}"] .duration-input`);
         if (inputElement) {
             inputElement.value = newFormatted;
         }
         
         // Update marker popup
-        const index = this.waypoints.findIndex(w => w.id === waypointId);
+        const index = this.waypoints.findIndex(w => w.sequence === sequence);
         if (index !== -1 && window.TripWeather.Managers.WaypointRenderer) {
             const marker = this.waypointMarkers[index];
             if (marker) {
@@ -287,21 +307,21 @@ window.TripWeather.Managers.Waypoint = {
 
     /**
      * Reorder waypoints
-     * @param {number} draggedId - ID of waypoint being dragged
-     * @param {number} targetId - ID of target waypoint
+     * @param {number} draggedSequence - Sequence of waypoint being dragged
+     * @param {number} targetSequence - Sequence of target waypoint
      */
-    reorderWaypoints: function(draggedId, targetId) {
-        const draggedIndex = this.waypoints.findIndex(w => w.id === draggedId);
-        const targetIndex = this.waypoints.findIndex(w => w.id === targetId);
+    reorderWaypoints: function(draggedSequence, targetSequence) {
+        const draggedIndex = this.waypoints.findIndex(w => w.sequence === draggedSequence);
+        const targetIndex = this.waypoints.findIndex(w => w.sequence === targetSequence);
         
         if (draggedIndex === -1 || targetIndex === -1) return;
         
-        // Don't do anything if dragging to the same position
+        // Don't do anything if dragging to same position
         if (draggedIndex === targetIndex) return;
         
         const [removed] = this.waypoints.splice(draggedIndex, 1);
         
-        // If we removed an item before the target, the target index shifts left by 1
+        // If we removed an item before target, target index shifts left by 1
         const adjustedTargetIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
         
         this.waypoints.splice(adjustedTargetIndex, 0, removed);
@@ -321,14 +341,14 @@ window.TripWeather.Managers.Waypoint = {
 
     /**
      * Move waypoint to end of list
-     * @param {number} draggedId - ID of waypoint to move
+     * @param {number} draggedSequence - Sequence of waypoint to move
      */
-    moveToEnd: function(draggedId) {
-        const draggedIndex = this.waypoints.findIndex(w => w.id === draggedId);
+    moveToEnd: function(draggedSequence) {
+        const draggedIndex = this.waypoints.findIndex(w => w.sequence === draggedSequence);
         
         if (draggedIndex === -1) return;
         
-        // Don't do anything if already at the end
+        // Don't do anything if already at end
         if (draggedIndex === this.waypoints.length - 1) return;
         
         const [removed] = this.waypoints.splice(draggedIndex, 1);
@@ -394,35 +414,35 @@ window.TripWeather.Managers.Waypoint = {
     recheckWaypointTimezone: function(waypoint) {
         return window.TripWeather.Services.Location.reverseGeocode(waypoint.lat, waypoint.lng)
             .then(function(data) {
-                // Extract timezone name directly from the response
+                // Extract timezone name directly from response
                 if (data && data.features && data.features.length > 0) {
                     const properties = data.features[0].properties;
                     const timezoneName = properties.timezone && properties.timezone.name ? properties.timezone.name : '';
                     
                     if (timezoneName) {
-                        // Get the target date for DST calculation
+                        // Get target date for DST calculation
                         const targetDate = waypoint.date && waypoint.time ? `${waypoint.date} ${waypoint.time}` : null;
                         
                         // Update timezone with DST-aware calculation
                         waypoint.timezone = window.TripWeather.Utils.Timezone.getTimezoneAbbr(timezoneName, targetDate);
                         
-                        // Update the table to show the new timezone
+                        // Update table to show new timezone
                         if (window.TripWeather.Managers.WaypointRenderer) {
                             window.TripWeather.Managers.WaypointRenderer.updateTable();
                         }
                         
                         // Update marker popup to show new timezone
-                        const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.id === waypoint.id);
+                        const index = this.waypoints.findIndex(w => w.sequence === waypoint.sequence);
                         if (index !== -1 && window.TripWeather.Managers.WaypointRenderer) {
-                            const marker = window.TripWeather.Managers.Waypoint.waypointMarkers[index];
+                            const marker = this.waypointMarkers[index];
                             if (marker) {
                                 window.TripWeather.Managers.WaypointRenderer.updateMarkerPopup(marker, waypoint, index + 1);
                             }
                         }
                         
-                        console.log(`Timezone rechecked for waypoint ${waypoint.id}: ${waypoint.timezone} (date: ${targetDate || 'current'})`);
+                        console.log(`Timezone rechecked for waypoint ${waypoint.sequence}: ${waypoint.timezone} (date: ${targetDate || 'current'})`);
                     } else {
-                        console.warn('No timezone name found in response for waypoint', waypoint.id);
+                        console.warn('No timezone name found in response for waypoint', waypoint.sequence);
                     }
                 } else {
                     console.warn('Invalid response data for timezone recheck');
@@ -470,12 +490,12 @@ window.TripWeather.Managers.Waypoint = {
     },
 
     /**
-     * Get waypoint by ID
-     * @param {number} id - Waypoint ID
+     * Get waypoint by sequence
+     * @param {number} sequence - Waypoint sequence
      * @returns {object|null} - Waypoint object or null if not found
      */
-    getWaypoint: function(id) {
-        return this.waypoints.find(w => w.id === id) || null;
+    getWaypoint: function(sequence) {
+        return this.waypoints.find(w => w.sequence === sequence) || null;
     },
 
     /**
@@ -496,56 +516,82 @@ window.TripWeather.Managers.Waypoint = {
 
     /**
      * Center map on waypoint
-     * @param {number} waypointId - Waypoint ID
+     * @param {number} sequence - Waypoint sequence
      */
-    centerOnWaypoint: function(waypointId) {
-        const waypoint = this.getWaypoint(waypointId);
+    centerOnWaypoint: function(sequence) {
+        const waypoint = this.getWaypoint(sequence);
         if (!waypoint) return;
         
         window.TripWeather.Managers.Map.centerOn(waypoint.lat, waypoint.lng);
         
-        const index = this.waypoints.findIndex(w => w.id === waypointId);
+        const index = this.waypoints.findIndex(w => w.sequence === sequence);
         if (index !== -1 && this.waypointMarkers[index]) {
             this.waypointMarkers[index].openPopup();
         }
         
         // Highlight table row
         if (window.TripWeather.Managers.WaypointRenderer) {
-            window.TripWeather.Managers.WaypointRenderer.highlightTableRow(waypointId);
+            window.TripWeather.Managers.WaypointRenderer.highlightTableRow(sequence);
         }
     },
 
     /**
      * Start waypoint replacement process
-     * @param {number} waypointId - Waypoint ID to replace
+     * @param {number} sequence - Waypoint sequence to replace
      */
-    selectNewLocationForWaypoint: function(waypointId) {
-        this.replacingWaypointId = waypointId;
+    selectNewLocationForWaypoint: function(sequence) {
+        this.replacingWaypointSequence = sequence;
         window.TripWeather.Managers.Map.setCursor('crosshair');
         window.TripWeather.Utils.Helpers.showAlert('Click on the map to select a new location for this waypoint.');
     },
 
     /**
-     * Get replacing waypoint ID
-     * @returns {number|null} - Current replacing waypoint ID or null
+     * Get replacing waypoint sequence
+     * @returns {number|null} - Current replacing waypoint sequence or null
      */
-    getReplacingWaypointId: function() {
-        return this.replacingWaypointId;
+    getReplacingWaypointSequence: function() {
+        return this.replacingWaypointSequence;
     },
 
     /**
-     * Set replacing waypoint ID
-     * @param {number|null} waypointId - Waypoint ID or null to clear
+     * Set replacing waypoint sequence
+     * @param {number|null} sequence - Waypoint sequence or null to clear
      */
-    setReplacingWaypointId: function(waypointId) {
-        this.replacingWaypointId = waypointId;
+    setReplacingWaypointSequence: function(sequence) {
+        this.replacingWaypointSequence = sequence;
     },
 
     /**
-     * Get the last waypoint number
-     * @returns {number} - Last waypoint number or 0 if no waypoints
+     * Get last waypoint number
+     * @returns {number} - Last waypoint sequence or 0 if no waypoints
      */
     getLastWaypointNumber: function() {
         return this.waypoints.length;
+    },
+
+    /**
+     * Clear all waypoints
+     */
+    clearAllWaypoints: function() {
+        // Remove all markers from map
+        const map = window.TripWeather.Managers.Map.getMap();
+        if (map) {
+            this.waypointMarkers.forEach(marker => map.removeLayer(marker));
+        }
+        
+        // Clear all data
+        this.waypoints = [];
+        this.waypointMarkers = [];
+        this.nextSequence = 1;
+        
+        // Update UI
+        if (window.TripWeather.Managers.WaypointRenderer) {
+            window.TripWeather.Managers.WaypointRenderer.updateTable();
+        }
+        
+        // Update route button state
+        if (window.TripWeather.Managers.Route) {
+            window.TripWeather.Managers.Route.updateButtonState();
+        }
     }
 };
