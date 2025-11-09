@@ -46,7 +46,8 @@ public class LocationController {
         }
         
         try {
-           response.put("locationName", data.getFeatures().get(0).getProperties().getFormatted());
+           String simplifiedLocationName = locationService.getSimplifiedLocationName(data);
+           response.put("locationName", simplifiedLocationName != null ? simplifiedLocationName : "Unknown");
         } catch (Exception e) {
            log.error("Failed to find location name in locationData: {}", data);
            response.put("locationName", "Unknown");

@@ -8,6 +8,9 @@ import com.pjr22.tripweather.model.LocationData;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 @Service
 @Slf4j
 public class LocationService {
@@ -37,19 +40,6 @@ public class LocationService {
                     .retrieve()
                     .body(LocationData.class);
 
-//            if (response != null && response.has("features")) {
-//                JsonNode features = response.get("features");
-//                if (features.isArray() && features.size() > 0) {
-//                    JsonNode firstFeature = features.get(0);
-//                    if (firstFeature.has("properties")) {
-//                        JsonNode properties = firstFeature.get("properties");
-//                        if (properties.has("formatted")) {
-//                            return properties.get("formatted").asText();
-//                        }
-//                    }
-//                }
-//            }
-
             return locationData;
          } catch (Exception e) {
             log.info("Failed to get formatted location info from: {}", url);
@@ -77,5 +67,47 @@ public class LocationService {
             log.error("GeoCode search request failed.", e);
             return null;
         }
+    }
+
+    /**
+     * Simplifies a location name by removing zip code and country information.
+     * Keeps the address up to and including the state abbreviation.
+     * 
+     * @param locationData LocationData object containing location information
+     * @return Simplified location name (e.g., "99 West 12th Avenue, Denver, CO")
+     *         or original formatted name if no state is found, or null if locationData is invalid
+     */
+    public String getSimplifiedLocationName(LocationData locationData) {
+        if (locationData == null || locationData.getFeatures() == null || locationData.getFeatures().isEmpty()) {
+            return null;
+        }
+
+        String formatted = locationData.getFeatures().get(0).getProperties().getFormatted();
+        if (formatted == null || formatted.trim().isEmpty()) {
+            return null;
+        }
+
+        // Pattern to match state abbreviation (2 uppercase letters) followed by optional space and numbers/characters
+        // This will match "CO 80204" or "CO" and stop there
+        Pattern pattern = Pattern.compile(",\\s*([A-Z]{2})(?:\\s+[^,]+)?$");
+        Matcher matcher = pattern.matcher(formatted);
+
+        if (matcher.find()) {
+            // Find the end position of the state abbreviation
+            int stateEnd = matcher.end(1);
+            return formatted.substring(0, stateEnd);
+        }
+
+        // If no state pattern is found, try a simpler approach - look for 2-letter state code
+        Pattern statePattern = Pattern.compile(",\\s*([A-Z]{2})");
+        Matcher stateMatcher = statePattern.matcher(formatted);
+        
+        if (stateMatcher.find()) {
+            int stateEnd = stateMatcher.end(1);
+            return formatted.substring(0, stateEnd);
+        }
+
+        // If no state is found, return the original formatted string
+        return formatted;
     }
 }
