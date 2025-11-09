@@ -892,6 +892,56 @@ function updateWaypointField(id, field, value) {
         if ((field === 'date' || field === 'time') && waypoint.date && waypoint.time) {
             fetchWeatherForWaypoint(waypoint);
         }
+        
+        // Recheck timezone when date or time changes
+        if ((field === 'date' || field === 'time') && waypoint.lat && waypoint.lng) {
+            recheckWaypointTimezone(waypoint);
+        }
+    }
+}
+
+/**
+ * Recheck timezone for a waypoint when date or time changes
+ * @param {Waypoint} waypoint - The waypoint to recheck timezone for
+ */
+async function recheckWaypointTimezone(waypoint) {
+    try {
+        const params = new URLSearchParams({
+            latitude: waypoint.lat,
+            longitude: waypoint.lng
+        });
+        
+        const response = await fetch(`/api/location/reverse?${params}`);
+        const data = await response.json();
+        
+        const locationInfo = parseLocationData(data);
+        
+        // Get the target date for DST calculation
+        const targetDate = waypoint.date && waypoint.time ? `${waypoint.date} ${waypoint.time}` : null;
+        
+        // Update timezone with DST-aware calculation
+        if (locationInfo.timezoneName) {
+            waypoint.timezone = getTimezoneAbbr(locationInfo.timezoneName, targetDate);
+        } else {
+            waypoint.timezone = locationInfo.timezone;
+        }
+        
+        // Update the table to show the new timezone
+        updateTable();
+        
+        // Update marker popup to show new timezone
+        const index = waypoints.findIndex(w => w.id === waypoint.id);
+        if (index !== -1) {
+            const marker = waypointMarkers[index];
+            if (marker) {
+                updateMarkerPopup(marker, waypoint, index + 1);
+            }
+        }
+        
+        console.log(`Timezone rechecked for waypoint ${waypoint.id}: ${waypoint.timezone}`);
+        
+    } catch (error) {
+        console.warn('Failed to recheck timezone:', error);
     }
 }
 
@@ -1446,7 +1496,7 @@ function updateWaypointWithRouteData(routeWaypoints) {
 }
 
 function clearRoute() {
-    // Remove all route polylines from the map
+    // Remove all route polylines from map
     routePolylines.forEach(polyline => {
         map.removeLayer(polyline);
     });
