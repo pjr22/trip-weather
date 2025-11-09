@@ -281,8 +281,8 @@ main {
 
 #waypoints-table th:nth-child(11), /* Precip column */
 #waypoints-table td:nth-child(11) {
-    width: 70px;
-    min-width: 70px;
+    width: 80px;
+    min-width: 80px;
     text-align: center;
 }
 
@@ -551,14 +551,13 @@ main {
 
 .loading-overlay {
     display: none;
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
     background-color: rgba(0, 0, 0, 0.5);
     z-index: 1000;
-    border-radius: 4px;
     align-items: center;
     justify-content: center;
 }
