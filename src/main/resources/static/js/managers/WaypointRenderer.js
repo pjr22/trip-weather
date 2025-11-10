@@ -164,37 +164,37 @@ window.TripWeather.Managers.WaypointRenderer = {
             row.innerHTML = `
                 <td class="drag-handle-cell"><span class="drag-handle" title="Drag to reorder">☰</span></td>
                 <td>${index + 1}</td>
-                <td><input type="date" value="${waypoint.date}" onchange="window.TripWeather.Managers.Waypoint.updateWaypointField(${waypoint.sequence}, 'date', this.value)"></td>
-                <td><input type="time" value="${waypoint.time}" onchange="window.TripWeather.Managers.Waypoint.updateWaypointField(${waypoint.sequence}, 'time', this.value)"></td>
+                <td><input type="date" value="${waypoint.date}" data-waypoint-sequence="${waypoint.sequence}" data-field="date"></td>
+                <td><input type="time" value="${waypoint.time}" data-waypoint-sequence="${waypoint.sequence}" data-field="time"></td>
                 <td>${waypoint.timezone || '-'}</td>
                 <td>
                     <div class="duration-input-container">
                         <input type="text" 
                                value="${window.TripWeather.Utils.Duration.formatDuration(waypoint.duration)}" 
                                placeholder="3d2h10m" 
-                               onblur="window.TripWeather.Managers.Waypoint.updateWaypointDuration(${waypoint.sequence}, this.value)"
-                               onkeydown="window.TripWeather.Managers.WaypointRenderer.handleDurationKeydown(event, ${waypoint.sequence}, this.value)"
+                               data-waypoint-sequence="${waypoint.sequence}"
+                               data-field="duration"
                                class="duration-input"
                                title="Enter duration like 3d2h10m, 48h22m, 1000m, 1.5h">
                         <div class="duration-arrows">
-                            <button class="duration-arrow-up" onclick="window.TripWeather.Managers.Waypoint.incrementWaypointDuration(${waypoint.sequence}, 10)" title="Add 10 minutes">▲</button>
-                            <button class="duration-arrow-down" onclick="window.TripWeather.Managers.Waypoint.incrementWaypointDuration(${waypoint.sequence}, -10)" title="Subtract 10 minutes">▼</button>
+                            <button class="duration-arrow-up" data-waypoint-sequence="${waypoint.sequence}" data-increment="10" title="Add 10 minutes">▲</button>
+                            <button class="duration-arrow-down" data-waypoint-sequence="${waypoint.sequence}" data-increment="-10" title="Subtract 10 minutes">▼</button>
                         </div>
                     </div>
                 </td>
-                <td><input type="text" value="${waypoint.locationName}" placeholder="Enter location name" onchange="window.TripWeather.Managers.Waypoint.updateWaypointField(${waypoint.sequence}, 'locationName', this.value)"></td>
+                <td><input type="text" value="${waypoint.locationName}" placeholder="Enter location name" data-waypoint-sequence="${waypoint.sequence}" data-field="locationName"></td>
                 ${weatherHtml}
                 <td class="actions-cell">
-                    <button class="action-btn" onclick="window.TripWeather.Managers.Waypoint.centerOnWaypoint(${waypoint.sequence})" title="Center on waypoint">
+                    <button class="action-btn" data-waypoint-sequence="${waypoint.sequence}" data-action="center" title="Center on waypoint">
                         <span class="action-icon-container" data-icon="icons/crosshair.svg"></span>
                     </button>
-                    <button class="action-btn" onclick="window.TripWeather.Managers.Waypoint.selectNewLocationForWaypoint(${waypoint.sequence})" title="Select new location on map">
+                    <button class="action-btn" data-waypoint-sequence="${waypoint.sequence}" data-action="select-location" title="Select new location on map">
                         <span class="action-icon-container" data-icon="icons/map_pin.svg"></span>
                     </button>
-                    <button class="action-btn" onclick="window.TripWeather.Managers.Search.searchNewLocationForWaypoint(${waypoint.sequence})" title="Search for new location">
+                    <button class="action-btn" data-waypoint-sequence="${waypoint.sequence}" data-action="search-location" title="Search for new location">
                         <span class="action-icon-container" data-icon="icons/search.svg"></span>
                     </button>
-                    <button class="action-btn delete-action" onclick="window.TripWeather.Managers.Waypoint.deleteWaypoint(${waypoint.sequence})" title="Delete waypoint">
+                    <button class="action-btn delete-action" data-waypoint-sequence="${waypoint.sequence}" data-action="delete" title="Delete waypoint">
                         <span class="action-icon-container" data-icon="icons/delete.svg"></span>
                     </button>
                 </td>
@@ -203,20 +203,8 @@ window.TripWeather.Managers.WaypointRenderer = {
             // Initialize drag and drop for the row
             this.setupDragAndDrop(row);
             
-            // Setup row click handler
-            row.addEventListener('click', function(e) {
-                if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
-                    this.highlightTableRow(waypoint.sequence);
-                    const marker = window.TripWeather.Managers.Waypoint.waypointMarkers.find(m => m.waypointSequence === waypoint.sequence);
-                    if (marker) {
-                        const map = window.TripWeather.Managers.Map.getMap();
-                        if (map) {
-                            map.setView(marker.getLatLng(), 13);
-                        }
-                        marker.openPopup();
-                    }
-                }
-            }.bind(this));
+            // Setup event handlers using data attributes instead of inline onclick
+            this.setupRowEventHandlers(row, waypoint, index);
             
             // Load action icons
             row.querySelectorAll('.action-icon-container').forEach(container => {
@@ -234,6 +222,78 @@ window.TripWeather.Managers.WaypointRenderer = {
             `;
             this.setupDropZone(dropZoneRow);
         }
+    },
+
+    /**
+     * Setup event handlers for a table row using data attributes
+     * @param {HTMLTableRowElement} row - Table row element
+     * @param {object} waypoint - Waypoint object
+     * @param {number} index - Index in waypoints array
+     */
+    setupRowEventHandlers: function(row, waypoint, index) {
+        // Setup input change handlers
+        row.querySelectorAll('input[data-waypoint-sequence]').forEach(input => {
+            const sequence = parseInt(input.dataset.waypointSequence);
+            const field = input.dataset.field;
+            
+            if (field === 'duration') {
+                input.addEventListener('blur', function(e) {
+                    window.TripWeather.Managers.Waypoint.updateWaypointDuration(sequence, e.target.value);
+                });
+                
+                input.addEventListener('keydown', function(e) {
+                    this.handleDurationKeydown(e, sequence, e.target.value);
+                }.bind(this));
+            } else {
+                input.addEventListener('change', function(e) {
+                    window.TripWeather.Managers.Waypoint.updateWaypointField(sequence, field, e.target.value);
+                });
+            }
+        });
+        
+        // Setup button click handlers
+        row.querySelectorAll('button[data-waypoint-sequence]').forEach(button => {
+            const sequence = parseInt(button.dataset.waypointSequence);
+            const action = button.dataset.action;
+            
+            if (action === 'center') {
+                button.addEventListener('click', function() {
+                    window.TripWeather.Managers.Waypoint.centerOnWaypoint(sequence);
+                });
+            } else if (action === 'select-location') {
+                button.addEventListener('click', function() {
+                    window.TripWeather.Managers.Waypoint.selectNewLocationForWaypoint(sequence);
+                });
+            } else if (action === 'search-location') {
+                button.addEventListener('click', function() {
+                    window.TripWeather.Managers.Search.searchNewLocationForWaypoint(sequence);
+                });
+            } else if (action === 'delete') {
+                button.addEventListener('click', function() {
+                    window.TripWeather.Managers.Waypoint.deleteWaypoint(sequence);
+                });
+            } else if (button.dataset.increment !== undefined) {
+                const increment = parseInt(button.dataset.increment);
+                button.addEventListener('click', function() {
+                    window.TripWeather.Managers.Waypoint.incrementWaypointDuration(sequence, increment);
+                });
+            }
+        });
+        
+        // Setup row click handler
+        row.addEventListener('click', function(e) {
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+                this.highlightTableRow(waypoint.sequence);
+                const marker = window.TripWeather.Managers.Waypoint.waypointMarkers.find(m => m.waypointSequence === waypoint.sequence);
+                if (marker) {
+                    const map = window.TripWeather.Managers.Map.getMap();
+                    if (map) {
+                        map.setView(marker.getLatLng(), 13);
+                    }
+                    marker.openPopup();
+                }
+            }
+        }.bind(this));
     },
 
     /**

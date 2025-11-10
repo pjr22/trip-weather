@@ -82,6 +82,11 @@ window.TripWeather.Managers.Waypoint = {
             waypoint.date = existingWaypoint.date || '';
             waypoint.time = existingWaypoint.time || '';
             waypoint.duration = existingWaypoint.duration || 0;
+            
+            // CRITICAL FIX: Update nextSequence to be higher than any existing waypoint sequence
+            if (existingWaypoint.sequence && existingWaypoint.sequence >= this.nextSequence) {
+                this.nextSequence = existingWaypoint.sequence + 1;
+            }
         } else {
             // Create new waypoint for manual addition
             waypoint = new this.Waypoint(this.nextSequence++, null, lat, lng);
@@ -95,9 +100,11 @@ window.TripWeather.Managers.Waypoint = {
         
         this.waypoints.push(waypoint);
         
-        // Add marker to map
+        // Add marker to map and ensure marker array stays synchronized
         if (window.TripWeather.Managers.WaypointRenderer) {
-            window.TripWeather.Managers.WaypointRenderer.addMarkerToMap(waypoint, this.waypoints.length);
+            const marker = window.TripWeather.Managers.WaypointRenderer.addMarkerToMap(waypoint, this.waypoints.length);
+            // Ensure the marker array stays in sync with waypoints array
+            this.waypointMarkers.push(marker);
         }
         
         // Update UI
@@ -187,10 +194,10 @@ window.TripWeather.Managers.Waypoint = {
             waypoint.timezone = '';
         }
         
-        // Update marker position
+        // Update marker position using correct index
         const index = this.waypoints.findIndex(w => w.sequence === sequence);
-        if (index !== -1 && window.TripWeather.Managers.WaypointRenderer) {
-            const marker = this.waypointMarkers[index];
+        if (index !== -1) {
+            const marker = this.waypointMarkers.find(m => m.waypointSequence === sequence);
             if (marker) {
                 marker.setLatLng([newLat, newLng]);
                 window.TripWeather.Managers.WaypointRenderer.updateMarkerPopup(marker, waypoint, index + 1);
@@ -263,13 +270,11 @@ window.TripWeather.Managers.Waypoint = {
         // Update waypoint duration
         waypoint.duration = validation.minutes;
         
-        // Update marker popup
-        const index = this.waypoints.findIndex(w => w.sequence === sequence);
-        if (index !== -1 && window.TripWeather.Managers.WaypointRenderer) {
-            const marker = this.waypointMarkers[index];
-            if (marker) {
-                window.TripWeather.Managers.WaypointRenderer.updateMarkerPopup(marker, waypoint, index + 1);
-            }
+        // Update marker popup using correct lookup
+        const marker = this.waypointMarkers.find(m => m.waypointSequence === sequence);
+        if (marker) {
+            const index = this.waypoints.findIndex(w => w.sequence === sequence);
+            window.TripWeather.Managers.WaypointRenderer.updateMarkerPopup(marker, waypoint, index + 1);
         }
     },
 
@@ -295,13 +300,11 @@ window.TripWeather.Managers.Waypoint = {
             inputElement.value = newFormatted;
         }
         
-        // Update marker popup
-        const index = this.waypoints.findIndex(w => w.sequence === sequence);
-        if (index !== -1 && window.TripWeather.Managers.WaypointRenderer) {
-            const marker = this.waypointMarkers[index];
-            if (marker) {
-                window.TripWeather.Managers.WaypointRenderer.updateMarkerPopup(marker, waypoint, index + 1);
-            }
+        // Update marker popup using correct lookup
+        const marker = this.waypointMarkers.find(m => m.waypointSequence === sequence);
+        if (marker) {
+            const index = this.waypoints.findIndex(w => w.sequence === sequence);
+            window.TripWeather.Managers.WaypointRenderer.updateMarkerPopup(marker, waypoint, index + 1);
         }
     },
 
@@ -378,10 +381,12 @@ window.TripWeather.Managers.Waypoint = {
         }
         this.waypointMarkers = [];
         
-        // Recreate all markers with new order numbers
+        // Recreate all markers with new order numbers and ensure synchronization
         if (window.TripWeather.Managers.WaypointRenderer) {
             this.waypoints.forEach((waypoint, index) => {
-                window.TripWeather.Managers.WaypointRenderer.addMarkerToMap(waypoint, index + 1);
+                const marker = window.TripWeather.Managers.WaypointRenderer.addMarkerToMap(waypoint, index + 1);
+                // Ensure the marker array stays in sync with waypoints array
+                this.waypointMarkers.push(marker);
             });
         }
     },
@@ -432,12 +437,10 @@ window.TripWeather.Managers.Waypoint = {
                         }
                         
                         // Update marker popup to show new timezone
-                        const index = this.waypoints.findIndex(w => w.sequence === waypoint.sequence);
-                        if (index !== -1 && window.TripWeather.Managers.WaypointRenderer) {
-                            const marker = this.waypointMarkers[index];
-                            if (marker) {
-                                window.TripWeather.Managers.WaypointRenderer.updateMarkerPopup(marker, waypoint, index + 1);
-                            }
+                        const marker = window.TripWeather.Managers.Waypoint.waypointMarkers.find(m => m.waypointSequence === waypoint.sequence);
+                        if (marker) {
+                            const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.sequence === waypoint.sequence);
+                            window.TripWeather.Managers.WaypointRenderer.updateMarkerPopup(marker, waypoint, index + 1);
                         }
                         
                         console.log(`Timezone rechecked for waypoint ${waypoint.sequence}: ${waypoint.timezone} (date: ${targetDate || 'current'})`);
@@ -524,9 +527,9 @@ window.TripWeather.Managers.Waypoint = {
         
         window.TripWeather.Managers.Map.centerOn(waypoint.lat, waypoint.lng);
         
-        const index = this.waypoints.findIndex(w => w.sequence === sequence);
-        if (index !== -1 && this.waypointMarkers[index]) {
-            this.waypointMarkers[index].openPopup();
+        const marker = this.waypointMarkers.find(m => m.waypointSequence === sequence);
+        if (marker) {
+            marker.openPopup();
         }
         
         // Highlight table row
