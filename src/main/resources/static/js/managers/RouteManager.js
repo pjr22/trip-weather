@@ -59,7 +59,7 @@ window.TripWeather.Managers.Route = {
 
         this.showLoading();
 
-        // Prepare waypoints for API request with date, time, and duration
+        // Prepare waypoints for API request with date, time, duration, and timezone name
         const waypointData = waypoints.map(function(waypoint) {
             return {
                 latitude: parseFloat(waypoint.lat),
@@ -67,7 +67,8 @@ window.TripWeather.Managers.Route = {
                 name: waypoint.locationName || `Waypoint ${waypoint.sequence}`,
                 date: waypoint.date || '',
                 time: waypoint.time || '',
-                duration: waypoint.duration || 0
+                duration: waypoint.duration || 0,
+                timezoneName: waypoint.timezoneName || ''
             };
         });
 
@@ -166,12 +167,32 @@ window.TripWeather.Managers.Route = {
                     waypoint.duration = routeWaypoint.duration;
                 }
                 
-                // Store timezone information
+                // Store timezone information if provided by route calculation
                 if (routeWaypoint.timezone) {
-                    waypoint.timezone = window.TripWeather.Utils.Timezone.getTimezoneAbbr(
-                        routeWaypoint.timezone, 
-                        waypoint.date && waypoint.time ? `${waypoint.date} ${waypoint.time}` : null
-                    );
+                    // Update timezone name if provided
+                    if (routeWaypoint.timezoneName) {
+                        waypoint.timezoneName = routeWaypoint.timezoneName;
+                    }
+                    // Update timezone offsets if provided
+                    if (routeWaypoint.timezoneStdOffset) {
+                        waypoint.timezoneStdOffset = routeWaypoint.timezoneStdOffset;
+                    }
+                    if (routeWaypoint.timezoneDstOffset) {
+                        waypoint.timezoneDstOffset = routeWaypoint.timezoneDstOffset;
+                    }
+                    // Update timezone abbreviations if provided
+                    if (routeWaypoint.timezoneStdAbbr) {
+                        waypoint.timezoneStdAbbr = routeWaypoint.timezoneStdAbbr;
+                    }
+                    if (routeWaypoint.timezoneDstAbbr) {
+                        waypoint.timezoneDstAbbr = routeWaypoint.timezoneDstAbbr;
+                    }
+                    
+                    // Update the current timezone abbreviation based on date
+                    if (waypoint.date && waypoint.time && waypoint.timezoneName) {
+                        const dateTimeStr = `${waypoint.date} ${waypoint.time}`;
+                        waypoint.timezone = window.TripWeather.Utils.Timezone.getTimezoneAbbrFromWaypoint(waypoint, dateTimeStr);
+                    }
                 }
             }
         });

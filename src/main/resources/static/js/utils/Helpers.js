@@ -17,8 +17,11 @@ window.TripWeather.Utils.Helpers = {
         if (!data || !data.features || data.features.length === 0) {
             return {
                 locationName: 'Unknown',
-                timezone: '',
-                timezoneName: ''
+                timezoneName: '',
+                timezoneStdOffset: '',
+                timezoneDstOffset: '',
+                timezoneStdAbbr: '',
+                timezoneDstAbbr: ''
             };
         }
         
@@ -49,20 +52,30 @@ window.TripWeather.Utils.Helpers = {
             locationName = properties.formatted.trim();
         }
         
-        // Extract timezone information
-        let timezone = '';
+        // Extract all timezone information from API response
         let timezoneName = '';
+        let timezoneStdOffset = '';
+        let timezoneDstOffset = '';
+        let timezoneStdAbbr = '';
+        let timezoneDstAbbr = '';
+        
         if (properties.timezone) {
-            // Extract timezone name for later DST calculation
             timezoneName = properties.timezone.name || '';
-            // For initial display, use current time to get appropriate abbreviation
-            timezone = window.TripWeather.Utils.Timezone.getTimezoneAbbr(timezoneName);
+            timezoneStdOffset = properties.timezone.offset_STD || '';
+            timezoneDstOffset = properties.timezone.offset_DST || '';
+            timezoneStdAbbr = properties.timezone.abbreviation_STD || '';
+            timezoneDstAbbr = properties.timezone.abbreviation_DST || '';
+            
+            // Note: The 'timezone' field is deprecated and has been removed
         }
         
         return {
             locationName: locationName || 'Unknown',
-            timezone: timezone,
-            timezoneName: timezoneName
+            timezoneName: timezoneName,
+            timezoneStdOffset: timezoneStdOffset,
+            timezoneDstOffset: timezoneDstOffset,
+            timezoneStdAbbr: timezoneStdAbbr,
+            timezoneDstAbbr: timezoneDstAbbr
         };
     },
 

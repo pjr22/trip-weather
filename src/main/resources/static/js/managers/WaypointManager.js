@@ -28,7 +28,12 @@ window.TripWeather.Managers.Waypoint = {
         this.lng = window.TripWeather.Utils.Helpers.formatCoordinate(lng);
         this.date = '';
         this.time = '';
-        this.timezone = '';
+        // Timezone information from API
+        this.timezoneName = '';         // Timezone proper name e.g., "America/Denver"
+        this.timezoneStdOffset = '';    // Standard time offset e.g., "-07:00"
+        this.timezoneDstOffset = '';    // Daylight saving time offset e.g., "-06:00"
+        this.timezoneStdAbbr = '';      // Standard time abbreviation e.g., "MST"
+        this.timezoneDstAbbr = '';      // Daylight saving time abbreviation e.g., "MDT"
         this.duration = 0;
         this.locationName = '';
         this.weather = null;
@@ -73,15 +78,24 @@ window.TripWeather.Managers.Waypoint = {
         if (existingWaypoint) {
             // Use existing waypoint data for loading routes
             waypoint = new this.Waypoint(
-                existingWaypoint.sequence || this.nextSequence++, 
-                existingWaypoint.uuid, 
-                lat, 
+                existingWaypoint.sequence || this.nextSequence++,
+                existingWaypoint.uuid,
+                lat,
                 lng
             );
             waypoint.locationName = existingWaypoint.locationName || '';
             waypoint.date = existingWaypoint.date || '';
             waypoint.time = existingWaypoint.time || '';
             waypoint.duration = existingWaypoint.duration || 0;
+            
+            // Copy timezone information if it exists
+            if (existingWaypoint.timezoneName) {
+                waypoint.timezoneName = existingWaypoint.timezoneName;
+                waypoint.timezoneStdOffset = existingWaypoint.timezoneStdOffset || '';
+                waypoint.timezoneDstOffset = existingWaypoint.timezoneDstOffset || '';
+                waypoint.timezoneStdAbbr = existingWaypoint.timezoneStdAbbr || '';
+                waypoint.timezoneDstAbbr = existingWaypoint.timezoneDstAbbr || '';
+            }
             
             // CRITICAL FIX: Update nextSequence to be higher than any existing waypoint sequence
             if (existingWaypoint.sequence && existingWaypoint.sequence >= this.nextSequence) {
@@ -94,7 +108,12 @@ window.TripWeather.Managers.Waypoint = {
             // If location info is provided, use it
             if (locationInfo) {
                 waypoint.locationName = locationInfo.locationName;
-                waypoint.timezone = locationInfo.timezone;
+                // Store all timezone information
+                waypoint.timezoneName = locationInfo.timezoneName || '';
+                waypoint.timezoneStdOffset = locationInfo.timezoneStdOffset || '';
+                waypoint.timezoneDstOffset = locationInfo.timezoneDstOffset || '';
+                waypoint.timezoneStdAbbr = locationInfo.timezoneStdAbbr || '';
+                waypoint.timezoneDstAbbr = locationInfo.timezoneDstAbbr || '';
             }
         }
         
@@ -188,10 +207,20 @@ window.TripWeather.Managers.Waypoint = {
         // Update location info if provided
         if (locationInfo) {
             waypoint.locationName = locationInfo.locationName;
-            waypoint.timezone = locationInfo.timezone;
+            // Store all timezone information
+            waypoint.timezoneName = locationInfo.timezoneName || '';
+            waypoint.timezoneStdOffset = locationInfo.timezoneStdOffset || '';
+            waypoint.timezoneDstOffset = locationInfo.timezoneDstOffset || '';
+            waypoint.timezoneStdAbbr = locationInfo.timezoneStdAbbr || '';
+            waypoint.timezoneDstAbbr = locationInfo.timezoneDstAbbr || '';
         } else {
             waypoint.locationName = '';
-            waypoint.timezone = '';
+            // Clear all timezone information
+            waypoint.timezoneName = '';
+            waypoint.timezoneStdOffset = '';
+            waypoint.timezoneDstOffset = '';
+            waypoint.timezoneStdAbbr = '';
+            waypoint.timezoneDstAbbr = '';
         }
         
         // Update marker position using correct index
@@ -230,21 +259,16 @@ window.TripWeather.Managers.Waypoint = {
         const waypoint = this.waypoints.find(w => w.sequence === sequence);
         if (!waypoint) return;
         
-        if (field === 'date' || field === 'time' || field === 'locationName' || field === 'timezone') {
+        if (field === 'date' || field === 'time' || field === 'locationName') {
             waypoint[field] = value;
             
             // Fetch weather when date and time are set
             if ((field === 'date' || field === 'time') && waypoint.date && waypoint.time) {
                 this.fetchWeatherForWaypoint(waypoint);
             }
-            
-            // Recheck timezone when date or time changes
-            if ((field === 'date' || field === 'time') && waypoint.lat && waypoint.lng) {
-                this.recheckWaypointTimezone(waypoint);
-            }
         }
         
-        // Update UI
+        // Update UI - specifically update the table to show the correct timezone abbreviation
         if (window.TripWeather.Managers.WaypointRenderer) {
             window.TripWeather.Managers.WaypointRenderer.updateTable();
         }
@@ -399,7 +423,12 @@ window.TripWeather.Managers.Waypoint = {
         return window.TripWeather.Services.Location.getLocationInfo(waypoint.lat, waypoint.lng)
             .then(function(locationInfo) {
                 waypoint.locationName = locationInfo.locationName;
-                waypoint.timezone = locationInfo.timezone;
+                // Store all timezone information
+                waypoint.timezoneName = locationInfo.timezoneName || '';
+                waypoint.timezoneStdOffset = locationInfo.timezoneStdOffset || '';
+                waypoint.timezoneDstOffset = locationInfo.timezoneDstOffset || '';
+                waypoint.timezoneStdAbbr = locationInfo.timezoneStdAbbr || '';
+                waypoint.timezoneDstAbbr = locationInfo.timezoneDstAbbr || '';
                 
                 // Update UI
                 if (window.TripWeather.Managers.WaypointRenderer) {
@@ -419,17 +448,29 @@ window.TripWeather.Managers.Waypoint = {
     recheckWaypointTimezone: function(waypoint) {
         return window.TripWeather.Services.Location.reverseGeocode(waypoint.lat, waypoint.lng)
             .then(function(data) {
-                // Extract timezone name directly from response
+                // Extract timezone information directly from response
                 if (data && data.features && data.features.length > 0) {
                     const properties = data.features[0].properties;
-                    const timezoneName = properties.timezone && properties.timezone.name ? properties.timezone.name : '';
+                    const timezone = properties.timezone;
                     
-                    if (timezoneName) {
-                        // Get target date for DST calculation
-                        const targetDate = waypoint.date && waypoint.time ? `${waypoint.date} ${waypoint.time}` : null;
+                    if (timezone) {
+                        // Store all timezone information from API
+                        waypoint.timezoneName = timezone.name || '';
+                        waypoint.timezoneStdOffset = timezone.offset_STD || '';
+                        waypoint.timezoneDstOffset = timezone.offset_DST || '';
+                        waypoint.timezoneStdAbbr = timezone.abbreviation_STD || '';
+                        waypoint.timezoneDstAbbr = timezone.abbreviation_DST || '';
                         
-                        // Update timezone with DST-aware calculation
-                        waypoint.timezone = window.TripWeather.Utils.Timezone.getTimezoneAbbr(timezoneName, targetDate);
+                        // Update the current timezone abbreviation based on date
+                        const targetDate = waypoint.date && waypoint.time ? `${waypoint.date} ${waypoint.time}` : null;
+                        if (targetDate && waypoint.timezoneName) {
+                            // Use the appropriate abbreviation based on DST
+                            const isDst = this.isDaylightSavingTimeForDate(new Date(targetDate), waypoint);
+                            waypoint.timezone = isDst ? waypoint.timezoneDstAbbr : waypoint.timezoneStdAbbr;
+                        } else {
+                            // Default to standard time if no date provided
+                            waypoint.timezone = waypoint.timezoneStdAbbr;
+                        }
                         
                         // Update table to show new timezone
                         if (window.TripWeather.Managers.WaypointRenderer) {
@@ -443,19 +484,20 @@ window.TripWeather.Managers.Waypoint = {
                             window.TripWeather.Managers.WaypointRenderer.updateMarkerPopup(marker, waypoint, index + 1);
                         }
                         
-                        console.log(`Timezone rechecked for waypoint ${waypoint.sequence}: ${waypoint.timezone} (date: ${targetDate || 'current'})`);
+                        console.log(`Timezone rechecked for waypoint ${waypoint.sequence}: ${targetDate || 'current'}`);
                     } else {
-                        console.warn('No timezone name found in response for waypoint', waypoint.sequence);
+                        console.warn('No timezone information found in response for waypoint', waypoint.sequence);
                     }
                 } else {
                     console.warn('Invalid response data for timezone recheck');
                 }
-            })
+            }.bind(this))
             .catch(function(error) {
                 console.warn('Failed to recheck timezone:', error);
                 // Don't leave timezone blank on error, keep existing value
             });
     },
+
 
     /**
      * Fetch weather for a waypoint

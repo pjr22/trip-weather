@@ -15,7 +15,7 @@ window.TripWeather.Managers.WaypointRenderer = {
      * @returns {string} - Formatted date/time string
      */
     formatWaypointTime: function(waypoint, isDeparture = false) {
-        if (!waypoint.date || !waypoint.time || !waypoint.timezone) {
+        if (!waypoint.date || !waypoint.time) {
             return '';
         }
         
@@ -42,8 +42,8 @@ window.TripWeather.Managers.WaypointRenderer = {
             hours = hours % 12 || 12; // Convert to 12-hour format, 0 becomes 12
             const timeStr = `${hours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
             
-            // Get timezone abbreviation
-            const timezoneAbbr = window.TripWeather.Utils.Timezone.getTimezoneAbbr(waypoint.timezone, date);
+            // Get timezone abbreviation from stored data
+            const timezoneAbbr = window.TripWeather.Utils.Timezone.getTimezoneAbbrFromWaypoint(waypoint, date);
             
             return `${dateStr} ${timeStr} ${timezoneAbbr}`;
         } catch (error) {
@@ -102,6 +102,11 @@ window.TripWeather.Managers.WaypointRenderer = {
         
         if (waypoint.locationName) {
             popupContent += `<br><strong>${waypoint.locationName}</strong><br>`;
+            
+            // Add timezone name after location name
+            if (waypoint.timezoneName) {
+                popupContent += `<small>Timezone: ${waypoint.timezoneName}</small><br>`;
+            }
         }
         
         // Add Arrival Time
@@ -161,17 +166,31 @@ window.TripWeather.Managers.WaypointRenderer = {
             
             const weatherHtml = window.TripWeather.Services.Weather.generateWeatherHtml(waypoint.weather, waypoint.weatherLoading);
             
+            // Get the appropriate timezone abbreviation based on date/time
+            let timezoneDisplay = '-';
+            if (waypoint.timezoneName) {
+                if (waypoint.date && waypoint.time) {
+                    // If we have date and time, determine DST status
+                    const dateTimeStr = `${waypoint.date} ${waypoint.time}`;
+                    const date = new Date(dateTimeStr);
+                    timezoneDisplay = window.TripWeather.Utils.Timezone.getTimezoneAbbrFromWaypoint(waypoint, date);
+                } else {
+                    // Default to standard time if no date/time
+                    timezoneDisplay = waypoint.timezoneStdAbbr || '-';
+                }
+            }
+            
             row.innerHTML = `
                 <td class="drag-handle-cell"><span class="drag-handle" title="Drag to reorder">☰</span></td>
                 <td>${index + 1}</td>
                 <td><input type="date" value="${waypoint.date}" data-waypoint-sequence="${waypoint.sequence}" data-field="date"></td>
                 <td><input type="time" value="${waypoint.time}" data-waypoint-sequence="${waypoint.sequence}" data-field="time"></td>
-                <td>${waypoint.timezone || '-'}</td>
+                <td>${timezoneDisplay}</td>
                 <td>
                     <div class="duration-input-container">
-                        <input type="text" 
-                               value="${window.TripWeather.Utils.Duration.formatDuration(waypoint.duration)}" 
-                               placeholder="3d2h10m" 
+                        <input type="text"
+                               value="${window.TripWeather.Utils.Duration.formatDuration(waypoint.duration)}"
+                               placeholder="3d2h10m"
                                data-waypoint-sequence="${waypoint.sequence}"
                                data-field="duration"
                                class="duration-input"

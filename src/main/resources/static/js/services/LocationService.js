@@ -91,6 +91,10 @@ window.TripWeather.Services.Location = {
                 locationName: 'Unknown',
                 timezone: '',
                 timezoneName: '',
+                timezoneStdOffset: '',
+                timezoneDstOffset: '',
+                timezoneStdAbbr: '',
+                timezoneDstAbbr: '',
                 coordinates: null
             };
         }

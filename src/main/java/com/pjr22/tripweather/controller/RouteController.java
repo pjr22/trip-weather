@@ -48,7 +48,8 @@ public class RouteController {
                 Double lat = ((Number) wp.get("latitude")).doubleValue();
                 Double lng = ((Number) wp.get("longitude")).doubleValue();
                 String name = wp.get("name") != null ? wp.get("name").toString() : "";
-                routeWaypoints.add(new RouteService.RouteRequest.Waypoint(lat, lng, name));
+                String timezoneName = wp.get("timezoneName") != null ? wp.get("timezoneName").toString() : "";
+                routeWaypoints.add(new RouteService.RouteRequest.Waypoint(lat, lng, name, timezoneName));
                 
                 // Extract duration (in minutes), default to 0 if not provided
                 Integer duration = 0;

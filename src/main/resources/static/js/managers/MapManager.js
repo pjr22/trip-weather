@@ -11,7 +11,7 @@ window.TripWeather.Managers.Map = {
     // Map instance and configuration
     map: null,
     userLocationMarker: null,
-    userLocation: { lat: null, lng: null, name: null, timezone: '' },
+    userLocation: { lat: null, lng: null, name: null, timezoneName: '', timezoneStdOffset: '', timezoneDstOffset: '', timezoneStdAbbr: '', timezoneDstAbbr: '' },
     
     // Configuration constants
     DEFAULT_LAT: 39.8283,
@@ -149,13 +149,13 @@ window.TripWeather.Managers.Map = {
             popupContent += `<br><br><strong>${this.userLocation.name}</strong>`;
         }
         
-        if (this.userLocation.timezone) {
-            popupContent += `<br>Timezone: ${this.userLocation.timezone}`;
+        if (this.userLocation.timezoneName) {
+            popupContent += `<br>Timezone: ${this.userLocation.timezoneName}`;
         }
         
         // Add action buttons at the bottom
         popupContent += `<br><br><div style="display: flex; gap: 8px; justify-content: center;">`;
-        popupContent += `<button onclick="window.TripWeather.Managers.Map.refreshUserLocation()" style="background-color: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">Refresh</button>`;
+        popupContent += `<button onclick="window.TripWeather.Managers.Map.refreshUserLocation()" style="background-color: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">Update</button>`;
         popupContent += `<button onclick="window.TripWeather.Managers.Map.addCurrentLocationAsWaypoint()" style="background-color: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">Add To Waypoints</button>`;
         popupContent += `</div>`;
         
@@ -168,11 +168,16 @@ window.TripWeather.Managers.Map = {
     fetchUserLocationName: function() {
         const self = this;
         return window.TripWeather.Services.Location.getLocationInfo(
-            this.userLocation.lat, 
+            this.userLocation.lat,
             this.userLocation.lng
         ).then(function(locationInfo) {
             self.userLocation.name = locationInfo.locationName;
-            self.userLocation.timezone = locationInfo.timezone;
+            // Store all timezone information
+            self.userLocation.timezoneName = locationInfo.timezoneName || '';
+            self.userLocation.timezoneStdOffset = locationInfo.timezoneStdOffset || '';
+            self.userLocation.timezoneDstOffset = locationInfo.timezoneDstOffset || '';
+            self.userLocation.timezoneStdAbbr = locationInfo.timezoneStdAbbr || '';
+            self.userLocation.timezoneDstAbbr = locationInfo.timezoneDstAbbr || '';
             self.updateUserLocationPopup();
         }).catch(function(error) {
             console.warn('Failed to fetch user location name:', error);
@@ -288,17 +293,21 @@ window.TripWeather.Managers.Map = {
             return;
         }
         
-        // Create location info object with current user location data
+        // Create location info object with all current user location data including timezone fields
         const locationInfo = {
             locationName: this.userLocation.name || 'Current Location',
-            timezone: this.userLocation.timezone || ''
+            timezoneName: this.userLocation.timezoneName || '',
+            timezoneStdOffset: this.userLocation.timezoneStdOffset || '',
+            timezoneDstOffset: this.userLocation.timezoneDstOffset || '',
+            timezoneStdAbbr: this.userLocation.timezoneStdAbbr || '',
+            timezoneDstAbbr: this.userLocation.timezoneDstAbbr || ''
         };
         
         // Add waypoint using WaypointManager
         if (window.TripWeather.Managers.Waypoint) {
             const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(
-                this.userLocation.lat, 
-                this.userLocation.lng, 
+                this.userLocation.lat,
+                this.userLocation.lng,
                 locationInfo
             );
             

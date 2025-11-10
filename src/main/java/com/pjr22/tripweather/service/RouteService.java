@@ -249,8 +249,10 @@ public class RouteService {
             for (int i = 0; i < originalWaypoints.size(); i++) {
                 RouteRequest.Waypoint originalWaypoint = originalWaypoints.get(i);
                 
-                // Get timezone for this waypoint
-                String timezone = getTimezone(originalWaypoint.getLatitude(), originalWaypoint.getLongitude());
+                // Get timezone for this waypoint - use provided timezone name if available, otherwise look it up
+                String timezone = originalWaypoint.getTimezoneName() != null && !originalWaypoint.getTimezoneName().isEmpty()
+                    ? originalWaypoint.getTimezoneName()
+                    : getTimezone(originalWaypoint.getLatitude(), originalWaypoint.getLongitude());
                 
                 // Create waypoint coordinates with location and name
                 List<Double> location = List.of(originalWaypoint.getLongitude(), originalWaypoint.getLatitude());
@@ -270,7 +272,9 @@ public class RouteService {
                 } else {
                     // Convert previous waypoint's departure time to current waypoint's timezone
                     RouteRequest.Waypoint previousWaypoint = originalWaypoints.get(i - 1);
-                    String previousTimezone = getTimezone(previousWaypoint.getLatitude(), previousWaypoint.getLongitude());
+                    String previousTimezone = previousWaypoint.getTimezoneName() != null && !previousWaypoint.getTimezoneName().isEmpty()
+                        ? previousWaypoint.getTimezoneName()
+                        : getTimezone(previousWaypoint.getLatitude(), previousWaypoint.getLongitude());
                     
                     String arrivalTimeInCurrentTimezone = convertDateTime(currentTimeStr, previousTimezone, timezone);
                     waypoint.setArrivalTime(arrivalTimeInCurrentTimezone);
@@ -306,7 +310,9 @@ public class RouteService {
             for (RouteRequest.Waypoint wp : originalWaypoints) {
                 List<Double> location = List.of(wp.getLongitude(), wp.getLatitude());
                 RouteData.WaypointCoordinates waypoint = new RouteData.WaypointCoordinates(location, wp.getName());
-                String timezone = getTimezone(wp.getLatitude(), wp.getLongitude());
+                String timezone = wp.getTimezoneName() != null && !wp.getTimezoneName().isEmpty()
+                    ? wp.getTimezoneName()
+                    : getTimezone(wp.getLatitude(), wp.getLongitude());
                 waypoint.setTimezone(timezone);
                 fallbackWaypoints.add(waypoint);
             }
@@ -348,6 +354,7 @@ public class RouteService {
             private Double latitude;
             private Double longitude;
             private String name;
+            private String timezoneName;
 
             public Waypoint() {}
 
@@ -355,6 +362,13 @@ public class RouteService {
                 this.latitude = latitude;
                 this.longitude = longitude;
                 this.name = name;
+            }
+            
+            public Waypoint(Double latitude, Double longitude, String name, String timezoneName) {
+                this.latitude = latitude;
+                this.longitude = longitude;
+                this.name = name;
+                this.timezoneName = timezoneName;
             }
 
             public Double getLatitude() {
@@ -379,6 +393,14 @@ public class RouteService {
 
             public void setName(String name) {
                 this.name = name;
+            }
+            
+            public String getTimezoneName() {
+                return timezoneName;
+            }
+
+            public void setTimezoneName(String timezoneName) {
+                this.timezoneName = timezoneName;
             }
         }
     }
