@@ -17,6 +17,15 @@ window.TripWeather.App = {
     },
 
     /**
+     * Current route information for tracking loaded routes
+     */
+    currentRoute: {
+        id: null,
+        name: null,
+        userId: null
+    },
+
+    /**
      * Initialize application
      */
     initialize: function() {
@@ -202,10 +211,20 @@ window.TripWeather.App = {
                 return;
             }
             
-            // Prompt user for route name
-            const routeName = prompt('Enter a name for this route:');
-            if (!routeName || routeName.trim() === '') {
-                return; // User cancelled or entered empty name
+            let routeName;
+            let routeId = this.currentRoute.id;
+            let userId = this.currentRoute.userId;
+            
+            // If we have a loaded route with a name, use that name without prompting
+            if (this.currentRoute.name) {
+                routeName = this.currentRoute.name;
+                console.log('Using existing route name:', routeName);
+            } else {
+                // Prompt user for route name for new routes
+                routeName = prompt('Enter a name for this route:');
+                if (!routeName || routeName.trim() === '') {
+                    return; // User cancelled or entered empty name
+                }
             }
             
             // Convert waypoints to DTO format
@@ -213,9 +232,10 @@ window.TripWeather.App = {
             
             // Prepare route data
             const routeData = {
+                id: routeId, // Include ID for updates, null for new routes
                 name: routeName.trim(),
                 waypoints: waypointDtos,
-                userId: null // Will use default user on backend
+                userId: userId // Use current user ID or null for guest
             };
             
             // Show loading indicator
@@ -225,12 +245,38 @@ window.TripWeather.App = {
             window.TripWeather.Services.RoutePersistence.saveRoute(routeData)
                 .then(response => {
                     window.TripWeather.Managers.UI.hideLoading('persistence-loading-overlay');
-                    window.TripWeather.Managers.UI.showNotification(
-                        `Route "${routeName}" saved successfully! Route ID: ${response.id}`, 
-                        5000, 
-                        'success'
-                    );
-                    console.log('Route saved successfully:', response);
+                    
+                    // Check if response is successful (2xx status codes)
+                    if (response.ok) {
+                        // Update current route tracking
+                        this.currentRoute.id = response.data.id;
+                        this.currentRoute.name = response.data.name;
+                        this.currentRoute.userId = response.data.userId;
+                        
+                        // Show appropriate success message based on response status
+                        let successMessage;
+                        if (response.status === 201) {
+                            successMessage = `The route "${response.data.name}" was successfully created.`;
+                        } else if (response.status === 200) {
+                            successMessage = `The route "${response.data.name}" was successfully updated.`;
+                        } else {
+                            successMessage = `The route "${response.data.name}" was saved successfully.`;
+                        }
+                        
+                        window.TripWeather.Managers.UI.showAlert(successMessage, 'success');
+                        console.log('Route saved successfully:', response.data);
+                    } else {
+                        // Handle non-2xx response codes as errors
+                        let errorMessage;
+                        if (response.data && response.data.error) {
+                            errorMessage = `Failed to save route: ${response.data.error}`;
+                        } else {
+                            errorMessage = `Failed to save route: Server returned status ${response.status}`;
+                        }
+                        
+                        window.TripWeather.Managers.UI.showAlert(errorMessage, 'error');
+                        console.error('Error saving route:', response);
+                    }
                 })
                 .catch(error => {
                     window.TripWeather.Managers.UI.hideLoading('persistence-loading-overlay');
@@ -286,6 +332,11 @@ window.TripWeather.App = {
                                 waypoint // Pass the existing waypoint object
                             );
                         });
+                        
+                        // Update current route tracking
+                        this.currentRoute.id = response.id;
+                        this.currentRoute.name = response.name;
+                        this.currentRoute.userId = response.userId;
                         
                         window.TripWeather.Managers.UI.showNotification(
                             `Route "${response.name}" loaded successfully with ${waypoints.length} waypoints!`, 

@@ -1,22 +1,25 @@
 package com.pjr22.tripweather.service;
 
-import com.pjr22.tripweather.dto.RouteDto;
-import com.pjr22.tripweather.dto.WaypointDto;
-import com.pjr22.tripweather.model.Route;
-import com.pjr22.tripweather.model.User;
-import com.pjr22.tripweather.model.Waypoint;
-import com.pjr22.tripweather.repository.RouteRepository;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import com.pjr22.tripweather.dto.RouteDto;
+import com.pjr22.tripweather.dto.WaypointDto;
+import com.pjr22.tripweather.model.Route;
+import com.pjr22.tripweather.model.User;
+import com.pjr22.tripweather.model.Waypoint;
+import com.pjr22.tripweather.repository.RouteRepository;
 
 /**
  * Service for handling route persistence operations
@@ -65,6 +68,12 @@ public class RoutePersistenceService {
             Optional<Route> existingRouteOpt = routeRepository.findById(routeDto.getId());
             if (existingRouteOpt.isPresent()) {
                 route = existingRouteOpt.get();
+                
+                // Eagerly fetch waypoints to avoid lazy loading issues
+                if (route.getWaypoints() != null) {
+                    route.getWaypoints().size(); // Force initialization
+                }
+                
                 route.setName(routeDto.getName());
                 // Verify the route belongs to the user (security check)
                 if (!route.getUser().getId().equals(user.getId())) {
@@ -83,39 +92,29 @@ public class RoutePersistenceService {
             }
         }
         
-        // Handle waypoints
-        if (routeDto.getWaypoints() != null && !routeDto.getWaypoints().isEmpty()) {
+        // Handle waypoints using the proper entity management approach
+        if (routeDto.getWaypoints() != null) {
             logger.info("Processing {} waypoints", routeDto.getWaypoints().size());
             
-            // Clear existing waypoints for updates
-            if (!isNewRoute && route.getWaypoints() != null) {
-                route.getWaypoints().clear();
+            if (isNewRoute) {
+                // For new routes, create all waypoints
+                List<Waypoint> waypoints = new ArrayList<>();
+                for (int i = 0; i < routeDto.getWaypoints().size(); i++) {
+                    WaypointDto waypointDto = routeDto.getWaypoints().get(i);
+                    Waypoint waypoint = convertToEntity(waypointDto);
+                    waypoint.setSequence(i + 1);
+                    waypoint.setRoute(route);
+                    waypoints.add(waypoint);
+                    logger.debug("Created new waypoint {}: {}", i + 1, waypoint.getLocationName());
+                }
+                route.setWaypoints(waypoints);
+            } else {
+                // For existing routes, manage waypoints properly
+                manageWaypointsForExistingRoute(route, routeDto.getWaypoints());
             }
-            
-            // Create new list of waypoints
-            List<Waypoint> waypoints = new ArrayList<>();
-            for (int i = 0; i < routeDto.getWaypoints().size(); i++) {
-                WaypointDto waypointDto = routeDto.getWaypoints().get(i);
-                
-                Waypoint waypoint = convertToEntity(waypointDto);
-                waypoint.setSequence(i + 1); // Ensure proper sequence
-                waypoint.setRoute(route);
-                
-                waypoints.add(waypoint);
-                
-                logger.debug("Added waypoint {}: {} ({}, {})", 
-                    i + 1,
-                    waypoint.getLocationName(),
-                    waypoint.getLatitude(),
-                    waypoint.getLongitude()
-                );
-            }
-            route.setWaypoints(waypoints);
         } else {
             logger.info("No waypoints provided");
-            if (route.getWaypoints() != null) {
-                route.getWaypoints().clear();
-            }
+            route.setWaypoints(new ArrayList<>());
         }
         
         // Save the route (this will also save waypoints due to cascade)
@@ -126,6 +125,61 @@ public class RoutePersistenceService {
         logger.info("Is new route: {}", isNewRoute);
         
         return convertToDto(savedRoute);
+    }
+    
+    /**
+     * Manage waypoints for an existing route
+     * @param route Existing route entity
+     * @param waypointDtos Waypoint DTOs from the request
+     */
+    private void manageWaypointsForExistingRoute(Route route, List<WaypointDto> waypointDtos) {
+        // Initialize waypoints collection if null
+        if (route.getWaypoints() == null) {
+            route.setWaypoints(new ArrayList<>());
+        }
+        
+        // Create a map of existing waypoints by ID for efficient lookup
+        Map<UUID, Waypoint> existingWaypointsMap = new HashMap<>();
+        for (Waypoint wp : route.getWaypoints()) {
+            if (wp.getId() != null) {
+                existingWaypointsMap.put(wp.getId(), wp);
+            }
+        }
+        
+        // Create a map of request waypoints by ID for efficient lookup
+        Map<UUID, WaypointDto> requestWaypointsMap = new HashMap<>();
+        for (WaypointDto dto : waypointDtos) {
+            if (dto.getId() != null) {
+                requestWaypointsMap.put(dto.getId(), dto);
+            }
+        }
+        
+        // Clear the existing collection first to avoid duplicates
+        route.getWaypoints().clear();
+        
+        // Process each waypoint in the request and add to the same collection
+        for (int i = 0; i < waypointDtos.size(); i++) {
+            WaypointDto waypointDto = waypointDtos.get(i);
+            
+            if (waypointDto.getId() != null && existingWaypointsMap.containsKey(waypointDto.getId())) {
+                // Update existing waypoint
+                Waypoint existingWaypoint = existingWaypointsMap.get(waypointDto.getId());
+                updateWaypointFromDto(existingWaypoint, waypointDto);
+                existingWaypoint.setSequence(i + 1);
+                route.getWaypoints().add(existingWaypoint);
+                logger.debug("Updated existing waypoint {}: {}", waypointDto.getId(), existingWaypoint.getLocationName());
+            } else {
+                // Create new waypoint
+                Waypoint newWaypoint = convertToEntity(waypointDto);
+                newWaypoint.setSequence(i + 1);
+                newWaypoint.setRoute(route);
+                route.getWaypoints().add(newWaypoint);
+                logger.debug("Created new waypoint: {}", newWaypoint.getLocationName());
+            }
+        }
+        
+        // Log the final state for debugging
+        logger.info("Route now has {} waypoints after update", route.getWaypoints().size());
     }
     
     /**
@@ -240,5 +294,20 @@ public class RoutePersistenceService {
         
         // Route would be set separately due to bidirectional relationship
         return waypoint;
+    }
+    
+    /**
+     * Update existing Waypoint entity from WaypointDto
+     * @param waypoint Existing Waypoint entity to update
+     * @param dto WaypointDto with new data
+     */
+    private void updateWaypointFromDto(Waypoint waypoint, WaypointDto dto) {
+        waypoint.setSequence(dto.getSequence());
+        waypoint.setDateTime(dto.getDateTime());
+        waypoint.setDurationMin(dto.getDurationMin() != null ? dto.getDurationMin() : 0); // Handle null duration
+        waypoint.setLocationName(dto.getLocationName());
+        waypoint.setLatitude(dto.getLatitude());
+        waypoint.setLongitude(dto.getLongitude());
+        // Note: ID and Route are not updated as they should remain the same
     }
 }

@@ -12,7 +12,7 @@ window.TripWeather.Services.RoutePersistence = {
      * @param {string} routeData.name - Route name
      * @param {Array} routeData.waypoints - Array of waypoint objects
      * @param {string} [routeData.userId] - Optional user ID (defaults to a default user)
-     * @returns {Promise} Promise that resolves with the saved route response
+     * @returns {Promise} Promise that resolves with saved route response and status
      */
     saveRoute: async function(routeData) {
         try {
@@ -24,11 +24,23 @@ window.TripWeather.Services.RoutePersistence = {
                 body: JSON.stringify(routeData)
             });
             
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            let responseData;
+            try {
+                responseData = await response.json();
+            } catch (jsonError) {
+                // If response is not JSON, create a generic error response
+                responseData = { 
+                    error: response.statusText || 'Unknown error occurred',
+                    status: response.status
+                };
             }
             
-            return await response.json();
+            // Return both the data and status for proper handling
+            return {
+                data: responseData,
+                status: response.status,
+                ok: response.ok
+            };
         } catch (error) {
             console.error('Error saving route:', error);
             throw error;

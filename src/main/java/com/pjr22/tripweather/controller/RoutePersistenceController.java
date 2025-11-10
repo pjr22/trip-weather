@@ -39,14 +39,12 @@ public class RoutePersistenceController {
     @PostMapping
     public ResponseEntity<RouteDto> saveRoute(@RequestBody RouteDto routeDto) {
         logger.info("Received request to save route: {}", routeDto.getName());
-        logger.info("Route contains {} waypoints", routeDto.getWaypoints() != null ? routeDto.getWaypoints().size() : 0);
         
         try {
             // Check if this is a new route (null ID) or an update
             boolean isNewRoute = (routeDto.getId() == null);
             
             RouteDto savedRoute = routePersistenceService.saveRoute(routeDto);
-            logger.info("Successfully saved route with ID: {}", savedRoute.getId());
             
             // Return 201 Created for new routes, 200 OK for updates
             if (isNewRoute) {
@@ -86,7 +84,6 @@ public class RoutePersistenceController {
             RouteDto route = routePersistenceService.loadRoute(routeUuid);
             if (route != null) {
                 logger.info("Successfully loaded route: {}", route.getName());
-                logger.info("Route contains {} waypoints", route.getWaypoints() != null ? route.getWaypoints().size() : 0);
                 return ResponseEntity.ok(route);
             } else {
                 logger.warn("Route not found with ID: {}", routeUuid);
