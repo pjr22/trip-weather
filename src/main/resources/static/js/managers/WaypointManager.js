@@ -638,5 +638,14 @@ window.TripWeather.Managers.Waypoint = {
         if (window.TripWeather.Managers.Route) {
             window.TripWeather.Managers.Route.updateButtonState();
         }
+    },
+
+    /**
+     * Clear waypoint entity identifiers so they are treated as new when persisted
+     */
+    clearWaypointIds: function() {
+        this.waypoints.forEach(function(waypoint) {
+            waypoint.uuid = null;
+        });
     }
 };

@@ -346,7 +346,12 @@ window.TripWeather.App = {
         this.closeRouteNameModal();
 
         if (!triggeredFromCallback) {
+            this.currentRoute.id = null;
+            if (window.TripWeather.Managers.Waypoint && typeof window.TripWeather.Managers.Waypoint.clearWaypointIds === 'function') {
+                window.TripWeather.Managers.Waypoint.clearWaypointIds();
+            }
             window.TripWeather.Managers.UI.showToast(`Route name set to "${value}".`, 'success');
+            console.log('Route renamed; treating as new route with cleared ID');
         }
 
         if (triggeredFromCallback) {
