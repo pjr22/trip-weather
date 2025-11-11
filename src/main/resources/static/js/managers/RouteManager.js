@@ -127,6 +127,14 @@ window.TripWeather.Managers.Route = {
         if (routeData.waypoints && routeData.waypoints.length > 0) {
             this.updateWaypointsWithRouteData(routeData.waypoints);
         }
+        
+        // Fetch weather for all waypoints after route calculation
+        const waypoints = window.TripWeather.Managers.Waypoint.getAllWaypoints();
+        waypoints.forEach(waypoint => {
+            if (waypoint.date && waypoint.time) {
+                window.TripWeather.Managers.Waypoint.fetchWeatherForWaypoint(waypoint);
+            }
+        });
 
         // Log route information
         console.log('Route calculated:', {

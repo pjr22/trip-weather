@@ -36,4 +36,12 @@ public interface RouteRepository extends JpaRepository<Route, UUID> {
      * @return Optional containing the route if found
      */
     Optional<Route> findByIdAndUserId(UUID id, UUID userId);
+    
+    /**
+     * Find routes by user ID and name containing the search text (case-insensitive)
+     * @param userId The user ID to search for
+     * @param searchText The text to search for in route names
+     * @return List of routes matching the criteria
+     */
+    List<Route> findByUserIdAndNameContainingIgnoreCase(UUID userId, String searchText);
 }

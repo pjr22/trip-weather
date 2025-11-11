@@ -10,6 +10,7 @@ window.TripWeather.Managers.Search = {
     
     // Search state
     searchDebounceTimer: null,
+    routeSearchDebounceTimer: null,
     
     /**
      * Initialize search functionality
@@ -43,6 +44,9 @@ window.TripWeather.Managers.Search = {
         if (searchInput) {
             searchInput.addEventListener('input', this.handleSearchInput.bind(this));
         }
+        
+        // Initialize route search modal
+        this.initializeRouteSearch();
     },
 
     /**
@@ -273,5 +277,208 @@ window.TripWeather.Managers.Search = {
         if (searchInput) {
             searchInput.focus();
         }
+    },
+    
+    /**
+     * Initialize route search functionality
+     */
+    initializeRouteSearch: function() {
+        const modal = document.getElementById('route-search-modal');
+        const closeBtn = modal ? modal.querySelector('.close') : null;
+        const routeSearchInput = document.getElementById('route-search-input');
+        
+        if (closeBtn) {
+            closeBtn.onclick = function() {
+                this.hideRouteSearchModal();
+            }.bind(this);
+        }
+        
+        if (modal) {
+            modal.onclick = function(event) {
+                if (event.target == modal) {
+                    this.hideRouteSearchModal();
+                }
+            }.bind(this);
+        }
+        
+        if (routeSearchInput) {
+            routeSearchInput.addEventListener('input', this.handleRouteSearchInput.bind(this));
+        }
+    },
+    
+    /**
+     * Show route search modal
+     */
+    showRouteSearchModal: function() {
+        const modal = document.getElementById('route-search-modal');
+        const routeSearchInput = document.getElementById('route-search-input');
+        
+        if (modal) {
+            modal.style.display = 'block';
+        }
+        
+        if (routeSearchInput) {
+            routeSearchInput.focus();
+        }
+    },
+    
+    /**
+     * Hide route search modal
+     */
+    hideRouteSearchModal: function() {
+        const modal = document.getElementById('route-search-modal');
+        const routeSearchInput = document.getElementById('route-search-input');
+        const routeSearchResults = document.getElementById('route-search-results');
+        
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        
+        if (routeSearchInput) {
+            routeSearchInput.value = '';
+        }
+        
+        if (routeSearchResults) {
+            routeSearchResults.innerHTML = '';
+        }
+    },
+    
+    /**
+     * Handle route search input with debouncing
+     * @param {Event} event - Input event
+     */
+    handleRouteSearchInput: function(event) {
+        const searchInput = event.target;
+        const query = searchInput.value.trim();
+        
+        if (this.routeSearchDebounceTimer) {
+            clearTimeout(this.routeSearchDebounceTimer);
+        }
+        
+        if (query.length < 2) {
+            document.getElementById('route-search-results').innerHTML = '';
+            return;
+        }
+        
+        document.getElementById('route-search-results').innerHTML = '<div class="search-loading">Searching routes...</div>';
+        
+        this.routeSearchDebounceTimer = setTimeout(function() {
+            this.performRouteSearch(query);
+        }.bind(this), 1000);
+    },
+    
+    /**
+     * Perform route search
+     * @param {string} query - Search query
+     */
+    performRouteSearch: function(query) {
+        window.TripWeather.Services.RoutePersistence.searchRoutes(query)
+            .then(function(data) {
+                window.TripWeather.Managers.Search.displayRouteSearchResults(data);
+            })
+            .catch(function(error) {
+                console.error('Route search error:', error);
+                document.getElementById('route-search-results').innerHTML = '<div class="search-no-results">Error performing route search</div>';
+            });
+    },
+    
+    /**
+     * Display route search results in modal
+     * @param {object} data - Search response data
+     */
+    displayRouteSearchResults: function(data) {
+        const resultsContainer = document.getElementById('route-search-results');
+        
+        if (!data || data.length === 0) {
+            resultsContainer.innerHTML = '<div class="search-no-results">No routes found</div>';
+            return;
+        }
+        
+        resultsContainer.innerHTML = '';
+        
+        data.forEach(route => {
+            const resultItem = document.createElement('div');
+            resultItem.className = 'search-result-item';
+            
+            const createdDate = route.created ? new Date(route.created).toLocaleDateString() : 'Unknown date';
+            
+            resultItem.innerHTML = `
+                <div class="result-label">${route.name}</div>
+                <div class="result-details">Created: ${createdDate}</div>
+            `;
+            
+            resultItem.onclick = function() {
+                window.TripWeather.Managers.Search.selectRouteSearchResult(route.id);
+            };
+            
+            resultsContainer.appendChild(resultItem);
+        });
+    },
+    
+    /**
+     * Handle selection of route search result
+     * @param {string} routeId - Route ID
+     */
+    selectRouteSearchResult: function(routeId) {
+        this.hideRouteSearchModal();
+        
+        // Show loading indicator
+        window.TripWeather.Managers.UI.showLoading('persistence-loading-overlay');
+        
+        // Load the selected route
+        window.TripWeather.Services.RoutePersistence.loadRoute(routeId)
+            .then(response => {
+                window.TripWeather.Managers.UI.hideLoading('persistence-loading-overlay');
+                
+                if (response) {
+                    // Convert waypoints from DTO format
+                    const waypoints = window.TripWeather.Services.RoutePersistence.convertWaypointsFromDto(response.waypoints || []);
+                    
+                    // Clear existing waypoints and add loaded ones
+                    window.TripWeather.Managers.Waypoint.clearAllWaypoints();
+                    
+                    waypoints.forEach(waypoint => {
+                        window.TripWeather.Managers.Waypoint.addWaypoint(
+                            waypoint.lat,
+                            waypoint.lng,
+                            null, // No location info needed for loaded waypoints
+                            waypoint // Pass the existing waypoint object
+                        );
+                        
+                        // Fetch weather for each waypoint if date and time are available
+                        if (waypoint.date && waypoint.time) {
+                            window.TripWeather.Managers.Waypoint.fetchWeatherForWaypoint(waypoint);
+                        }
+                    });
+                    
+                    // Update current route tracking
+                    window.TripWeather.App.currentRoute.id = response.id;
+                    window.TripWeather.App.currentRoute.name = response.name;
+                    window.TripWeather.App.currentRoute.userId = response.userId;
+                    
+                    window.TripWeather.Managers.UI.showNotification(
+                        `Route "${response.name}" loaded successfully with ${waypoints.length} waypoints!`,
+                        5000,
+                        'success'
+                    );
+                    console.log('Route loaded successfully:', response);
+                    
+                    // Automatically calculate route after loading
+                    window.TripWeather.Managers.Route.calculateRoute();
+                } else {
+                    window.TripWeather.Managers.UI.showAlert(
+                        'Route not found with the provided ID.',
+                        'warning'
+                    );
+                }
+            })
+            .catch(error => {
+                window.TripWeather.Managers.UI.hideLoading('persistence-loading-overlay');
+                window.TripWeather.Managers.UI.showAlert(
+                    `Failed to load route: ${error.message}`,
+                    'error'
+                );
+                console.error('Error loading route:', error);
+            });
     }
 };

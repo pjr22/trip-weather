@@ -66,10 +66,16 @@ public class RoutePersistenceController {
      */
     @GetMapping("/search/{searchText}")
     public ResponseEntity<List<RouteSearchResultDto>> searchForRoutes(@PathVariable String searchText) {
-       List<RouteSearchResultDto> results = new ArrayList<>();
-       // TODO - find matching routes by name, populate and return results
+       logger.info("Searching for routes with text: {}", searchText);
        
-       return ResponseEntity.ok(results);
+       try {
+           List<RouteSearchResultDto> results = routePersistenceService.searchRoutes(searchText, null);
+           logger.info("Found {} routes matching search text: {}", results.size(), searchText);
+           return ResponseEntity.ok(results);
+       } catch (Exception e) {
+           logger.error("Error searching for routes with text: {}", searchText, e);
+           return ResponseEntity.internalServerError().build();
+       }
     }
 
     /**

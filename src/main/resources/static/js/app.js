@@ -303,67 +303,12 @@ window.TripWeather.App = {
         console.log('Load route button clicked');
         
         try {
-            // Prompt user for route ID
-            const routeId = prompt('Enter the Route ID to load:');
-            if (!routeId || routeId.trim() === '') {
-                return; // User cancelled or entered empty ID
-            }
-            
-            // Show loading indicator
-            window.TripWeather.Managers.UI.showLoading('persistence-loading-overlay');
-            
-            // Load route
-            window.TripWeather.Services.RoutePersistence.loadRoute(routeId.trim())
-                .then(response => {
-                    window.TripWeather.Managers.UI.hideLoading('persistence-loading-overlay');
-                    
-                    if (response) {
-                        // Convert waypoints from DTO format
-                        const waypoints = window.TripWeather.Services.RoutePersistence.convertWaypointsFromDto(response.waypoints || []);
-                        
-                        // Clear existing waypoints and add loaded ones
-                        window.TripWeather.Managers.Waypoint.clearAllWaypoints();
-                        
-                        waypoints.forEach(waypoint => {
-                            window.TripWeather.Managers.Waypoint.addWaypoint(
-                                waypoint.lat, 
-                                waypoint.lng, 
-                                null, // No location info needed for loaded waypoints
-                                waypoint // Pass the existing waypoint object
-                            );
-                        });
-                        
-                        // Update current route tracking
-                        this.currentRoute.id = response.id;
-                        this.currentRoute.name = response.name;
-                        this.currentRoute.userId = response.userId;
-                        
-                        window.TripWeather.Managers.UI.showNotification(
-                            `Route "${response.name}" loaded successfully with ${waypoints.length} waypoints!`, 
-                            5000, 
-                            'success'
-                        );
-                        console.log('Route loaded successfully:', response);
-                    } else {
-                        window.TripWeather.Managers.UI.showAlert(
-                            'Route not found with the provided ID.', 
-                            'warning'
-                        );
-                    }
-                })
-                .catch(error => {
-                    window.TripWeather.Managers.UI.hideLoading('persistence-loading-overlay');
-                    window.TripWeather.Managers.UI.showAlert(
-                        `Failed to load route: ${error.message}`, 
-                        'error'
-                    );
-                    console.error('Error loading route:', error);
-                });
-                
+            // Show route search modal instead of prompting for ID
+            window.TripWeather.Managers.Search.showRouteSearchModal();
         } catch (error) {
             console.error('Error handling load route:', error);
             window.TripWeather.Managers.UI.showAlert(
-                `An error occurred while loading the route: ${error.message}`, 
+                `An error occurred while loading the route: ${error.message}`,
                 'error'
             );
         }

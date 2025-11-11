@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.pjr22.tripweather.dto.RouteDto;
+import com.pjr22.tripweather.dto.RouteSearchResultDto;
 import com.pjr22.tripweather.dto.WaypointDto;
 import com.pjr22.tripweather.model.Route;
 import com.pjr22.tripweather.model.User;
@@ -309,5 +310,42 @@ public class RoutePersistenceService {
         waypoint.setLatitude(dto.getLatitude());
         waypoint.setLongitude(dto.getLongitude());
         // Note: ID and Route are not updated as they should remain the same
+    }
+    
+    /**
+     * Search for routes by name with case-insensitive matching
+     * @param searchText The text to search for in route names
+     * @param username Optional username to search for (null for guest)
+     * @return List of RouteSearchResultDto objects matching the search criteria
+     */
+    @Transactional(readOnly = true)
+    public List<RouteSearchResultDto> searchRoutes(String searchText, String username) {
+        logger.info("=== SEARCH ROUTES REQUEST ===");
+        logger.info("Search text: {}", searchText);
+        logger.info("Username: {}", username);
+        
+        // Get the user (guest if username is null or user not found)
+        User user = userManagementService.getOrCreateGuestUser();
+        logger.info("Using user: {} (ID: {})", user.getName(), user.getId());
+        
+        // Search for routes by user ID and name containing the search text (case-insensitive)
+        List<Route> routes = routeRepository.findByUserIdAndNameContainingIgnoreCase(user.getId(), searchText);
+        
+        logger.info("Found {} routes matching search criteria", routes.size());
+        
+        // Convert to DTOs
+        List<RouteSearchResultDto> results = new ArrayList<>();
+        for (Route route : routes) {
+            RouteSearchResultDto dto = new RouteSearchResultDto();
+            dto.setId(route.getId());
+            dto.setName(route.getName());
+            dto.setCreated(route.getCreated());
+            dto.setUserId(route.getUser().getId());
+            results.add(dto);
+            logger.debug("Added route to results: {} (ID: {})", route.getName(), route.getId());
+        }
+        
+        logger.info("=== SEARCH ROUTES COMPLETED ===");
+        return results;
     }
 }

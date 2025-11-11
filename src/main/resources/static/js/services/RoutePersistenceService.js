@@ -149,5 +149,32 @@ window.TripWeather.Services.RoutePersistence = {
         const hours = String(dateObj.getHours()).padStart(2, '0');
         const minutes = String(dateObj.getMinutes()).padStart(2, '0');
         return `${hours}:${minutes}`;
+    },
+    
+    /**
+     * Search for routes by name
+     * @param {string} searchQuery - Route name to search for
+     * @param {string} [username] - Optional username (defaults to guest)
+     * @returns {Promise} Promise that resolves with search results
+     */
+    searchRoutes: async function(searchQuery, username = null) {
+        try {
+            const url = `/api/routes/search/${encodeURIComponent(searchQuery)}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error searching routes:', error);
+            throw error;
+        }
     }
 };
