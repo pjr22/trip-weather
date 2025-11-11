@@ -453,8 +453,8 @@ window.TripWeather.Managers.Search = {
                     
                     // Update current route tracking
                     window.TripWeather.App.currentRoute.id = response.id;
-                    window.TripWeather.App.currentRoute.name = response.name;
                     window.TripWeather.App.currentRoute.userId = response.userId;
+                    window.TripWeather.App.setCurrentRouteName(response.name);
                     
                     window.TripWeather.Managers.UI.showNotification(
                         `Route "${response.name}" loaded successfully with ${waypoints.length} waypoints!`,

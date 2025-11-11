@@ -59,12 +59,24 @@
     <div class="container">
         <header>
             <div class="header-content">
-                <div class="header-logo">
-                    <img src="icons/car_mountain_sunny.png" alt="Trip Weather Logo" class="logo-image">
+                <div class="header-left">
+                    <div class="header-logo">
+                        <img src="icons/car_mountain_sunny.png" alt="Trip Weather Logo" class="logo-image">
+                    </div>
+                    <div class="header-text">
+                        <h1>Trip Weather</h1>
+                        <p>Plan your route and view weather forecasts</p>
+                    </div>
                 </div>
-                <div class="header-text">
-                    <h1>Trip Weather</h1>
-                    <p>Plan your route and view weather forecasts</p>
+                <div class="header-route-info">
+                    <div class="route-name-display">
+                        <span class="route-name-label">Current Route:</span>
+                        <span id="current-route-name" class="route-name-value">New</span>
+                        <button id="rename-route-btn" class="icon-btn" title="Rename Route">
+                            <span class="route-name-icon" data-icon="icons/pencil.svg"></span>
+                        </button>
+                    </div>
+                    <button id="new-route-btn" class="action-btn-secondary">🆕 New Route</button>
                 </div>
             </div>
         </header>
@@ -134,6 +146,22 @@
             <div class="modal-body">
                 <input type="text" id="route-search-input" class="search-input" placeholder="Enter route name..." autocomplete="off">
                 <div id="route-search-results" class="search-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="route-name-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Name This Route</h3>
+                <span class="close" data-close="route-name-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="route-name-input" class="search-input" placeholder="Enter route name..." autocomplete="off">
+                <div class="modal-actions">
+                    <button id="route-name-cancel-btn" class="modal-btn secondary">Cancel</button>
+                    <button id="route-name-confirm-btn" class="modal-btn primary">Save Name</button>
+                </div>
             </div>
         </div>
     </div>

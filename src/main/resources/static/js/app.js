@@ -25,6 +25,9 @@ window.TripWeather.App = {
         userId: null
     },
 
+    routeNameModalCallback: null,
+    routeNameModalDefaultConfirmText: 'Save Name',
+
     /**
      * Initialize application
      */
@@ -54,6 +57,9 @@ window.TripWeather.App = {
             
             // Initialize managers in dependency order
             this.initializeManagers();
+            
+            // Initialize route header controls
+            this.initializeRouteControls();
             
             // Initialize map
             this.initializeMap();
@@ -148,6 +154,215 @@ window.TripWeather.App = {
     },
 
     /**
+     * Initialize route header controls and naming modal
+     */
+    initializeRouteControls: function() {
+        console.log('Initializing route controls...');
+
+        this.initializeRouteNameModal();
+        this.updateCurrentRouteDisplay();
+
+        const renameRouteBtn = document.getElementById('rename-route-btn');
+        if (renameRouteBtn) {
+            renameRouteBtn.addEventListener('click', this.handleRenameRoute.bind(this));
+
+            const iconContainer = renameRouteBtn.querySelector('.route-name-icon');
+            if (iconContainer) {
+                window.TripWeather.Utils.IconLoader.loadSvgIcon('icons/pencil.svg', iconContainer, 'route-edit-icon');
+            }
+        } else {
+            console.warn('Rename route button not found');
+        }
+
+        const newRouteBtn = document.getElementById('new-route-btn');
+        if (newRouteBtn) {
+            newRouteBtn.addEventListener('click', this.handleNewRoute.bind(this));
+        } else {
+            console.warn('New route button not found');
+        }
+    },
+
+    /**
+     * Setup modal interactions for naming routes
+     */
+    initializeRouteNameModal: function() {
+        const modal = document.getElementById('route-name-modal');
+        const input = document.getElementById('route-name-input');
+        const confirmBtn = document.getElementById('route-name-confirm-btn');
+        const cancelBtn = document.getElementById('route-name-cancel-btn');
+        const closeBtn = modal ? modal.querySelector('.close') : null;
+
+        if (!modal || !input || !confirmBtn || !cancelBtn) {
+            console.warn('Route name modal elements not found');
+            return;
+        }
+
+        confirmBtn.addEventListener('click', this.handleRouteNameConfirm.bind(this));
+        cancelBtn.addEventListener('click', this.handleRouteNameCancel.bind(this));
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', this.handleRouteNameCancel.bind(this));
+        }
+
+        modal.addEventListener('click', function(event) {
+            if (event.target === modal) {
+                this.handleRouteNameCancel();
+            }
+        }.bind(this));
+
+        input.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                this.handleRouteNameConfirm();
+            }
+        }.bind(this));
+    },
+
+    /**
+     * Update UI with current route name
+     */
+    updateCurrentRouteDisplay: function() {
+        const routeNameSpan = document.getElementById('current-route-name');
+        if (!routeNameSpan) return;
+
+        const displayName = this.currentRoute.name ? this.currentRoute.name : 'New';
+        routeNameSpan.textContent = displayName;
+        routeNameSpan.title = displayName;
+    },
+
+    /**
+     * Set current route name and refresh display
+     * @param {string} name - Route name
+     */
+    setCurrentRouteName: function(name) {
+        const trimmed = name ? name.trim() : '';
+        this.currentRoute.name = trimmed !== '' ? trimmed : null;
+        this.updateCurrentRouteDisplay();
+    },
+
+    /**
+     * Reset route state for a new route
+     */
+    handleNewRoute: function() {
+        console.log('Starting a new route');
+
+        this.routeNameModalCallback = null;
+        this.closeRouteNameModal();
+
+        const existingUserId = this.currentRoute.userId || null;
+        this.currentRoute = { id: null, name: null, userId: existingUserId };
+        window.TripWeather.Managers.Waypoint.clearAllWaypoints();
+        window.TripWeather.Managers.Route.clearRoute();
+        this.updateCurrentRouteDisplay();
+
+        window.TripWeather.Managers.UI.showToast('Started a new route.', 'info');
+    },
+
+    /**
+     * Handle rename route button click
+     */
+    handleRenameRoute: function() {
+        this.openRouteNameModal({
+            initialValue: this.currentRoute.name || '',
+            confirmText: 'Save Name'
+        });
+    },
+
+    /**
+     * Open the route naming modal
+     * @param {object} options - Modal options
+     */
+    openRouteNameModal: function(options) {
+        options = options || {};
+
+        const modal = document.getElementById('route-name-modal');
+        const input = document.getElementById('route-name-input');
+        const confirmBtn = document.getElementById('route-name-confirm-btn');
+        const titleEl = modal ? modal.querySelector('.modal-header h3') : null;
+
+        if (!modal || !input || !confirmBtn) {
+            console.warn('Cannot open route name modal; elements missing');
+            return;
+        }
+
+        if (titleEl) {
+            titleEl.textContent = options.title || 'Name This Route';
+        }
+
+        confirmBtn.textContent = options.confirmText || this.routeNameModalDefaultConfirmText;
+        this.routeNameModalCallback = typeof options.onConfirm === 'function' ? options.onConfirm : null;
+
+        const initialValue = options.initialValue !== undefined ? options.initialValue : (this.currentRoute.name || '');
+        input.value = initialValue;
+
+        modal.style.display = 'block';
+
+        requestAnimationFrame(function() {
+            input.focus();
+            input.setSelectionRange(0, input.value.length);
+        });
+    },
+
+    /**
+     * Close the route naming modal
+     */
+    closeRouteNameModal: function() {
+        const modal = document.getElementById('route-name-modal');
+        const confirmBtn = document.getElementById('route-name-confirm-btn');
+        const input = document.getElementById('route-name-input');
+
+        if (modal) {
+            modal.style.display = 'none';
+        }
+
+        if (confirmBtn) {
+            confirmBtn.textContent = this.routeNameModalDefaultConfirmText;
+        }
+
+        if (input) {
+            input.value = this.currentRoute.name || '';
+        }
+    },
+
+    /**
+     * Handle confirming a new route name
+     */
+    handleRouteNameConfirm: function() {
+        const input = document.getElementById('route-name-input');
+        if (!input) return;
+
+        const value = input.value.trim();
+        if (!value) {
+            window.TripWeather.Managers.UI.showToast('Please enter a route name.', 'warning');
+            input.focus();
+            return;
+        }
+
+        const callback = this.routeNameModalCallback;
+        const triggeredFromCallback = typeof callback === 'function';
+        this.routeNameModalCallback = null;
+
+        this.setCurrentRouteName(value);
+        this.closeRouteNameModal();
+
+        if (!triggeredFromCallback) {
+            window.TripWeather.Managers.UI.showToast(`Route name set to "${value}".`, 'success');
+        }
+
+        if (triggeredFromCallback) {
+            callback(value);
+        }
+    },
+
+    /**
+     * Handle cancelling the route name modal
+     */
+    handleRouteNameCancel: function() {
+        this.routeNameModalCallback = null;
+        this.closeRouteNameModal();
+    },
+
+    /**
      * Setup global event listeners
      */
     setupGlobalEvents: function() {
@@ -200,7 +415,7 @@ window.TripWeather.App = {
     /**
      * Handle save route button click
      */
-    handleSaveRoute: function() {
+    handleSaveRoute: function(skipNamePrompt) {
         console.log('Save route button clicked');
         
         try {
@@ -210,22 +425,21 @@ window.TripWeather.App = {
                 window.TripWeather.Managers.UI.showToast('No waypoints to save. Please add waypoints to your route first.', 'warning');
                 return;
             }
-            
-            let routeName;
-            let routeId = this.currentRoute.id;
-            let userId = this.currentRoute.userId;
-            
-            // If we have a loaded route with a name, use that name without prompting
-            if (this.currentRoute.name) {
-                routeName = this.currentRoute.name;
-                console.log('Using existing route name:', routeName);
-            } else {
-                // Prompt user for route name for new routes
-                routeName = prompt('Enter a name for this route:');
-                if (!routeName || routeName.trim() === '') {
-                    return; // User cancelled or entered empty name
-                }
+            const routeId = this.currentRoute.id;
+            const userId = this.currentRoute.userId;
+
+            if (!skipNamePrompt && (!this.currentRoute.name || this.currentRoute.name.trim() === '')) {
+                this.openRouteNameModal({
+                    initialValue: '',
+                    confirmText: 'Continue',
+                    onConfirm: () => {
+                        this.handleSaveRoute(true);
+                    }
+                });
+                return;
             }
+
+            const routeName = this.currentRoute.name ? this.currentRoute.name.trim() : '';
             
             // Convert waypoints to DTO format
             const waypointDtos = window.TripWeather.Services.RoutePersistence.convertWaypointsToDto(waypoints);
@@ -250,8 +464,8 @@ window.TripWeather.App = {
                     if (response.ok) {
                         // Update current route tracking
                         this.currentRoute.id = response.data.id;
-                        this.currentRoute.name = response.data.name;
                         this.currentRoute.userId = response.data.userId;
+                        this.setCurrentRouteName(response.data.name);
                         
                         // Show appropriate success message based on response status
                         let successMessage;

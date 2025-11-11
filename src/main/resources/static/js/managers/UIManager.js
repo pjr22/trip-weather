@@ -235,6 +235,12 @@ window.TripWeather.Managers.UI = {
      * Handle escape key press
      */
     handleEscapeKey: function() {
+        const routeNameModal = document.getElementById('route-name-modal');
+        if (routeNameModal && routeNameModal.style.display === 'block') {
+            window.TripWeather.App.handleRouteNameCancel();
+            return;
+        }
+
         // Close search modal if open
         const searchModal = document.getElementById('search-modal');
         if (searchModal && searchModal.style.display === 'block') {
