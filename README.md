@@ -61,6 +61,19 @@ Trip Weather is a Spring Boot web application that helps users plan road trips b
 
 4. Open `http://localhost:8090` in a browser.
 
+## Toast Notifications
+
+Toast notifications appear in the upper-center of the screen by default. You can change their placement at runtime using the helper utilities:
+
+```js
+// Example: src/main/resources/static/js/app.js
+window.TripWeather.Utils.Helpers.setToastPosition('lower-right');
+// or configure multiple defaults at once
+window.TripWeather.Utils.Helpers.configureToasts({ position: 'lower-right' });
+```
+
+Valid positions are `upper-left`, `upper-center`, `upper-right`, `lower-left`, `lower-center`, and `lower-right`.
+
 ## Project Structure
 
 ```

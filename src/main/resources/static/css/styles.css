@@ -18,7 +18,7 @@ body {
 header {
     margin-bottom: 10px;
     background-color: #fff;
-    padding: 10px;
+    padding: 10px 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
@@ -901,13 +901,53 @@ main {
 /* Toast notifications */
 .toast-container {
     position: fixed;
-    top: 20px;
-    right: 20px;
     display: flex;
     flex-direction: column;
     gap: 12px;
     z-index: 10000;
     pointer-events: none;
+    align-items: flex-start;
+    justify-content: flex-start;
+    transform: none;
+}
+
+.toast-container--upper-left {
+    top: 20px;
+    left: 20px;
+}
+
+.toast-container--upper-center {
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    align-items: center;
+}
+
+.toast-container--upper-right {
+    top: 20px;
+    right: 20px;
+    align-items: flex-end;
+}
+
+.toast-container--lower-left {
+    bottom: 20px;
+    left: 20px;
+    justify-content: flex-end;
+}
+
+.toast-container--lower-center {
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.toast-container--lower-right {
+    bottom: 20px;
+    right: 20px;
+    align-items: flex-end;
+    justify-content: flex-end;
 }
 
 .toast {

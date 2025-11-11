@@ -125,22 +125,67 @@ window.TripWeather.Utils.Helpers = {
      * Default toast configuration
      */
     toastDefaults: {
-        duration: 5000
+        duration: 5000,
+        position: 'upper-center'
     },
 
     _toastContainer: null,
+    _toastPositions: [
+        'upper-left',
+        'upper-center',
+        'upper-right',
+        'lower-left',
+        'lower-center',
+        'lower-right'
+    ],
+
+    /**
+     * Update toast defaults at runtime
+     * @param {object} config - Configuration overrides
+     */
+    configureToasts: function(config) {
+        if (!config || typeof config !== 'object') {
+            return;
+        }
+
+        if (typeof config.duration === 'number') {
+            this.toastDefaults.duration = config.duration;
+        }
+
+        if (typeof config.position === 'string') {
+            this.setToastPosition(config.position);
+        }
+    },
+
+    /**
+     * Set default toast position
+     * @param {string} position - Desired toast position
+     */
+    setToastPosition: function(position) {
+        if (!this._isValidToastPosition(position)) {
+            console.warn(`Invalid toast position "${position}"`);
+            return;
+        }
+
+        this.toastDefaults.position = position;
+        this._applyToastPosition(position);
+    },
 
     /**
      * Get or create toast container element
      * @returns {HTMLElement} - Toast container element
      */
-    getToastContainer: function() {
+    getToastContainer: function(positionOverride) {
         if (!this._toastContainer) {
             const container = document.createElement('div');
             container.className = 'toast-container';
             document.body.appendChild(container);
             this._toastContainer = container;
         }
+        const targetPosition = this._isValidToastPosition(positionOverride)
+            ? positionOverride
+            : this.toastDefaults.position;
+        this._applyToastPosition(targetPosition);
         return this._toastContainer;
     },
 
@@ -148,12 +193,26 @@ window.TripWeather.Utils.Helpers = {
      * Show toast message
      * @param {string} message - Message to display
      * @param {string} type - Toast type ('success', 'warning', 'error', 'info')
-     * @param {number} duration - Duration in milliseconds
+     * @param {number|object} duration - Duration in milliseconds or options object
+     * @param {object} [options] - Additional toast options
      */
-    showToast: function(message, type, duration) {
+    showToast: function(message, type, duration, options) {
         const toastType = type || 'info';
-        const durationMs = typeof duration === 'number' ? duration : this.toastDefaults.duration;
-        const container = this.getToastContainer();
+        let resolvedOptions = options;
+        let durationMs = this.toastDefaults.duration;
+
+        if (typeof duration === 'number') {
+            durationMs = duration;
+        } else if (duration && typeof duration === 'object') {
+            resolvedOptions = duration;
+        }
+
+        if (resolvedOptions && typeof resolvedOptions.duration === 'number' && typeof duration !== 'number') {
+            durationMs = resolvedOptions.duration;
+        }
+
+        const overridePosition = resolvedOptions && resolvedOptions.position;
+        const container = this.getToastContainer(overridePosition);
 
         const toast = document.createElement('div');
         toast.className = `toast toast-${toastType}`;
@@ -193,6 +252,29 @@ window.TripWeather.Utils.Helpers = {
         }
 
         return toast;
+    },
+
+    _isValidToastPosition: function(position) {
+        return this._toastPositions.indexOf(position) !== -1;
+    },
+
+    _applyToastPosition: function(position) {
+        if (!this._toastContainer) {
+            return;
+        }
+
+        const positionClassPrefix = 'toast-container--';
+
+        this._toastPositions.forEach(pos => {
+            this._toastContainer.classList.remove(`${positionClassPrefix}${pos}`);
+        });
+
+        const normalizedPosition = this._isValidToastPosition(position)
+            ? position
+            : this.toastDefaults.position;
+
+        this._toastContainer.classList.add(`${positionClassPrefix}${normalizedPosition}`);
+        this._toastContainer.setAttribute('data-toast-position', normalizedPosition);
     },
 
     /**

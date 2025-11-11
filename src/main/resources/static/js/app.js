@@ -27,6 +27,7 @@ window.TripWeather.App = {
 
     routeNameModalCallback: null,
     routeNameModalDefaultConfirmText: 'Save Name',
+    routeNameMinLength: 3,
 
     /**
      * Initialize application
@@ -294,6 +295,9 @@ window.TripWeather.App = {
 
         const initialValue = options.initialValue !== undefined ? options.initialValue : (this.currentRoute.name || '');
         input.value = initialValue;
+        if (this.routeNameMinLength) {
+            input.setAttribute('minlength', this.routeNameMinLength);
+        }
 
         modal.style.display = 'block';
 
@@ -332,8 +336,12 @@ window.TripWeather.App = {
         if (!input) return;
 
         const value = input.value.trim();
-        if (!value) {
-            window.TripWeather.Managers.UI.showToast('Please enter a route name.', 'warning');
+        const minLength = this.routeNameMinLength || 1;
+        if (value.length < minLength) {
+            const message = minLength > 1
+                ? `Route name must be at least ${minLength} characters.`
+                : 'Please enter a route name.';
+            window.TripWeather.Managers.UI.showToast(message, 'warning');
             input.focus();
             return;
         }
@@ -422,6 +430,13 @@ window.TripWeather.App = {
      */
     handleSaveRoute: function(skipNamePrompt) {
         console.log('Save route button clicked');
+
+        if (skipNamePrompt && typeof skipNamePrompt.preventDefault === 'function') {
+            skipNamePrompt.preventDefault();
+            skipNamePrompt = false;
+        }
+
+        const shouldSkipNamePrompt = skipNamePrompt === true;
         
         try {
             const waypoints = window.TripWeather.Managers.Waypoint.getAllWaypoints();
@@ -433,9 +448,12 @@ window.TripWeather.App = {
             const routeId = this.currentRoute.id;
             const userId = this.currentRoute.userId;
 
-            if (!skipNamePrompt && (!this.currentRoute.name || this.currentRoute.name.trim() === '')) {
+            const routeNameForPrompt = this.currentRoute.name ? this.currentRoute.name.trim() : '';
+            const minLength = this.routeNameMinLength || 1;
+
+            if (!shouldSkipNamePrompt && routeNameForPrompt.length < minLength) {
                 this.openRouteNameModal({
-                    initialValue: '',
+                    initialValue: routeNameForPrompt,
                     confirmText: 'Continue',
                     onConfirm: () => {
                         this.handleSaveRoute(true);
@@ -445,6 +463,18 @@ window.TripWeather.App = {
             }
 
             const routeName = this.currentRoute.name ? this.currentRoute.name.trim() : '';
+
+            if (routeName.length < minLength) {
+                window.TripWeather.Managers.UI.showToast(`Route name must be at least ${minLength} characters.`, 'warning');
+                this.openRouteNameModal({
+                    initialValue: routeName,
+                    confirmText: 'Continue',
+                    onConfirm: () => {
+                        this.handleSaveRoute(true);
+                    }
+                });
+                return;
+            }
             
             // Convert waypoints to DTO format
             const waypointDtos = window.TripWeather.Services.RoutePersistence.convertWaypointsToDto(waypoints);
