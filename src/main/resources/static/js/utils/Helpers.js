@@ -122,11 +122,87 @@ window.TripWeather.Utils.Helpers = {
     },
 
     /**
-     * Show alert message (wrapper for consistency)
-     * @param {string} message - Message to display
+     * Default toast configuration
      */
-    showAlert: function(message) {
-        alert(message);
+    toastDefaults: {
+        duration: 5000
+    },
+
+    _toastContainer: null,
+
+    /**
+     * Get or create toast container element
+     * @returns {HTMLElement} - Toast container element
+     */
+    getToastContainer: function() {
+        if (!this._toastContainer) {
+            const container = document.createElement('div');
+            container.className = 'toast-container';
+            document.body.appendChild(container);
+            this._toastContainer = container;
+        }
+        return this._toastContainer;
+    },
+
+    /**
+     * Show toast message
+     * @param {string} message - Message to display
+     * @param {string} type - Toast type ('success', 'warning', 'error', 'info')
+     * @param {number} duration - Duration in milliseconds
+     */
+    showToast: function(message, type, duration) {
+        const toastType = type || 'info';
+        const durationMs = typeof duration === 'number' ? duration : this.toastDefaults.duration;
+        const container = this.getToastContainer();
+
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${toastType}`;
+
+        const messageSpan = document.createElement('span');
+        messageSpan.className = 'toast-message-text';
+        messageSpan.textContent = message;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'toast-close';
+        closeBtn.setAttribute('aria-label', 'Dismiss notification');
+        closeBtn.textContent = '×';
+
+        const removeToast = () => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                if (toast.parentNode === container) {
+                    container.removeChild(toast);
+                }
+            }, 250);
+        };
+
+        closeBtn.addEventListener('click', removeToast);
+
+        toast.appendChild(messageSpan);
+        toast.appendChild(closeBtn);
+        container.appendChild(toast);
+
+        // Trigger animation
+        requestAnimationFrame(() => {
+            toast.classList.add('show');
+        });
+
+        if (durationMs > 0) {
+            setTimeout(removeToast, durationMs);
+        }
+
+        return toast;
+    },
+
+    /**
+     * Backwards compatible wrapper for deprecated alert usage
+     * @param {string} message - Message to display
+     * @param {string} type - Toast type
+     * @param {number} duration - Duration in milliseconds
+     */
+    showAlert: function(message, type, duration) {
+        return this.showToast(message, type, duration);
     },
 
     /**

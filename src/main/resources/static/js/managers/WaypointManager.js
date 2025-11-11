@@ -587,7 +587,7 @@ window.TripWeather.Managers.Waypoint = {
     selectNewLocationForWaypoint: function(sequence) {
         this.replacingWaypointSequence = sequence;
         window.TripWeather.Managers.Map.setCursor('crosshair');
-        window.TripWeather.Utils.Helpers.showAlert('Click on the map to select a new location for this waypoint.');
+        window.TripWeather.Utils.Helpers.showToast('Click on the map to select a new location for this waypoint.', 'info');
     },
 
     /**

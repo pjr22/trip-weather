@@ -207,7 +207,7 @@ window.TripWeather.App = {
             const waypoints = window.TripWeather.Managers.Waypoint.getAllWaypoints();
             
             if (waypoints.length === 0) {
-                window.TripWeather.Managers.UI.showAlert('No waypoints to save. Please add waypoints to your route first.', 'warning');
+                window.TripWeather.Managers.UI.showToast('No waypoints to save. Please add waypoints to your route first.', 'warning');
                 return;
             }
             
@@ -263,7 +263,7 @@ window.TripWeather.App = {
                             successMessage = `The route "${response.data.name}" was saved successfully.`;
                         }
                         
-                        window.TripWeather.Managers.UI.showAlert(successMessage, 'success');
+                        window.TripWeather.Managers.UI.showToast(successMessage, 'success');
                         console.log('Route saved successfully:', response.data);
                     } else {
                         // Handle non-2xx response codes as errors
@@ -274,13 +274,13 @@ window.TripWeather.App = {
                             errorMessage = `Failed to save route: Server returned status ${response.status}`;
                         }
                         
-                        window.TripWeather.Managers.UI.showAlert(errorMessage, 'error');
+                        window.TripWeather.Managers.UI.showToast(errorMessage, 'error');
                         console.error('Error saving route:', response);
                     }
                 })
                 .catch(error => {
                     window.TripWeather.Managers.UI.hideLoading('persistence-loading-overlay');
-                    window.TripWeather.Managers.UI.showAlert(
+                    window.TripWeather.Managers.UI.showToast(
                         `Failed to save route: ${error.message}`, 
                         'error'
                     );
@@ -289,7 +289,7 @@ window.TripWeather.App = {
                 
         } catch (error) {
             console.error('Error handling save route:', error);
-            window.TripWeather.Managers.UI.showAlert(
+            window.TripWeather.Managers.UI.showToast(
                 `An error occurred while saving the route: ${error.message}`, 
                 'error'
             );
@@ -307,7 +307,7 @@ window.TripWeather.App = {
             window.TripWeather.Managers.Search.showRouteSearchModal();
         } catch (error) {
             console.error('Error handling load route:', error);
-            window.TripWeather.Managers.UI.showAlert(
+            window.TripWeather.Managers.UI.showToast(
                 `An error occurred while loading the route: ${error.message}`,
                 'error'
             );
@@ -364,7 +364,7 @@ window.TripWeather.App = {
         console.error('Global error:', event.error);
         
         if (this.config.debug) {
-            window.TripWeather.Managers.UI.showAlert(
+            window.TripWeather.Managers.UI.showToast(
                 `An error occurred: ${event.error.message}\n\nCheck console for details.`,
                 'error'
             );
@@ -379,7 +379,7 @@ window.TripWeather.App = {
         console.error('Unhandled promise rejection:', event.reason);
         
         if (this.config.debug) {
-            window.TripWeather.Managers.UI.showAlert(
+            window.TripWeather.Managers.UI.showToast(
                 `An unhandled error occurred: ${event.reason}\n\nCheck console for details.`,
                 'error'
             );

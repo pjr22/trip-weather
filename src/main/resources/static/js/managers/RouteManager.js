@@ -53,7 +53,7 @@ window.TripWeather.Managers.Route = {
         const waypoints = window.TripWeather.Managers.Waypoint.getAllWaypoints();
         
         if (waypoints.length < 2) {
-            window.TripWeather.Managers.UI.showAlert('Please add at least 2 waypoints to calculate a route.');
+            window.TripWeather.Managers.UI.showToast('Please add at least 2 waypoints to calculate a route.', 'warning');
             return;
         }
 
@@ -83,7 +83,7 @@ window.TripWeather.Managers.Route = {
             })
             .catch(function(error) {
                 console.error('Route calculation error:', error);
-                window.TripWeather.Managers.UI.showAlert('Failed to calculate route: ' + error.message);
+                window.TripWeather.Managers.UI.showToast('Failed to calculate route: ' + error.message, 'error');
                 window.TripWeather.Managers.Route.clearRoute();
             })
             .finally(function() {

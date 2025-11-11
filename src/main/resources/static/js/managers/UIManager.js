@@ -34,16 +34,22 @@ window.TripWeather.Managers.UI = {
     },
 
     /**
-     * Show alert message with consistent styling
+     * Show toast notification with consistent styling
      * @param {string} message - Message to display
-     * @param {string} type - Alert type ('info', 'warning', 'error')
+     * @param {string} type - Toast type ('info', 'success', 'warning', 'error')
+     * @param {number} duration - Duration in milliseconds (optional)
      */
-    showAlert: function(message, type) {
-        type = type || 'info';
-        
-        // For now, use browser alert - could be enhanced with custom modal
-        console.log(`[${type.toUpperCase()}] ${message}`);
-        window.TripWeather.Utils.Helpers.showAlert(message);
+    showToast: function(message, type, duration) {
+        const toastType = type || 'info';
+        console.log(`[${toastType.toUpperCase()}] ${message}`);
+        return window.TripWeather.Utils.Helpers.showToast(message, toastType, duration);
+    },
+
+    /**
+     * Deprecated alert wrapper retained for backward compatibility
+     */
+    showAlert: function(message, type, duration) {
+        return this.showToast(message, type, duration);
     },
 
     /**

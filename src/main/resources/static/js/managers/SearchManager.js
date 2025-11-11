@@ -466,7 +466,7 @@ window.TripWeather.Managers.Search = {
                     // Automatically calculate route after loading
                     window.TripWeather.Managers.Route.calculateRoute();
                 } else {
-                    window.TripWeather.Managers.UI.showAlert(
+                    window.TripWeather.Managers.UI.showToast(
                         'Route not found with the provided ID.',
                         'warning'
                     );
@@ -474,7 +474,7 @@ window.TripWeather.Managers.Search = {
             })
             .catch(error => {
                 window.TripWeather.Managers.UI.hideLoading('persistence-loading-overlay');
-                window.TripWeather.Managers.UI.showAlert(
+                window.TripWeather.Managers.UI.showToast(
                     `Failed to load route: ${error.message}`,
                     'error'
                 );

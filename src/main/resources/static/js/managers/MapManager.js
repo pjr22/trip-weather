@@ -91,7 +91,7 @@ window.TripWeather.Managers.Map = {
      */
     recenterOnUserLocation: function() {
         if (!("geolocation" in navigator)) {
-            window.TripWeather.Utils.Helpers.showAlert('Geolocation is not supported by your browser.');
+            window.TripWeather.Utils.Helpers.showToast('Geolocation is not supported by your browser.', 'warning');
             return;
         }
         
@@ -125,7 +125,7 @@ window.TripWeather.Managers.Map = {
             function(error) {
                 console.warn('Geolocation error:', error.message);
                 window.TripWeather.Utils.Helpers.hideLoading('location-loading-overlay');
-                window.TripWeather.Utils.Helpers.showAlert('Unable to get your current location. Please check your browser permissions.');
+                window.TripWeather.Utils.Helpers.showToast('Unable to get your current location. Please check your browser permissions.', 'error');
             },
             {
                 enableHighAccuracy: true,
@@ -289,7 +289,7 @@ window.TripWeather.Managers.Map = {
      */
     addCurrentLocationAsWaypoint: function() {
         if (!this.userLocation.lat || !this.userLocation.lng) {
-            window.TripWeather.Utils.Helpers.showAlert('User location not available. Please refresh your location first.');
+            window.TripWeather.Utils.Helpers.showToast('User location not available. Please refresh your location first.', 'warning');
             return;
         }
         
@@ -317,7 +317,7 @@ window.TripWeather.Managers.Map = {
             }
         } else {
             console.error('WaypointManager not available');
-            window.TripWeather.Utils.Helpers.showAlert('Unable to add waypoint. Please try again.');
+            window.TripWeather.Utils.Helpers.showToast('Unable to add waypoint. Please try again.', 'error');
         }
     }
 };
