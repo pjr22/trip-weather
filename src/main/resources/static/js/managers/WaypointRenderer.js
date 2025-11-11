@@ -92,27 +92,33 @@ window.TripWeather.Managers.WaypointRenderer = {
      * @param {number} orderNumber - Order number
      */
     updateMarkerPopup: function(marker, waypoint, orderNumber) {
+        const helpers = window.TripWeather.Utils.Helpers;
         const lastWaypointNumber = window.TripWeather.Managers.Waypoint.getLastWaypointNumber();
         const isStart = orderNumber === 1;
         const isEnd = orderNumber === lastWaypointNumber;
         let waypointLabel = isStart ? 'Start' : isEnd ? 'End' : `Waypoint ${orderNumber}`;
-        let popupContent = `<strong>${waypointLabel}</strong><br>`;
-        popupContent += `Lat: ${waypoint.lat}<br>`;
-        popupContent += `Lon: ${waypoint.lng}<br>`;
+        const safeWaypointLabel = helpers.escapeHtml(waypointLabel);
+        const safeLat = helpers.escapeHtml(waypoint.lat);
+        const safeLng = helpers.escapeHtml(waypoint.lng);
+        let popupContent = `<strong>${safeWaypointLabel}</strong><br>`;
+        popupContent += `Lat: ${safeLat}<br>`;
+        popupContent += `Lon: ${safeLng}<br>`;
         
         if (waypoint.locationName) {
-            popupContent += `<br><strong>${waypoint.locationName}</strong><br>`;
+            const safeLocationName = helpers.escapeHtml(waypoint.locationName);
+            popupContent += `<br><strong>${safeLocationName}</strong><br>`;
             
             // Add timezone name after location name
             if (waypoint.timezoneName) {
-                popupContent += `<small>Timezone: ${waypoint.timezoneName}</small><br>`;
+                const safeTimezoneName = helpers.escapeHtml(waypoint.timezoneName);
+                popupContent += `<small>Timezone: ${safeTimezoneName}</small><br>`;
             }
         }
         
         // Add Arrival Time
         const arrivalTime = this.formatWaypointTime(waypoint, false);
         if (!isStart && arrivalTime) {
-            popupContent += `Arrival Time: ${arrivalTime}<br>`;
+            popupContent += `Arrival Time: ${helpers.escapeHtml(arrivalTime)}<br>`;
         }
         
         // Add Departure Time if there's a duration
@@ -126,7 +132,7 @@ window.TripWeather.Managers.WaypointRenderer = {
             // Add Departure Time
             const departureTime = this.formatWaypointTime(waypoint, true);
             if (departureTime) {
-                popupContent += `Departure Time: ${departureTime}<br>`;
+                popupContent += `Departure Time: ${helpers.escapeHtml(departureTime)}<br>`;
             }
 
             // Add Duration
@@ -137,8 +143,8 @@ window.TripWeather.Managers.WaypointRenderer = {
             if (hours > 0 || days > 0) {
                 durationText += `${hours} hours, `;
             }
-            durationText += `${mins} minutes`;            
-            popupContent += `${durationText}<br>`;            
+            durationText += `${mins} minutes`;
+            popupContent += `${helpers.escapeHtml(durationText)}<br>`;
         }
         
         if (waypoint.weather && !waypoint.weather.error) {
@@ -158,6 +164,7 @@ window.TripWeather.Managers.WaypointRenderer = {
         
         tbody.innerHTML = '';
         
+        const helpers = window.TripWeather.Utils.Helpers;
         const waypoints = window.TripWeather.Managers.Waypoint.getAllWaypoints();
         
         waypoints.forEach((waypoint, index) => {
@@ -179,17 +186,23 @@ window.TripWeather.Managers.WaypointRenderer = {
                     timezoneDisplay = waypoint.timezoneStdAbbr || '-';
                 }
             }
+
+            const safeDateValue = helpers.escapeHtml(waypoint.date || '');
+            const safeTimeValue = helpers.escapeHtml(waypoint.time || '');
+            const safeTimezoneDisplay = helpers.escapeHtml(timezoneDisplay);
+            const safeDurationValue = helpers.escapeHtml(window.TripWeather.Utils.Duration.formatDuration(waypoint.duration));
+            const safeLocationValue = helpers.escapeHtml(waypoint.locationName || '');
             
             row.innerHTML = `
                 <td class="drag-handle-cell"><span class="drag-handle" title="Drag to reorder">☰</span></td>
                 <td>${index + 1}</td>
-                <td><input type="date" value="${waypoint.date}" data-waypoint-sequence="${waypoint.sequence}" data-field="date"></td>
-                <td><input type="time" value="${waypoint.time}" data-waypoint-sequence="${waypoint.sequence}" data-field="time"></td>
-                <td>${timezoneDisplay}</td>
+                <td><input type="date" value="${safeDateValue}" data-waypoint-sequence="${waypoint.sequence}" data-field="date"></td>
+                <td><input type="time" value="${safeTimeValue}" data-waypoint-sequence="${waypoint.sequence}" data-field="time"></td>
+                <td>${safeTimezoneDisplay}</td>
                 <td>
                     <div class="duration-input-container">
                         <input type="text"
-                               value="${window.TripWeather.Utils.Duration.formatDuration(waypoint.duration)}"
+                               value="${safeDurationValue}"
                                placeholder="3d2h10m"
                                data-waypoint-sequence="${waypoint.sequence}"
                                data-field="duration"
@@ -201,7 +214,7 @@ window.TripWeather.Managers.WaypointRenderer = {
                         </div>
                     </div>
                 </td>
-                <td><input type="text" value="${waypoint.locationName}" placeholder="Enter location name" data-waypoint-sequence="${waypoint.sequence}" data-field="locationName"></td>
+                <td><input type="text" value="${safeLocationValue}" placeholder="Enter location name" data-waypoint-sequence="${waypoint.sequence}" data-field="locationName"></td>
                 ${weatherHtml}
                 <td class="actions-cell">
                     <button class="action-btn" data-waypoint-sequence="${waypoint.sequence}" data-action="center" title="Center on waypoint">
@@ -357,13 +370,19 @@ window.TripWeather.Managers.WaypointRenderer = {
      * @param {object} waypoint - Waypoint object
      */
     updateMarkerWithWeather: function(waypoint) {
-        const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.sequence === waypoint.sequence);
-        if (index !== -1) {
-            const marker = window.TripWeather.Managers.Waypoint.waypointMarkers[index];
-            if (marker) {
-                this.updateMarkerPopup(marker, waypoint, index + 1);
-            }
+        const marker = window.TripWeather.Managers.Waypoint.waypointMarkers.find(
+            m => m.waypointSequence === waypoint.sequence
+        );
+        if (!marker) {
+            return;
         }
+
+        const orderIndex = window.TripWeather.Managers.Waypoint.waypoints.findIndex(
+            w => w.sequence === waypoint.sequence
+        );
+        const orderNumber = orderIndex !== -1 ? orderIndex + 1 : waypoint.sequence;
+
+        this.updateMarkerPopup(marker, waypoint, orderNumber);
     },
 
     /**
@@ -371,13 +390,19 @@ window.TripWeather.Managers.WaypointRenderer = {
      * @param {object} waypoint - Waypoint object
      */
     updateMarkerWithLocation: function(waypoint) {
-        const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.sequence === waypoint.sequence);
-        if (index !== -1) {
-            const marker = window.TripWeather.Managers.Waypoint.waypointMarkers[index];
-            if (marker) {
-                this.updateMarkerPopup(marker, waypoint, index + 1);
-            }
+        const marker = window.TripWeather.Managers.Waypoint.waypointMarkers.find(
+            m => m.waypointSequence === waypoint.sequence
+        );
+        if (!marker) {
+            return;
         }
+
+        const orderIndex = window.TripWeather.Managers.Waypoint.waypoints.findIndex(
+            w => w.sequence === waypoint.sequence
+        );
+        const orderNumber = orderIndex !== -1 ? orderIndex + 1 : waypoint.sequence;
+
+        this.updateMarkerPopup(marker, waypoint, orderNumber);
     },
 
     /**

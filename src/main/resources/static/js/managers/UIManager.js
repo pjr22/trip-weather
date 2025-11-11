@@ -214,7 +214,7 @@ window.TripWeather.Managers.UI = {
             
             // Ctrl+Enter or Cmd+Enter - calculate route
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-                this.handleCalculateRoute();
+                this.handleCalculateRouteShortcut();
             }
             
             // Ctrl+F or Cmd+F - focus search
@@ -237,9 +237,9 @@ window.TripWeather.Managers.UI = {
         }
         
         // Cancel waypoint replacement if active
-        const replacingWaypointId = window.TripWeather.Managers.Waypoint.getReplacingWaypointId();
-        if (replacingWaypointId !== null) {
-            window.TripWeather.Managers.Waypoint.setReplacingWaypointId(null);
+        const replacingWaypointSequence = window.TripWeather.Managers.Waypoint.getReplacingWaypointSequence();
+        if (replacingWaypointSequence !== null) {
+            window.TripWeather.Managers.Waypoint.setReplacingWaypointSequence(null);
             window.TripWeather.Managers.Map.setCursor('');
             this.showNotification('Waypoint replacement cancelled', 2000, 'info');
             return;
@@ -260,9 +260,11 @@ window.TripWeather.Managers.UI = {
      * Handle search shortcut
      */
     handleSearchShortcut: function() {
-        const searchBtn = document.getElementById('search-btn');
-        if (searchBtn) {
-            searchBtn.click();
+        const searchButton = document.getElementById('search-location-btn');
+        if (searchButton) {
+            searchButton.click();
+        } else if (window.TripWeather.Managers.Search) {
+            window.TripWeather.Managers.Search.showModal();
         }
     },
 

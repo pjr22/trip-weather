@@ -189,7 +189,7 @@ window.TripWeather.Utils.Timezone = {
         const targetDate = date ? new Date(date) : new Date();
         
         // Determine if DST is active for this date
-        const isDst = window.TripWeather.Managers.Waypoint.isDaylightSavingTimeForDate(targetDate, waypoint);
+        const isDst = this.isDaylightSavingTimeForDate(targetDate, waypoint);
         
         // Return appropriate offset
         return isDst ? waypoint.timezoneDstOffset : waypoint.timezoneStdOffset;

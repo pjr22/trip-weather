@@ -465,7 +465,7 @@ window.TripWeather.Managers.Waypoint = {
                         const targetDate = waypoint.date && waypoint.time ? `${waypoint.date} ${waypoint.time}` : null;
                         if (targetDate && waypoint.timezoneName) {
                             // Use the appropriate abbreviation based on DST
-                            const isDst = this.isDaylightSavingTimeForDate(new Date(targetDate), waypoint);
+                            const isDst = window.TripWeather.Utils.Timezone.isDaylightSavingTimeForDate(new Date(targetDate), waypoint);
                             waypoint.timezone = isDst ? waypoint.timezoneDstAbbr : waypoint.timezoneStdAbbr;
                         } else {
                             // Default to standard time if no date provided

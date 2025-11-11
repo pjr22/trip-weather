@@ -101,6 +101,8 @@ window.TripWeather.Services.Weather = {
      * @returns {string} - HTML string for weather cells
      */
     generateWeatherHtml: function(weather, isLoading) {
+        const helpers = window.TripWeather.Utils.Helpers;
+
         if (isLoading) {
             return `
                 <td colspan="4" class="weather-loading">Loading weather...</td>
@@ -108,24 +110,30 @@ window.TripWeather.Services.Weather = {
         }
         
         if (weather && weather.error) {
+            const safeError = helpers.escapeHtml(weather.error);
             return `
-                <td colspan="4" class="weather-error">${weather.error}</td>
+                <td colspan="4" class="weather-error">${safeError}</td>
             `;
         }
         
         if (weather) {
             const formatted = this.formatWeatherDisplay(weather);
+            const safeCondition = helpers.escapeHtml(formatted.condition);
+            const safeTemperature = helpers.escapeHtml(formatted.temperature);
+            const safeWind = helpers.escapeHtml(formatted.wind);
+            const safePrecipitation = helpers.escapeHtml(formatted.precipitation);
             
             let weatherIcon = '';
             if (formatted.iconUrl) {
-                weatherIcon = `<img src="${formatted.iconUrl}" alt="${formatted.condition}" class="weather-icon"> `;
+                const safeIconUrl = helpers.escapeHtml(formatted.iconUrl);
+                weatherIcon = `<img src="${safeIconUrl}" alt="${safeCondition}" class="weather-icon"> `;
             }
             
             return `
-                <td>${weatherIcon}${formatted.condition}</td>
-                <td>${formatted.temperature}</td>
-                <td>${formatted.wind}</td>
-                <td>${formatted.precipitation}</td>
+                <td>${weatherIcon}${safeCondition}</td>
+                <td>${safeTemperature}</td>
+                <td>${safeWind}</td>
+                <td>${safePrecipitation}</td>
             `;
         }
         
@@ -143,26 +151,33 @@ window.TripWeather.Services.Weather = {
      * @returns {string} - HTML string for weather popup content
      */
     generateWeatherPopupHtml: function(weather) {
+        const helpers = window.TripWeather.Utils.Helpers;
+
         if (!weather || weather.error) {
-            return weather?.error || 'No weather data available';
+            return helpers.escapeHtml(weather?.error || 'No weather data available');
         }
         
         let html = '';
         
         if (weather.iconUrl) {
-            html += `<img src="${weather.iconUrl}" alt="${weather.condition}" class="weather-icon"> `;
+            const safeIconUrl = helpers.escapeHtml(weather.iconUrl);
+            const safeConditionText = helpers.escapeHtml(weather.condition);
+            html += `<img src="${safeIconUrl}" alt="${safeConditionText}" class="weather-icon"> `;
         }
         
-        html += `${weather.condition}<br>`;
+        html += `${helpers.escapeHtml(weather.condition)}<br>`;
         
         if (weather.temperature) {
-            html += `Temp: ${weather.temperature}°${weather.temperatureUnit}<br>`;
+            const tempDisplay = `${weather.temperature}°${weather.temperatureUnit}`;
+            html += `Temp: ${helpers.escapeHtml(tempDisplay)}<br>`;
         }
         
-        html += `Wind: ${weather.windSpeed} ${weather.windDirection}<br>`;
+        const windText = helpers.escapeHtml(`Wind: ${weather.windSpeed} ${weather.windDirection}`);
+        html += `${windText}<br>`;
         
         if (weather.precipitationProbability !== null) {
-            html += `Precip: ${weather.precipitationProbability}%`;
+            const precipText = helpers.escapeHtml(`Precip: ${weather.precipitationProbability}%`);
+            html += precipText;
         }
         
         return html;

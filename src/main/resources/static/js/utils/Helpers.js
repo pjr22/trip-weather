@@ -173,6 +173,24 @@ window.TripWeather.Utils.Helpers = {
     },
 
     /**
+     * Escape string for safe HTML insertion
+     * @param {*} value - Value to escape
+     * @returns {string} - Escaped HTML string
+     */
+    escapeHtml: function(value) {
+        if (value === null || value === undefined) {
+            return '';
+        }
+
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
+    /**
      * Create HTTP query string from parameters
      * @param {object} params - Parameters object
      * @returns {string} - Query string

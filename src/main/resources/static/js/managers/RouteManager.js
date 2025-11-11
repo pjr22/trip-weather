@@ -176,27 +176,29 @@ window.TripWeather.Managers.Route = {
                 }
                 
                 // Store timezone information if provided by route calculation
-                if (routeWaypoint.timezone) {
-                    // Update timezone name if provided
+                const timezoneDataProvided = routeWaypoint.timezoneName ||
+                    routeWaypoint.timezoneStdOffset ||
+                    routeWaypoint.timezoneDstOffset ||
+                    routeWaypoint.timezoneStdAbbr ||
+                    routeWaypoint.timezoneDstAbbr;
+
+                if (timezoneDataProvided) {
                     if (routeWaypoint.timezoneName) {
                         waypoint.timezoneName = routeWaypoint.timezoneName;
                     }
-                    // Update timezone offsets if provided
                     if (routeWaypoint.timezoneStdOffset) {
                         waypoint.timezoneStdOffset = routeWaypoint.timezoneStdOffset;
                     }
                     if (routeWaypoint.timezoneDstOffset) {
                         waypoint.timezoneDstOffset = routeWaypoint.timezoneDstOffset;
                     }
-                    // Update timezone abbreviations if provided
                     if (routeWaypoint.timezoneStdAbbr) {
                         waypoint.timezoneStdAbbr = routeWaypoint.timezoneStdAbbr;
                     }
                     if (routeWaypoint.timezoneDstAbbr) {
                         waypoint.timezoneDstAbbr = routeWaypoint.timezoneDstAbbr;
                     }
-                    
-                    // Update the current timezone abbreviation based on date
+
                     if (waypoint.date && waypoint.time && waypoint.timezoneName) {
                         const dateTimeStr = `${waypoint.date} ${waypoint.time}`;
                         waypoint.timezone = window.TripWeather.Utils.Timezone.getTimezoneAbbrFromWaypoint(waypoint, dateTimeStr);
@@ -280,9 +282,13 @@ window.TripWeather.Managers.Route = {
             return true;
         }
         
+        const waypointsLength = Array.isArray(this.currentRoute.waypoints)
+            ? this.currentRoute.waypoints.length
+            : 0;
+
         // For additions, only affects route if not at the end
         if (changeType === 'add') {
-            return waypointIndex < this.currentRoute.getWaypoints().length;
+            return waypointIndex < waypointsLength;
         }
         
         // For all other changes, it affects route
