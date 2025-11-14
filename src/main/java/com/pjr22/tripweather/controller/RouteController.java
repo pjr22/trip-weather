@@ -1,17 +1,24 @@
 package com.pjr22.tripweather.controller;
 
+import com.pjr22.tripweather.Utils;
 import com.pjr22.tripweather.model.RouteData;
 import com.pjr22.tripweather.service.RouteService;
+
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/route")
 @CrossOrigin(origins = "*")
+@Slf4j
 public class RouteController {
 
     private final RouteService routeService;
@@ -22,35 +29,39 @@ public class RouteController {
 
     @PostMapping("/calculate")
     public ResponseEntity<RouteData> calculateRoute(@RequestBody List<Map<String, Object>> waypoints) {
-        try {
-            // Extract departure date/time if provided, or use current time as default
-            String departureDateTime = null;
-            if (!waypoints.isEmpty()) {
-                Map<String, Object> firstWaypoint = waypoints.get(0);
-                String date = firstWaypoint.get("date") != null ? firstWaypoint.get("date").toString() : "";
-                String time = firstWaypoint.get("time") != null ? firstWaypoint.get("time").toString() : "";
-                
-                if (!date.isEmpty() && !time.isEmpty()) {
-                    departureDateTime = date + " " + time;
-                } else {
-                    // Use current time as default departure time
-                    java.time.LocalDateTime now = java.time.LocalDateTime.now();
-                    java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-                    departureDateTime = now.format(formatter);
-                }
-            }
+        if (waypoints == null || waypoints.isEmpty()) {
+           return ResponseEntity.badRequest().build();
+        }
 
+        try {
             // Convert request waypoints to RouteService waypoints and extract durations
             List<RouteService.RouteRequest.Waypoint> routeWaypoints = new ArrayList<>();
             List<Integer> durations = new ArrayList<>();
-            
+
+            int i = 0;
+            ZonedDateTime departureDateTime = ZonedDateTime.now(ZoneId.of(Utils.default_timezone_name));
             for (Map<String, Object> wp : waypoints) {
                 Double lat = ((Number) wp.get("latitude")).doubleValue();
                 Double lng = ((Number) wp.get("longitude")).doubleValue();
                 String name = wp.get("name") != null ? wp.get("name").toString() : "";
-                String timezoneName = wp.get("timezoneName") != null ? wp.get("timezoneName").toString() : "";
+                String timezoneName = (String) wp.get("timezoneName");
                 routeWaypoints.add(new RouteService.RouteRequest.Waypoint(lat, lng, name, timezoneName));
-                
+                if (++i == 1) {
+                   // First waypoint dictates departure time
+                   try {
+                      String date = (String) wp.get("date");
+                      String time = (String) wp.get("time");
+                      ZoneId zone = timezoneName != null && !timezoneName.isBlank() ? ZoneId.of(timezoneName) : ZoneId.of(Utils.default_timezone_name);
+                      if (date != null && !date.isBlank() && time != null && !time.isBlank()) {
+                         departureDateTime = Utils.getZonedDateTime(date, time, zone);
+                      } else {
+                         departureDateTime = ZonedDateTime.now(zone);
+                      }
+                   } catch (Exception e) {
+                      // don't care
+                   }
+                }
+
                 // Extract duration (in minutes), default to 0 if not provided
                 Integer duration = 0;
                 if (wp.get("duration") != null) {
@@ -63,7 +74,7 @@ public class RouteController {
                 durations.add(duration);
             }
 
-            RouteData routeData = routeService.calculateRouteWithArrivalTimesAndDurations(routeWaypoints, departureDateTime, durations);
+            RouteData routeData = routeService.calculateRoute(routeWaypoints, departureDateTime, durations);
 
             // Check if route calculation was successful
             if (routeData.getGeometry() != null && !routeData.getGeometry().isEmpty()) {
@@ -74,6 +85,7 @@ public class RouteController {
             }
 
         } catch (Exception e) {
+            log.error("Route calculation failed.", e);
             // Create empty route data for error case
             RouteData errorRoute = new RouteData();
             errorRoute.setDistance(0.0);

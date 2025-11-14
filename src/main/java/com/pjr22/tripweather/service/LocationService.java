@@ -3,13 +3,11 @@ package com.pjr22.tripweather.service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.pjr22.tripweather.model.LocationData;
 
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 @Slf4j

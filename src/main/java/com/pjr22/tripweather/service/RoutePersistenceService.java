@@ -256,28 +256,7 @@ public class RoutePersistenceService {
         dto.setRouteId(waypoint.getRoute() != null ? waypoint.getRoute().getId() : null);
         return dto;
     }
-    
-    /**
-     * Convert RouteDto to Route entity
-     * @param dto RouteDto
-     * @return Route entity
-     */
-    private Route convertToEntity(RouteDto dto) {
-        Route route = new Route();
-        route.setId(dto.getId());
-        route.setName(dto.getName());
-        route.setCreated(dto.getCreated());
-        
-        if (dto.getUserId() != null) {
-            User user = new User();
-            user.setId(dto.getUserId());
-            route.setUser(user);
-        }
-        
-        // Waypoints would be set separately due to bidirectional relationship
-        return route;
-    }
-    
+
     /**
      * Convert WaypointDto to Waypoint entity
      * @param dto WaypointDto
