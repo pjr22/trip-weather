@@ -398,6 +398,9 @@ window.TripWeather.App = {
         // Setup route persistence buttons
         this.setupRoutePersistenceButtons();
         
+        // Check for routeId in URL parameters
+        this.checkForRouteIdInUrl();
+        
         console.log('Global events setup complete');
     },
 
@@ -409,6 +412,7 @@ window.TripWeather.App = {
         
         const saveRouteBtn = document.getElementById('save-route-btn');
         const loadRouteBtn = document.getElementById('load-route-btn');
+        const shareRouteBtn = document.getElementById('share-route-btn');
         
         if (saveRouteBtn) {
             saveRouteBtn.addEventListener('click', this.handleSaveRoute.bind(this));
@@ -420,6 +424,12 @@ window.TripWeather.App = {
             loadRouteBtn.addEventListener('click', this.handleLoadRoute.bind(this));
         } else {
             console.warn('Load route button not found');
+        }
+        
+        if (shareRouteBtn) {
+            shareRouteBtn.addEventListener('click', this.handleShareRoute.bind(this));
+        } else {
+            console.warn('Share route button not found');
         }
         
         console.log('Route persistence buttons setup complete');
@@ -560,6 +570,191 @@ window.TripWeather.App = {
                 `An error occurred while loading the route: ${error.message}`,
                 'error'
             );
+        }
+    },
+
+    /**
+     * Handle share route button click
+     */
+    handleShareRoute: function() {
+        console.log('Share route button clicked');
+        
+        try {
+            // Check if we have a route to share
+            if (!this.currentRoute.id) {
+                window.TripWeather.Managers.UI.showToast(
+                    'Please save the route before sharing it.',
+                    'warning'
+                );
+                return;
+            }
+            
+            // Generate shareable link
+            const shareableLink = this.generateShareableLink(this.currentRoute.id);
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(shareableLink)
+                .then(() => {
+                    window.TripWeather.Managers.UI.showToast(
+                        'Route link copied to clipboard!',
+                        'success'
+                    );
+                })
+                .catch(err => {
+                    console.error('Failed to copy link to clipboard:', err);
+                    // Fallback: show the link in a dialog
+                    this.showShareableLinkDialog(shareableLink);
+                });
+                
+        } catch (error) {
+            console.error('Error handling share route:', error);
+            window.TripWeather.Managers.UI.showToast(
+                `An error occurred while sharing the route: ${error.message}`,
+                'error'
+            );
+        }
+    },
+
+    /**
+     * Generate a shareable link for a route
+     * @param {string} routeId - UUID of the route
+     * @returns {string} - Shareable URL
+     */
+    generateShareableLink: function(routeId) {
+        const baseUrl = window.location.origin + window.location.pathname;
+        return `${baseUrl}?routeId=${encodeURIComponent(routeId)}`;
+    },
+
+    /**
+     * Show shareable link in a dialog as fallback
+     * @param {string} link - Shareable link
+     */
+    showShareableLinkDialog: function(link) {
+        const message = `Share this link with others:\n\n${link}\n\n(Copy this link manually)`;
+        
+        // Create a simple modal for the link
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'block';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Share Route</h3>
+                    <span class="close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <p>Copy this link to share your route:</p>
+                    <input type="text" value="${link}" readonly style="width: 100%; padding: 8px; margin: 10px 0;">
+                    <button id="copy-link-btn" class="modal-btn primary">Copy Link</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Setup event listeners
+        const closeBtn = modal.querySelector('.close');
+        const copyBtn = modal.getElementById('copy-link-btn');
+        const input = modal.querySelector('input');
+        
+        const closeModal = () => {
+            document.body.removeChild(modal);
+        };
+        
+        closeBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+        
+        copyBtn.addEventListener('click', () => {
+            input.select();
+            document.execCommand('copy');
+            window.TripWeather.Managers.UI.showToast('Link copied to clipboard!', 'success');
+        });
+    },
+
+    /**
+     * Check for routeId in URL parameters and load the route if found
+     */
+    checkForRouteIdInUrl: function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const routeId = urlParams.get('routeId');
+        
+        if (routeId) {
+            console.log('Found routeId in URL:', routeId);
+            this.loadRouteFromUrl(routeId);
+        }
+    },
+
+    /**
+     * Wait for the map to finish initializing before performing map-dependent actions
+     * @param {number} timeoutMs - Maximum time to wait for the map (default 5000ms)
+     * @returns {Promise<void>}
+     */
+    waitForMapReady: function(timeoutMs = 5000) {
+        return new Promise((resolve, reject) => {
+            const mapManager = window.TripWeather.Managers.Map;
+            
+            if (!mapManager) {
+                reject(new Error('Map manager is not available'));
+                return;
+            }
+            
+            if (mapManager.getMap()) {
+                resolve();
+                return;
+            }
+            
+            const startTime = Date.now();
+            const pollInterval = 100;
+            const intervalId = setInterval(() => {
+                if (mapManager.getMap()) {
+                    clearInterval(intervalId);
+                    resolve();
+                } else if (Date.now() - startTime >= timeoutMs) {
+                    clearInterval(intervalId);
+                    reject(new Error('Map failed to initialize in time'));
+                }
+            }, pollInterval);
+        });
+    },
+
+    /**
+     * Load a route from URL parameter by reusing the existing search flow
+     * @param {string} routeId - UUID of the route to load
+     */
+    loadRouteFromUrl: async function(routeId) {
+        console.log('Loading route from URL via SearchManager:', routeId);
+        
+        const searchManager = window.TripWeather.Managers.Search;
+        if (!searchManager || typeof searchManager.selectRouteSearchResult !== 'function') {
+            console.error('SearchManager.selectRouteSearchResult is not available');
+            window.TripWeather.Managers.UI.showToast(
+                'Unable to load the shared route right now. Please try again.',
+                'error'
+            );
+            return;
+        }
+        
+        try {
+            await this.waitForMapReady();
+        } catch (mapError) {
+            console.error('Map was not ready in time for route loading:', mapError);
+            window.TripWeather.Managers.UI.showToast(
+                'The map is still loading. Please try refreshing the page.',
+                'error'
+            );
+            return;
+        }
+        
+        try {
+            await searchManager.selectRouteSearchResult(routeId);
+        } catch (error) {
+            console.error('Error loading route via shared link:', error);
+            // Leave error messaging to SearchManager but ensure URL is cleaned up
+            const url = new URL(window.location);
+            url.searchParams.delete('routeId');
+            window.history.replaceState({}, '', url);
         }
     },
 
