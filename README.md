@@ -1,5 +1,8 @@
 # Trip Weather
 
+## Repository owner's note:
+ This project is largely an AI coding experiment. Approximately 95% (or more) of the code, including this README document, is AI generated, using a variety of AI tools and models. The rest was written by me (PJR22), the repository owner, as mostly bug fixes and minor improvements. A lot of the code is bad, and the UI could probably benefit from a complete rewrite using more modern technologies. Some improvements will continue to be made, and I may take on larger, more ambitious refactoring efforts at some point, as I find this to be a useful tool for planning road trips. It was, in fact, created out of frustration with the lack of a simple, user-friendly tool for planning road trips that includes weather information along the route. The code is offered as-is, without any warranty or guarantee of functionality. Use it as you see fit.
+
 Trip Weather is a Spring Boot web application that helps users plan road trips by allowing them to:
 
 - Plot a route on an interactive map (OpenStreetMap via Leaflet.js)
