@@ -95,6 +95,15 @@ window.TripWeather.Managers.Waypoint = {
                 waypoint.timezoneDstOffset = existingWaypoint.timezoneDstOffset || '';
                 waypoint.timezoneStdAbbr = existingWaypoint.timezoneStdAbbr || '';
                 waypoint.timezoneDstAbbr = existingWaypoint.timezoneDstAbbr || '';
+            } else if (existingWaypoint.timezone) {
+                // Handle case where only timezone field is set (from loaded routes)
+                waypoint.timezoneName = existingWaypoint.timezone;
+                // For loaded routes, we might not have detailed timezone info
+                // Set default values that will be populated when needed
+                waypoint.timezoneStdOffset = existingWaypoint.timezoneStdOffset || '';
+                waypoint.timezoneDstOffset = existingWaypoint.timezoneDstOffset || '';
+                waypoint.timezoneStdAbbr = existingWaypoint.timezoneStdAbbr || '';
+                waypoint.timezoneDstAbbr = existingWaypoint.timezoneDstAbbr || '';
             }
             
             // CRITICAL FIX: Update nextSequence to be higher than any existing waypoint sequence
@@ -466,10 +475,11 @@ window.TripWeather.Managers.Waypoint = {
                         if (targetDate && waypoint.timezoneName) {
                             // Use the appropriate abbreviation based on DST
                             const isDst = window.TripWeather.Utils.Timezone.isDaylightSavingTimeForDate(new Date(targetDate), waypoint);
-                            waypoint.timezone = isDst ? waypoint.timezoneDstAbbr : waypoint.timezoneStdAbbr;
+                            // Store the current timezone abbreviation in a separate field for display
+                            waypoint.currentTimezoneAbbr = isDst ? waypoint.timezoneDstAbbr : waypoint.timezoneStdAbbr;
                         } else {
                             // Default to standard time if no date provided
-                            waypoint.timezone = waypoint.timezoneStdAbbr;
+                            waypoint.currentTimezoneAbbr = waypoint.timezoneStdAbbr;
                         }
                         
                         // Update table to show new timezone

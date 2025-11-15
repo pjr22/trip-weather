@@ -248,7 +248,9 @@ public class RoutePersistenceService {
         WaypointDto dto = new WaypointDto();
         dto.setId(waypoint.getId());
         dto.setSequence(waypoint.getSequence());
-        dto.setDateTime(waypoint.getDateTime());
+        dto.setDate(waypoint.getDate());
+        dto.setTime(waypoint.getTime());
+        dto.setTimezone(waypoint.getTimezone());
         dto.setDurationMin(waypoint.getDurationMin());
         dto.setLocationName(waypoint.getLocationName());
         dto.setLatitude(waypoint.getLatitude());
@@ -266,7 +268,9 @@ public class RoutePersistenceService {
         Waypoint waypoint = new Waypoint();
         waypoint.setId(dto.getId()); // This will be null for new waypoints, @PrePersist will generate UUID
         waypoint.setSequence(dto.getSequence());
-        waypoint.setDateTime(dto.getDateTime());
+        waypoint.setDate(dto.getDate());
+        waypoint.setTime(dto.getTime());
+        waypoint.setTimezone(dto.getTimezone());
         waypoint.setDurationMin(dto.getDurationMin() != null ? dto.getDurationMin() : 0); // Handle null duration
         waypoint.setLocationName(dto.getLocationName());
         waypoint.setLatitude(dto.getLatitude());
@@ -283,7 +287,9 @@ public class RoutePersistenceService {
      */
     private void updateWaypointFromDto(Waypoint waypoint, WaypointDto dto) {
         waypoint.setSequence(dto.getSequence());
-        waypoint.setDateTime(dto.getDateTime());
+        waypoint.setDate(dto.getDate());
+        waypoint.setTime(dto.getTime());
+        waypoint.setTimezone(dto.getTimezone());
         waypoint.setDurationMin(dto.getDurationMin() != null ? dto.getDurationMin() : 0); // Handle null duration
         waypoint.setLocationName(dto.getLocationName());
         waypoint.setLatitude(dto.getLatitude());

@@ -5,7 +5,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
-import java.time.ZonedDateTime;
 import java.util.UUID;
 
 @Entity
@@ -22,8 +21,14 @@ public class Waypoint {
     @Column(name = "sequence", nullable = false)
     private Integer sequence;
     
-    @Column(name = "date_time")
-    private ZonedDateTime dateTime;
+    @Column(name = "date")
+    private String date;
+    
+    @Column(name = "time")
+    private String time;
+    
+    @Column(name = "timezone")
+    private String timezone;
     
     @Column(name = "duration_min")
     private Integer durationMin;

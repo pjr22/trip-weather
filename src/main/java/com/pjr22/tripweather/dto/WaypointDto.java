@@ -4,7 +4,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
-import java.time.ZonedDateTime;
 import java.util.UUID;
 
 @Data
@@ -14,7 +13,9 @@ public class WaypointDto {
     
     private UUID id;
     private Integer sequence;
-    private ZonedDateTime dateTime;
+    private String date;
+    private String time;
+    private String timezone;
     private Integer durationMin;
     private String locationName;
     private Double latitude;

@@ -201,7 +201,7 @@ window.TripWeather.Managers.Route = {
 
                     if (waypoint.date && waypoint.time && waypoint.timezoneName) {
                         const dateTimeStr = `${waypoint.date} ${waypoint.time}`;
-                        waypoint.timezone = window.TripWeather.Utils.Timezone.getTimezoneAbbrFromWaypoint(waypoint, dateTimeStr);
+                        waypoint.currentTimezoneAbbr = window.TripWeather.Utils.Timezone.getTimezoneAbbrFromWaypoint(waypoint, dateTimeStr);
                     }
                 }
             }

@@ -81,7 +81,9 @@ window.TripWeather.Services.RoutePersistence = {
         return waypoints.map((waypoint, index) => ({
             id: waypoint.uuid || null, // Use uuid field for entity ID, null for new waypoints
             sequence: index + 1, // Sequence is based on array position
-            dateTime: waypoint.date && waypoint.time ? this.formatZonedDateTime(waypoint.date, waypoint.time) : null,
+            date: waypoint.date || '',
+            time: waypoint.time || '',
+            timezone: waypoint.timezoneName || '', // Use timezoneName as the timezone field
             durationMin: waypoint.duration || 0, // Convert null/undefined to 0
             locationName: waypoint.locationName || '',
             latitude: parseFloat(waypoint.lat),
@@ -90,20 +92,6 @@ window.TripWeather.Services.RoutePersistence = {
         }));
     },
     
-    /**
-     * Format date and time to ISO 8601 format with timezone for ZonedDateTime
-     * @param {string} date - Date string (yyyy-MM-dd)
-     * @param {string} time - Time string (HH:mm)
-     * @returns {string} ISO 8601 datetime string with timezone
-     */
-    formatZonedDateTime: function(date, time) {
-        // Create a Date object in the user's local timezone
-        const dateTimeString = `${date}T${time}:00`;
-        const dateObj = new Date(dateTimeString);
-        
-        // Return ISO 8601 string with timezone offset
-        return dateObj.toISOString();
-    },
     
     /**
      * Convert waypoint DTOs back to the UI format
@@ -112,14 +100,12 @@ window.TripWeather.Services.RoutePersistence = {
      */
     convertWaypointsFromDto: function(waypointDtos) {
         return waypointDtos.map(dto => {
-            // Parse ISO 8601 string to get local date and time
-            const dateObj = dto.dateTime ? new Date(dto.dateTime) : null;
-            
             return {
                 uuid: dto.id, // Store the entity UUID
                 sequence: dto.sequence, // Store the sequence number
-                date: dateObj ? this.formatLocalDate(dateObj) : '', // Extract date part
-                time: dateObj ? this.formatLocalTime(dateObj) : '', // Extract time part
+                date: dto.date || '', // Use separate date field
+                time: dto.time || '', // Use separate time field
+                timezoneName: dto.timezone || '', // Use timezone field as timezoneName
                 duration: dto.durationMin || 0, // Convert null to 0
                 locationName: dto.locationName || '',
                 lat: dto.latitude,
@@ -128,28 +114,6 @@ window.TripWeather.Services.RoutePersistence = {
         });
     },
     
-    /**
-     * Format Date object to local date string (yyyy-MM-dd)
-     * @param {Date} dateObj - Date object
-     * @returns {string} Local date string
-     */
-    formatLocalDate: function(dateObj) {
-        const year = dateObj.getFullYear();
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const day = String(dateObj.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    },
-    
-    /**
-     * Format Date object to local time string (HH:mm)
-     * @param {Date} dateObj - Date object
-     * @returns {string} Local time string
-     */
-    formatLocalTime: function(dateObj) {
-        const hours = String(dateObj.getHours()).padStart(2, '0');
-        const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-        return `${hours}:${minutes}`;
-    },
     
     /**
      * Search for routes by name

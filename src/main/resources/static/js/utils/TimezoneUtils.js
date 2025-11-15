@@ -25,7 +25,14 @@ window.TripWeather.Utils.Timezone = {
         const isDst = this.isDaylightSavingTimeForDate(targetDate, waypoint);
         
         // Return appropriate abbreviation
-        return isDst ? waypoint.timezoneDstAbbr : waypoint.timezoneStdAbbr;
+        const abbr = isDst ? waypoint.timezoneDstAbbr : waypoint.timezoneStdAbbr;
+        
+        // Store the current timezone abbreviation for display purposes
+        if (waypoint) {
+            waypoint.currentTimezoneAbbr = abbr;
+        }
+        
+        return abbr;
     },
     
     /**
