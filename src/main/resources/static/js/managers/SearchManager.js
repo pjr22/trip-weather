@@ -176,21 +176,43 @@ window.TripWeather.Managers.Search = {
     selectSearchResult: function(lat, lng, locationName, feature) {
         this.hideModal();
 
-        let alt = 0;
-        // TODO: search results don't contain altitude information, need to fetch elevation from route service
-        
-        // Check if we're replacing a waypoint
-        const replacingWaypointSequence = window.TripWeather.Managers.Waypoint.getReplacingWaypointSequence();
-        
-        if (replacingWaypointSequence !== null) {
-            this.replaceWaypointLocationFromSearch(replacingWaypointSequence, lat, lng, alt, locationName, feature);
-            window.TripWeather.Managers.Waypoint.setReplacingWaypointSequence(null);
-        } else {
-            this.addWaypointFromSearch(lat, lng, alt, locationName, feature);
-        }
-        
-        // Center map on selected location
-        window.TripWeather.Managers.Map.centerOn(lat, lng, 13);
+        // Fetch elevation for the selected location
+        window.TripWeather.Services.Location.getElevation(lat, lng)
+            .then(function(elevation) {
+                const alt = elevation || 0;
+                
+                // Check if we're replacing a waypoint
+                const replacingWaypointSequence = window.TripWeather.Managers.Waypoint.getReplacingWaypointSequence();
+                
+                if (replacingWaypointSequence !== null) {
+                    window.TripWeather.Managers.Search.replaceWaypointLocationFromSearch(replacingWaypointSequence, lat, lng, alt, locationName, feature);
+                    window.TripWeather.Managers.Waypoint.setReplacingWaypointSequence(null);
+                } else {
+                    window.TripWeather.Managers.Search.addWaypointFromSearch(lat, lng, alt, locationName, feature);
+                }
+                
+                // Center map on selected location
+                window.TripWeather.Managers.Map.centerOn(lat, lng, 13);
+            })
+            .catch(function(error) {
+                console.warn('Failed to fetch elevation, using 0 as default:', error);
+                
+                // Fallback to 0 elevation if fetch fails
+                const alt = 0;
+                
+                // Check if we're replacing a waypoint
+                const replacingWaypointSequence = window.TripWeather.Managers.Waypoint.getReplacingWaypointSequence();
+                
+                if (replacingWaypointSequence !== null) {
+                    window.TripWeather.Managers.Search.replaceWaypointLocationFromSearch(replacingWaypointSequence, lat, lng, alt, locationName, feature);
+                    window.TripWeather.Managers.Waypoint.setReplacingWaypointSequence(null);
+                } else {
+                    window.TripWeather.Managers.Search.addWaypointFromSearch(lat, lng, alt, locationName, feature);
+                }
+                
+                // Center map on selected location
+                window.TripWeather.Managers.Map.centerOn(lat, lng, 13);
+            });
     },
 
     /**

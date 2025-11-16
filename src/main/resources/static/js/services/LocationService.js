@@ -57,6 +57,30 @@ window.TripWeather.Services.Location = {
     },
 
     /**
+     * Fetch elevation for a given location
+     * @param {number} latitude - Latitude coordinate
+     * @param {number} longitude - Longitude coordinate
+     * @returns {Promise<number>} - Promise that resolves to elevation in meters
+     */
+    getElevation: function(latitude, longitude) {
+        const params = {
+            lat: latitude,
+            lon: longitude
+        };
+        
+        const url = '/api/route/elevation?' + window.TripWeather.Utils.Helpers.createQueryString(params);
+        
+        return window.TripWeather.Utils.Helpers.httpGet(url)
+            .then(function(elevation) {
+                return elevation;
+            })
+            .catch(function(error) {
+                console.error('Elevation fetch error:', error);
+                throw error;
+            });
+    },
+
+    /**
      * Get location name, elevation and timezone for coordinates (with caching)
      * @param {number} latitude - Latitude coordinate
      * @param {number} longitude - Longitude coordinate
