@@ -58,13 +58,31 @@ window.TripWeather.Managers.Waypoint = {
      * @param {L.MouseEvent} e - Leaflet mouse event
      */
     handleMapClick: function(e) {
-        if (this.replacingWaypointSequence !== null) {
-            this.replaceWaypointLocation(this.replacingWaypointSequence, e.latlng.lat, e.latlng.lng, 0);
-            this.replacingWaypointSequence = null;
-            window.TripWeather.Managers.Map.setCursor('');
-        } else {
-            this.addWaypoint(e.latlng.lat, e.latlng.lng, 0);
-        }
+        const self = this;
+        
+        // Validate location using snap endpoint before proceeding
+        window.TripWeather.Services.Location.snapToLocation(e.latlng.lat, e.latlng.lng)
+            .then(function(isRouteable) {
+                if (!isRouteable) {
+                    // Location is not routeable, show error and don't add waypoint
+                    window.TripWeather.Utils.Helpers.showToast('That location is not routeable. Select a different location.', 'error');
+                    return;
+                }
+                
+                // Location is valid, proceed with waypoint addition/replacement
+                if (self.replacingWaypointSequence !== null) {
+                    self.replaceWaypointLocation(self.replacingWaypointSequence, e.latlng.lat, e.latlng.lng, 0);
+                    self.replacingWaypointSequence = null;
+                    window.TripWeather.Managers.Map.setCursor('');
+                } else {
+                    self.addWaypoint(e.latlng.lat, e.latlng.lng, 0);
+                }
+            })
+            .catch(function(error) {
+                console.error('Error validating location:', error);
+                // If there's an error with validation, show error message
+                window.TripWeather.Utils.Helpers.showToast('Error validating location. Please try again.', 'error');
+            });
     },
 
     /**
@@ -74,9 +92,47 @@ window.TripWeather.Managers.Waypoint = {
      * @param {number} alt - altitude
      * @param {object} locationInfo - Optional pre-fetched location information
      * @param {object} existingWaypoint - Optional existing waypoint object to load
+     * @param {boolean} skipValidation - Skip validation (true for search results/user location, false for map clicks)
      * @returns {object} - Created waypoint
      */
-    addWaypoint: function(lat, lng, alt, locationInfo, existingWaypoint) {
+    addWaypoint: function(lat, lng, alt, locationInfo, existingWaypoint, skipValidation) {
+        const self = this;
+        
+        // If validation is not skipped, validate location using snap endpoint
+        if (!skipValidation) {
+            return window.TripWeather.Services.Location.snapToLocation(lat, lng)
+                .then(function(isRouteable) {
+                    if (!isRouteable) {
+                        // Location is not routeable, show error and don't add waypoint
+                        window.TripWeather.Utils.Helpers.showToast('That location is not routeable. Select a different location.', 'error');
+                        return null;
+                    }
+                    
+                    // Location is valid, proceed with waypoint addition
+                    return self.performWaypointAddition(lat, lng, alt, locationInfo, existingWaypoint);
+                })
+                .catch(function(error) {
+                    console.error('Error validating location:', error);
+                    // If there's an error with validation, show error message
+                    window.TripWeather.Utils.Helpers.showToast('Error validating location. Please try again.', 'error');
+                    return null;
+                });
+        } else {
+            // Skip validation and proceed directly with addition
+            return this.performWaypointAddition(lat, lng, alt, locationInfo, existingWaypoint);
+        }
+    },
+    
+    /**
+     * Perform actual waypoint addition after validation
+     * @param {number} lat - Latitude coordinate
+     * @param {number} lng - Longitude coordinate
+     * @param {number} alt - altitude
+     * @param {object} locationInfo - Optional pre-fetched location information
+     * @param {object} existingWaypoint - Optional existing waypoint object to load
+     * @returns {object} - Created waypoint
+     */
+    performWaypointAddition: function(lat, lng, alt, locationInfo, existingWaypoint) {
         let waypoint;
         if (existingWaypoint) {
             // Use existing waypoint data for loading routes
@@ -210,8 +266,46 @@ window.TripWeather.Managers.Waypoint = {
      * @param {number} newLng - New longitude
      * @param {number} newAlt - New altitude
      * @param {object} locationInfo - Optional pre-fetched location information
+     * @param {boolean} skipValidation - Skip validation (true for search results, false for map clicks)
      */
-    replaceWaypointLocation: function(sequence, newLat, newLng, newAlt, locationInfo) {
+    replaceWaypointLocation: function(sequence, newLat, newLng, newAlt, locationInfo, skipValidation) {
+        const self = this;
+        const waypoint = this.waypoints.find(w => w.sequence === sequence);
+        if (!waypoint) return;
+        
+        // If validation is not skipped, validate location using snap endpoint
+        if (!skipValidation) {
+            window.TripWeather.Services.Location.snapToLocation(newLat, newLng)
+                .then(function(isRouteable) {
+                    if (!isRouteable) {
+                        // Location is not routeable, show error and don't replace waypoint
+                        window.TripWeather.Utils.Helpers.showToast('That location is not routeable. Select a different location.', 'error');
+                        return;
+                    }
+                    
+                    // Location is valid, proceed with waypoint replacement
+                    self.performWaypointReplacement(sequence, newLat, newLng, newAlt, locationInfo);
+                })
+                .catch(function(error) {
+                    console.error('Error validating location:', error);
+                    // If there's an error with validation, show error message
+                    window.TripWeather.Utils.Helpers.showToast('Error validating location. Please try again.', 'error');
+                });
+        } else {
+            // Skip validation and proceed directly with replacement
+            this.performWaypointReplacement(sequence, newLat, newLng, newAlt, locationInfo);
+        }
+    },
+    
+    /**
+     * Perform the actual waypoint replacement after validation
+     * @param {number} sequence - Sequence of waypoint to replace
+     * @param {number} newLat - New latitude
+     * @param {number} newLng - New longitude
+     * @param {number} newAlt - New altitude
+     * @param {object} locationInfo - Optional pre-fetched location information
+     */
+    performWaypointReplacement: function(sequence, newLat, newLng, newAlt, locationInfo) {
         const waypoint = this.waypoints.find(w => w.sequence === sequence);
         if (!waypoint) return;
         

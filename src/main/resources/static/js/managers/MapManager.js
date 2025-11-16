@@ -311,7 +311,9 @@ window.TripWeather.Managers.Map = {
                 this.userLocation.lat,
                 this.userLocation.lng,
                 this.userLocation.alt || 0,
-                locationInfo
+                locationInfo,
+                null, // No existing waypoint object
+                true // Skip validation for user location (should be valid)
             );
             
             // Close the user location popup

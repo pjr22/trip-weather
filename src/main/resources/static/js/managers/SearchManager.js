@@ -238,8 +238,8 @@ window.TripWeather.Managers.Search = {
         // Extract location information from search result
         const locationInfo = window.TripWeather.Services.Location.extractLocationFromFeature(feature);
         
-        // Create waypoint with pre-fetched location data
-        const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(lat, lng, alt, locationInfo);
+        // Create waypoint with pre-fetched location data, skip validation since search results are already valid
+        const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(lat, lng, alt, locationInfo, null, true);
         
         // No need to call fetchLocationInfo since we already have all the data
         const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.sequence === waypoint.sequence);
@@ -266,8 +266,8 @@ window.TripWeather.Managers.Search = {
         // Extract location information from search result
         const locationInfo = window.TripWeather.Services.Location.extractLocationFromFeature(feature);
         
-        // Replace waypoint with pre-fetched location data
-        window.TripWeather.Managers.Waypoint.replaceWaypointLocation(sequence, lat, lng, alt, locationInfo);
+        // Replace waypoint with pre-fetched location data, skip validation since search results are already valid
+        window.TripWeather.Managers.Waypoint.replaceWaypointLocation(sequence, lat, lng, alt, locationInfo, true);
     },
 
     /**
@@ -483,7 +483,8 @@ window.TripWeather.Managers.Search = {
                             waypoint.lng,
                             waypoint.alt,
                             null, // No location info needed for loaded waypoints
-                            waypoint // Pass the existing waypoint object
+                            waypoint, // Pass the existing waypoint object
+                            true // Skip validation for loaded routes
                         );
                         
                         // Fetch weather for each waypoint if date and time are available

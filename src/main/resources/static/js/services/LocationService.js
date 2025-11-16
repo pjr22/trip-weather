@@ -81,6 +81,35 @@ window.TripWeather.Services.Location = {
     },
 
     /**
+     * Validate if a location is routeable using the snap endpoint
+     * @param {number} latitude - Latitude coordinate
+     * @param {number} longitude - Longitude coordinate
+     * @returns {Promise<boolean>} - Promise that resolves to true if location is routeable, false otherwise
+     */
+    snapToLocation: function(latitude, longitude) {
+        const params = {
+            lat: latitude,
+            lon: longitude
+        };
+        
+        const url = '/api/route/snap?' + window.TripWeather.Utils.Helpers.createQueryString(params);
+        
+        return window.TripWeather.Utils.Helpers.httpGet(url)
+            .then(function(response) {
+                // Check if the response has features array and it's not empty
+                if (response && response.features && Array.isArray(response.features)) {
+                    return response.features.length > 0;
+                }
+                return false;
+            })
+            .catch(function(error) {
+                console.error('Snap validation error:', error);
+                // If there's an error with the snap endpoint, assume the location is not routeable
+                return false;
+            });
+    },
+
+    /**
      * Get location name, elevation and timezone for coordinates (with caching)
      * @param {number} latitude - Latitude coordinate
      * @param {number} longitude - Longitude coordinate
