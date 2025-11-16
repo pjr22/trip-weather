@@ -20,12 +20,14 @@ window.TripWeather.Managers.Waypoint = {
      * @param {string} uuid - UUID for entity identification (null for new waypoints)
      * @param {number} lat - Latitude coordinate
      * @param {number} lng - Longitude coordinate
+     * @param {number} alt - Elevation in meters
      */
-    Waypoint: function(sequence, uuid, lat, lng) {
+    Waypoint: function(sequence, uuid, lat, lng, alt) {
         this.sequence = sequence;
         this.uuid = uuid; // null for new waypoints, will be set by backend
         this.lat = window.TripWeather.Utils.Helpers.formatCoordinate(lat);
         this.lng = window.TripWeather.Utils.Helpers.formatCoordinate(lng);
+        this.alt = alt;
         this.date = '';
         this.time = '';
         // Timezone information from API
@@ -57,11 +59,11 @@ window.TripWeather.Managers.Waypoint = {
      */
     handleMapClick: function(e) {
         if (this.replacingWaypointSequence !== null) {
-            this.replaceWaypointLocation(this.replacingWaypointSequence, e.latlng.lat, e.latlng.lng);
+            this.replaceWaypointLocation(this.replacingWaypointSequence, e.latlng.lat, e.latlng.lng, 0);
             this.replacingWaypointSequence = null;
             window.TripWeather.Managers.Map.setCursor('');
         } else {
-            this.addWaypoint(e.latlng.lat, e.latlng.lng);
+            this.addWaypoint(e.latlng.lat, e.latlng.lng, 0);
         }
     },
 
@@ -69,20 +71,21 @@ window.TripWeather.Managers.Waypoint = {
      * Add a new waypoint at specified coordinates
      * @param {number} lat - Latitude coordinate
      * @param {number} lng - Longitude coordinate
+     * @param {number} alt - altitude
      * @param {object} locationInfo - Optional pre-fetched location information
      * @param {object} existingWaypoint - Optional existing waypoint object to load
      * @returns {object} - Created waypoint
      */
-    addWaypoint: function(lat, lng, locationInfo, existingWaypoint) {
+    addWaypoint: function(lat, lng, alt, locationInfo, existingWaypoint) {
         let waypoint;
-        
         if (existingWaypoint) {
             // Use existing waypoint data for loading routes
             waypoint = new this.Waypoint(
                 existingWaypoint.sequence || this.nextSequence++,
                 existingWaypoint.uuid,
                 lat,
-                lng
+                lng,
+                alt
             );
             waypoint.locationName = existingWaypoint.locationName || '';
             waypoint.date = existingWaypoint.date || '';
@@ -114,7 +117,7 @@ window.TripWeather.Managers.Waypoint = {
             }
         } else {
             // Create new waypoint for manual addition
-            waypoint = new this.Waypoint(this.nextSequence++, null, lat, lng);
+            waypoint = new this.Waypoint(this.nextSequence++, null, lat, lng, alt);
             
             // If location info is provided, use it
             if (locationInfo) {
@@ -127,7 +130,7 @@ window.TripWeather.Managers.Waypoint = {
                 waypoint.timezoneDstAbbr = locationInfo.timezoneDstAbbr || '';
             }
         }
-        
+
         this.waypoints.push(waypoint);
         
         // Add marker to map and ensure marker array stays synchronized
@@ -154,7 +157,7 @@ window.TripWeather.Managers.Waypoint = {
         
         // Fetch location info if not provided
         if (!locationInfo) {
-            this.fetchLocationName(waypoint);
+            this.fetchLocationInfo(waypoint);
         }
         
         return waypoint;
@@ -205,14 +208,16 @@ window.TripWeather.Managers.Waypoint = {
      * @param {number} sequence - Sequence of waypoint to replace
      * @param {number} newLat - New latitude
      * @param {number} newLng - New longitude
+     * @param {number} newAlt - New altitude
      * @param {object} locationInfo - Optional pre-fetched location information
      */
-    replaceWaypointLocation: function(sequence, newLat, newLng, locationInfo) {
+    replaceWaypointLocation: function(sequence, newLat, newLng, newAlt, locationInfo) {
         const waypoint = this.waypoints.find(w => w.sequence === sequence);
         if (!waypoint) return;
         
         waypoint.lat = window.TripWeather.Utils.Helpers.formatCoordinate(newLat);
         waypoint.lng = window.TripWeather.Utils.Helpers.formatCoordinate(newLng);
+        waypoint.alt = newAlt;
         waypoint.weather = null;
         
         // Update location info if provided
@@ -256,7 +261,7 @@ window.TripWeather.Managers.Waypoint = {
         
         // Fetch location info if not provided
         if (!locationInfo) {
-            this.fetchLocationName(waypoint);
+            this.fetchLocationInfo(waypoint);
         }
     },
 
@@ -430,10 +435,12 @@ window.TripWeather.Managers.Waypoint = {
      * Fetch location name for a waypoint
      * @param {object} waypoint - Waypoint object
      */
-    fetchLocationName: function(waypoint) {
+    fetchLocationInfo: function(waypoint) {
+
         return window.TripWeather.Services.Location.getLocationInfo(waypoint.lat, waypoint.lng)
             .then(function(locationInfo) {
                 waypoint.locationName = locationInfo.locationName;
+                waypoint.alt = locationInfo.elevation;
                 // Store all timezone information
                 waypoint.timezoneName = locationInfo.timezoneName || '';
                 waypoint.timezoneStdOffset = locationInfo.timezoneStdOffset || '';

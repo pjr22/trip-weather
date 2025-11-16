@@ -33,21 +33,19 @@ public class RouteService {
    private final String apiKey;
    private final String baseUrl;
    private final ObjectMapper objectMapper;
-   private final LocationService locationService;
 
    private static final String DIRECTIONS_ENDPOINT = "/v2/directions/driving-car/geojson";
+   private static final String ELEVATION_ENDPOINT = "/elevation/point";
    private static final String SNAP_ENDPOINT = "/v2/snap/driving-car/geojson";
 
    public RouteService(
          @Value("${openrouteservice.api.key}") String apiKey,
-         @Value("${openrouteservice.base.url:https://api.openrouteservice.org}") String baseUrl,
-         LocationService locationService
+         @Value("${openrouteservice.base.url:https://api.openrouteservice.org}") String baseUrl
    ) {
       this.apiKey = apiKey;
       this.baseUrl = baseUrl;
       this.restClient = RestClient.builder().baseUrl(this.baseUrl).build();
       this.objectMapper = new ObjectMapper();
-      this.locationService = locationService;
    }
 
    public LocationData snapToLocation(double latitude, double longitude) {
@@ -77,6 +75,27 @@ public class RouteService {
       }
    }
 
+   // https://localhost:5000/elevation/point?geometry=13.349762,38.11295
+   public Double getElevation(double latitude, double longitude) {
+      try {
+         if (apiKey == null || apiKey.isEmpty()) {
+            return null;
+        }
+
+        String url = String.format(ELEVATION_ENDPOINT + "?geometry=%s,%s", longitude, latitude);
+        LocationData.Feature feature = restClient.get()
+              .uri(url)
+              .header("Authorization", apiKey)
+              .retrieve()
+              .body(LocationData.Feature.class);
+        
+        return Double.valueOf(feature.getGeometry().getCoordinates().get(2));
+        
+      } catch (Exception e) {
+         return null;
+      }
+   }
+
    public RouteData calculateRoute(
          List<RouteRequest.Waypoint> waypoints,
          ZonedDateTime departureDateTime,
@@ -95,6 +114,7 @@ public class RouteService {
          RouteRequest request = new RouteRequest();
          request.setCoordinates(convertWaypointsToCoordinates(waypoints));
          request.setRadiuses(List.of(-1));
+         request.setElevation(true);
 
          String requestBody = objectMapper.writeValueAsString(request);
 
@@ -111,25 +131,6 @@ public class RouteService {
       } catch (Exception e) {
          return createErrorRoute("Failed to calculate route: " + e.getMessage());
       }
-   }
-
-   /**
-    * Get timezone information for a coordinate using LocationService
-    */
-   private String getTimezone(Double latitude, Double longitude) {
-      try {
-         LocationData locationData = locationService.reverseGeocode(latitude, longitude);
-         if (locationData.getFeatures() != null && !locationData.getFeatures().isEmpty()) {
-            LocationData.Timezone timezone = locationData.getFeatures().get(0).getProperties().getTimezone();
-            if (timezone != null) {
-               return timezone.getName();
-            }
-         }
-      } catch (Exception e) {
-         System.err.println(
-               "Error getting timezone for coordinates " + latitude + ", " + longitude + ": " + e.getMessage());
-      }
-      return "UTC"; // Fallback
    }
 
    /**
@@ -180,10 +181,13 @@ public class RouteService {
             JsonNode coordinates = geometryNode.get("coordinates");
             if (coordinates.isArray()) {
                for (JsonNode coord : coordinates) {
-                  if (coord.isArray() && coord.size() >= 2) {
+                  if (coord.isArray() && coord.size() > 1) {
                      List<Double> point = new ArrayList<>();
                      point.add(coord.get(0).asDouble()); // longitude
                      point.add(coord.get(1).asDouble()); // latitude
+                     if (coord.size() > 2) {
+                        point.add(coord.get(2).asDouble()); // elevation)
+                     }
                      geometry.add(point);
                   }
                }
@@ -236,7 +240,7 @@ public class RouteService {
                List<Double> location = List.of(wp.getLongitude(), wp.getLatitude());
                RouteData.WaypointCoordinates waypoint = new RouteData.WaypointCoordinates(location, wp.getName());
                // Add timezone even if no departure time is set
-               String timezone = getTimezone(wp.getLatitude(), wp.getLongitude());
+               String timezone = wp.getTimezoneName();
                waypoint.setTimezone(timezone);
                waypointInfo.add(waypoint);
             }
@@ -268,12 +272,7 @@ public class RouteService {
 
          for (int i = 0; i < originalWaypoints.size(); i++) {
             RouteRequest.Waypoint originalWaypoint = originalWaypoints.get(i);
-
-            // Get timezone for this waypoint - use provided timezone name if available,
-            // otherwise look it up
-            String timezone = originalWaypoint.getTimezoneName() != null
-                  && !originalWaypoint.getTimezoneName().isEmpty() ? originalWaypoint.getTimezoneName()
-                        : getTimezone(originalWaypoint.getLatitude(), originalWaypoint.getLongitude());
+            String timezone = originalWaypoint.getTimezoneName();
 
             // Create waypoint coordinates with location and name
             List<Double> location = List.of(originalWaypoint.getLongitude(), originalWaypoint.getLatitude());
@@ -294,9 +293,7 @@ public class RouteService {
             } else {
                // Convert previous waypoint's departure time to current waypoint's timezone
                RouteRequest.Waypoint previousWaypoint = originalWaypoints.get(i - 1);
-               String previousTimezone = previousWaypoint.getTimezoneName() != null
-                     && !previousWaypoint.getTimezoneName().isEmpty() ? previousWaypoint.getTimezoneName()
-                           : getTimezone(previousWaypoint.getLatitude(), previousWaypoint.getLongitude());
+               String previousTimezone = previousWaypoint.getTimezoneName();
 
                String arrivalTimeInCurrentTimezone = Utils.convertDateTime(currentTimeStr, previousTimezone, timezone);
                waypoint.setArrivalTime(arrivalTimeInCurrentTimezone);
@@ -327,16 +324,14 @@ public class RouteService {
          return waypointsWithTimes;
 
       } catch (Exception e) {
-         // If there's an error parsing the departure time, return waypoints without
-         // arrival times
+         // If there's an error parsing the departure time, return waypoints without arrival times
          System.err.println("Error calculating arrival times with durations and timezones: " + e.getMessage());
          // Return basic waypoints without arrival times
          List<RouteData.WaypointCoordinates> fallbackWaypoints = new ArrayList<>();
          for (RouteRequest.Waypoint wp : originalWaypoints) {
             List<Double> location = List.of(wp.getLongitude(), wp.getLatitude());
             RouteData.WaypointCoordinates waypoint = new RouteData.WaypointCoordinates(location, wp.getName());
-            String timezone = wp.getTimezoneName() != null && !wp.getTimezoneName().isEmpty() ? wp.getTimezoneName()
-                  : getTimezone(wp.getLatitude(), wp.getLongitude());
+            String timezone = wp.getTimezoneName();
             waypoint.setTimezone(timezone);
             fallbackWaypoints.add(waypoint);
          }
@@ -362,9 +357,10 @@ public class RouteService {
    @NoArgsConstructor
    @AllArgsConstructor
    public static class RouteRequest {
+      private String format = "geojson";
       private List<List<Double>> coordinates;
       private List<Integer> radiuses;
-      private String format = "geojson";
+      private Boolean elevation;
 
       @Setter
       @Getter

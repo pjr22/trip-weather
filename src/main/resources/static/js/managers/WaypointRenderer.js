@@ -101,8 +101,9 @@ window.TripWeather.Managers.WaypointRenderer = {
         const safeLat = helpers.escapeHtml(waypoint.lat);
         const safeLng = helpers.escapeHtml(waypoint.lng);
         let popupContent = `<strong>${safeWaypointLabel}</strong><br>`;
-        popupContent += `Lat: ${safeLat}<br>`;
-        popupContent += `Lon: ${safeLng}<br>`;
+        popupContent += `Latitude: ${safeLat}<br>`;
+        popupContent += `Longitude: ${safeLng}<br>`;
+        popupContent += `Elevation: ${window.TripWeather.Utils.Helpers.formatElevation(waypoint.alt)}<br>`;
         
         if (waypoint.locationName) {
             const safeLocationName = helpers.escapeHtml(waypoint.locationName);

@@ -30,6 +30,7 @@ window.TripWeather.Services.Location = {
                 console.warn('Failed to fetch location name:', error);
                 return {
                     locationName: 'Unknown',
+                    elevation: 0,
                     timezone: '',
                     timezoneName: ''
                 };
@@ -56,7 +57,7 @@ window.TripWeather.Services.Location = {
     },
 
     /**
-     * Get location name and timezone for coordinates (with caching)
+     * Get location name, elevation and timezone for coordinates (with caching)
      * @param {number} latitude - Latitude coordinate
      * @param {number} longitude - Longitude coordinate
      * @returns {Promise<object>} - Promise that resolves to location information

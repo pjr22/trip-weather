@@ -254,6 +254,7 @@ public class RoutePersistenceService {
         dto.setDurationMin(waypoint.getDurationMin());
         dto.setLocationName(waypoint.getLocationName());
         dto.setLatitude(waypoint.getLatitude());
+        dto.setElevation(waypoint.getElevation());
         dto.setLongitude(waypoint.getLongitude());
         dto.setRouteId(waypoint.getRoute() != null ? waypoint.getRoute().getId() : null);
         return dto;
@@ -275,6 +276,7 @@ public class RoutePersistenceService {
         waypoint.setLocationName(dto.getLocationName());
         waypoint.setLatitude(dto.getLatitude());
         waypoint.setLongitude(dto.getLongitude());
+        waypoint.setElevation(dto.getElevation());
         
         // Route would be set separately due to bidirectional relationship
         return waypoint;

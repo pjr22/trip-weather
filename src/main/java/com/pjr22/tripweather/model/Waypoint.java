@@ -42,6 +42,9 @@ public class Waypoint {
     @Column(name = "longitude", nullable = false)
     private Double longitude;
     
+    @Column(name = "elevation")
+    private Double elevation;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id", nullable = false, referencedColumnName = "id")
     private Route route;

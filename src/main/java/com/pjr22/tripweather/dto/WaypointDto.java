@@ -20,5 +20,6 @@ public class WaypointDto {
     private String locationName;
     private Double latitude;
     private Double longitude;
+    private Double elevation;
     private UUID routeId;
 }

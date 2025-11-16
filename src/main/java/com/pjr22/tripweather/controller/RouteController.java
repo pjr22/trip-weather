@@ -36,6 +36,14 @@ public class RouteController {
         return routeService.snapToLocation(lat, lon);
     }
 
+    @GetMapping("/elevation")
+    public Double getElevationAtPoint(
+            @RequestParam double lat,
+            @RequestParam double lon) {
+        
+        return routeService.getElevation(lat, lon);
+    }
+
     @PostMapping("/calculate")
     public ResponseEntity<RouteData> calculateRoute(@RequestBody List<Map<String, Object>> waypoints) {
         if (waypoints == null || waypoints.isEmpty()) {

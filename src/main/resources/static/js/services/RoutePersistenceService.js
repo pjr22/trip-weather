@@ -88,10 +88,10 @@ window.TripWeather.Services.RoutePersistence = {
             locationName: waypoint.locationName || '',
             latitude: parseFloat(waypoint.lat),
             longitude: parseFloat(waypoint.lng),
+            elevation: waypoint.alt,
             routeId: null // Will be set by the backend
         }));
     },
-    
     
     /**
      * Convert waypoint DTOs back to the UI format
@@ -109,11 +109,11 @@ window.TripWeather.Services.RoutePersistence = {
                 duration: dto.durationMin || 0, // Convert null to 0
                 locationName: dto.locationName || '',
                 lat: dto.latitude,
-                lng: dto.longitude
+                lng: dto.longitude,
+                alt: dto.elevation
             };
         });
     },
-    
     
     /**
      * Search for routes by name

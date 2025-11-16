@@ -17,6 +17,7 @@ window.TripWeather.Utils.Helpers = {
         if (!data || !data.features || data.features.length === 0) {
             return {
                 locationName: 'Unknown',
+                elevation: 0,
                 timezoneName: '',
                 timezoneStdOffset: '',
                 timezoneDstOffset: '',
@@ -27,6 +28,7 @@ window.TripWeather.Utils.Helpers = {
         
         const feature = data.features[0];
         const properties = feature.properties;
+        const geometry = feature.geometry;
         
         // Build location name from address components (same logic as server-side generateLocationName)
         let locationName = '';
@@ -51,6 +53,12 @@ window.TripWeather.Utils.Helpers = {
         if (!locationName && properties.formatted) {
             locationName = properties.formatted.trim();
         }
+
+        // Extract elevation from API response
+        let elevation = 0;
+        if (geometry && geometry.coordinates && geometry.coordinates.length > 2) {
+            elevation = geometry.coordinates[2];
+        }
         
         // Extract all timezone information from API response
         let timezoneName = '';
@@ -71,6 +79,7 @@ window.TripWeather.Utils.Helpers = {
         
         return {
             locationName: locationName || 'Unknown',
+            elevation: elevation || 0,
             timezoneName: timezoneName,
             timezoneStdOffset: timezoneStdOffset,
             timezoneDstOffset: timezoneDstOffset,
@@ -289,13 +298,22 @@ window.TripWeather.Utils.Helpers = {
 
     /**
      * Format coordinate to fixed decimal places
-     * @param {number} coord - Coordinate value
+     * @param {string} coord - Coordinate value
      * @param {number} decimals - Number of decimal places (default 6)
      * @returns {string} - Formatted coordinate
      */
     formatCoordinate: function(coord, decimals) {
         decimals = decimals || 6;
         return parseFloat(coord).toFixed(decimals);
+    },
+
+    /**
+     * Format altitude as feet from elevation in meters
+     * @param {string} elevation - Eleveation in meters
+     * @returns {string} - Formatted altitude in feet
+     */
+    formatElevation: function(elevation) {
+        return `${elevation ? Math.floor(parseInt(elevation) * 3.28084) : 0} ft`;
     },
 
     /**

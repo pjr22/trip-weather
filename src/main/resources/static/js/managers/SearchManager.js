@@ -175,15 +175,18 @@ window.TripWeather.Managers.Search = {
      */
     selectSearchResult: function(lat, lng, locationName, feature) {
         this.hideModal();
+
+        let alt = 0;
+        // TODO: search results don't contain altitude information, need to fetch elevation from route service
         
         // Check if we're replacing a waypoint
         const replacingWaypointSequence = window.TripWeather.Managers.Waypoint.getReplacingWaypointSequence();
         
         if (replacingWaypointSequence !== null) {
-            this.replaceWaypointLocationFromSearch(replacingWaypointSequence, lat, lng, locationName, feature);
+            this.replaceWaypointLocationFromSearch(replacingWaypointSequence, lat, lng, alt, locationName, feature);
             window.TripWeather.Managers.Waypoint.setReplacingWaypointSequence(null);
         } else {
-            this.addWaypointFromSearch(lat, lng, locationName, feature);
+            this.addWaypointFromSearch(lat, lng, alt, locationName, feature);
         }
         
         // Center map on selected location
@@ -194,17 +197,18 @@ window.TripWeather.Managers.Search = {
      * Add waypoint from search result
      * @param {number} lat - Latitude
      * @param {number} lng - Longitude
+     * @param {number} alt - Altitude
      * @param {string} locationName - Location name
      * @param {object} feature - GeoJSON feature object
      */
-    addWaypointFromSearch: function(lat, lng, locationName, feature) {
+    addWaypointFromSearch: function(lat, lng, alt, locationName, feature) {
         // Extract location information from search result
         const locationInfo = window.TripWeather.Services.Location.extractLocationFromFeature(feature);
         
         // Create waypoint with pre-fetched location data
-        const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(lat, lng, locationInfo);
+        const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(lat, lng, alt, locationInfo);
         
-        // No need to call fetchLocationName since we already have all the data
+        // No need to call fetchLocationInfo since we already have all the data
         const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.sequence === waypoint.sequence);
         if (index !== -1) {
             const marker = window.TripWeather.Managers.Waypoint.waypointMarkers[index];
@@ -219,15 +223,16 @@ window.TripWeather.Managers.Search = {
      * @param {number} sequence - Sequence of waypoint to replace
      * @param {number} lat - New latitude
      * @param {number} lng - New longitude
+     * @param {number} alt - New altitude
      * @param {string} locationName - Location name
      * @param {object} feature - GeoJSON feature object
      */
-    replaceWaypointLocationFromSearch: function(sequence, lat, lng, locationName, feature) {
+    replaceWaypointLocationFromSearch: function(sequence, lat, lng, alt, locationName, feature) {
         // Extract location information from search result
         const locationInfo = window.TripWeather.Services.Location.extractLocationFromFeature(feature);
         
         // Replace waypoint with pre-fetched location data
-        window.TripWeather.Managers.Waypoint.replaceWaypointLocation(sequence, lat, lng, locationInfo);
+        window.TripWeather.Managers.Waypoint.replaceWaypointLocation(sequence, lat, lng, alt, locationInfo);
     },
 
     /**
@@ -441,6 +446,7 @@ window.TripWeather.Managers.Search = {
                         window.TripWeather.Managers.Waypoint.addWaypoint(
                             waypoint.lat,
                             waypoint.lng,
+                            waypoint.alt,
                             null, // No location info needed for loaded waypoints
                             waypoint // Pass the existing waypoint object
                         );

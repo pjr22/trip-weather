@@ -13,14 +13,19 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class LocationService {
 
+    private final RouteService routeService;
     private final RestClient restClient;
     private final String apiKey;
     private final String baseUrl;
 
-    public LocationService(@Value("${geoapify.api.key}") String apiKey,
-                           @Value("${geoapify.base.url:https://api.geoapify.com/v1}") String baseUrl) {
+    public LocationService(
+          @Value("${geoapify.api.key}") String apiKey,
+          @Value("${geoapify.base.url:https://api.geoapify.com/v1}") String baseUrl,
+          RouteService routeService
+    ) {
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
+        this.routeService = routeService;
         this.restClient = RestClient.builder()
                 .baseUrl(this.baseUrl)
                 .build();
@@ -33,10 +38,15 @@ public class LocationService {
                 return null;
             }
 
+            Double elevation = routeService.getElevation(latitude, longitude);
             LocationData locationData = restClient.get()
                     .uri(url)
                     .retrieve()
                     .body(LocationData.class);
+
+            if (elevation != null) {
+               locationData.getFeatures().get(0).getGeometry().getCoordinates().add(elevation);
+            }
 
             return locationData;
          } catch (Exception e) {

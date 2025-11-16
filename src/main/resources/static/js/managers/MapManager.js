@@ -118,7 +118,7 @@ window.TripWeather.Managers.Map = {
                     window.TripWeather.Managers.Map.userLocationMarker.openPopup();
                 }
                 
-                window.TripWeather.Managers.Map.fetchUserLocationName().finally(function() {
+                window.TripWeather.Managers.Map.fetchLocationInfo().finally(function() {
                     window.TripWeather.Utils.Helpers.hideLoading('location-loading-overlay');
                 });
             },
@@ -142,8 +142,9 @@ window.TripWeather.Managers.Map = {
         if (!this.userLocationMarker) return;
         
         let popupContent = '<strong>Your Location</strong><br>';
-        popupContent += `Lat: ${this.userLocation.lat}<br>`;
-        popupContent += `Lon: ${this.userLocation.lng}`;
+        popupContent += `Latitude: ${this.userLocation.lat}<br>`;
+        popupContent += `Longitude: ${this.userLocation.lng}<br>`;
+        popupContent += `Elevation: ${window.TripWeather.Utils.Helpers.formatElevation(this.userLocation.alt)}<br>`;
         
         if (this.userLocation.name) {
             popupContent += `<br><br><strong>${this.userLocation.name}</strong>`;
@@ -163,15 +164,16 @@ window.TripWeather.Managers.Map = {
     },
 
     /**
-     * Fetch user location name using reverse geocoding
+     * Fetch user location info using reverse geocoding
      */
-    fetchUserLocationName: function() {
+    fetchLocationInfo: function() {
         const self = this;
         return window.TripWeather.Services.Location.getLocationInfo(
             this.userLocation.lat,
             this.userLocation.lng
         ).then(function(locationInfo) {
             self.userLocation.name = locationInfo.locationName;
+            self.userLocation.alt = locationInfo.elevation;
             // Store all timezone information
             self.userLocation.timezoneName = locationInfo.timezoneName || '';
             self.userLocation.timezoneStdOffset = locationInfo.timezoneStdOffset || '';
@@ -197,7 +199,7 @@ window.TripWeather.Managers.Map = {
                     const lng = position.coords.longitude;
                     window.TripWeather.Managers.Map.initialize(lat, lng, window.TripWeather.Managers.Map.USER_ZOOM);
                     
-                    window.TripWeather.Managers.Map.fetchUserLocationName().finally(function() {
+                    window.TripWeather.Managers.Map.fetchLocationInfo().finally(function() {
                         window.TripWeather.Utils.Helpers.hideLoading('location-loading-overlay');
                     });
                 },
@@ -308,6 +310,7 @@ window.TripWeather.Managers.Map = {
             const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(
                 this.userLocation.lat,
                 this.userLocation.lng,
+                this.userLocation.alt || 0,
                 locationInfo
             );
             
