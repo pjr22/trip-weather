@@ -188,7 +188,12 @@ window.TripWeather.Managers.Search = {
                     window.TripWeather.Managers.Search.replaceWaypointLocationFromSearch(replacingWaypointSequence, lat, lng, alt, locationName, feature);
                     window.TripWeather.Managers.Waypoint.setReplacingWaypointSequence(null);
                 } else {
-                    window.TripWeather.Managers.Search.addWaypointFromSearch(lat, lng, alt, locationName, feature);
+                    const waypoint = window.TripWeather.Managers.Search.addWaypointFromSearch(lat, lng, alt, locationName, feature);
+                    
+                    // Open popup for the newly added waypoint after elevation is retrieved
+                    if (waypoint && window.TripWeather.Managers.WaypointRenderer) {
+                        window.TripWeather.Managers.WaypointRenderer.openWaypointPopup(waypoint.sequence);
+                    }
                 }
                 
                 // Center map on selected location
@@ -207,7 +212,12 @@ window.TripWeather.Managers.Search = {
                     window.TripWeather.Managers.Search.replaceWaypointLocationFromSearch(replacingWaypointSequence, lat, lng, alt, locationName, feature);
                     window.TripWeather.Managers.Waypoint.setReplacingWaypointSequence(null);
                 } else {
-                    window.TripWeather.Managers.Search.addWaypointFromSearch(lat, lng, alt, locationName, feature);
+                    const waypoint = window.TripWeather.Managers.Search.addWaypointFromSearch(lat, lng, alt, locationName, feature);
+                    
+                    // Open popup for the newly added waypoint even if elevation fetch failed
+                    if (waypoint && window.TripWeather.Managers.WaypointRenderer) {
+                        window.TripWeather.Managers.WaypointRenderer.openWaypointPopup(waypoint.sequence);
+                    }
                 }
                 
                 // Center map on selected location
@@ -222,6 +232,7 @@ window.TripWeather.Managers.Search = {
      * @param {number} alt - Altitude
      * @param {string} locationName - Location name
      * @param {object} feature - GeoJSON feature object
+     * @returns {object} - Created waypoint
      */
     addWaypointFromSearch: function(lat, lng, alt, locationName, feature) {
         // Extract location information from search result
@@ -238,6 +249,8 @@ window.TripWeather.Managers.Search = {
                 window.TripWeather.Managers.WaypointRenderer.updateMarkerPopup(marker, waypoint, index + 1);
             }
         }
+        
+        return waypoint;
     },
 
     /**

@@ -452,6 +452,9 @@ window.TripWeather.Managers.Waypoint = {
                 if (window.TripWeather.Managers.WaypointRenderer) {
                     window.TripWeather.Managers.WaypointRenderer.updateTable();
                     window.TripWeather.Managers.WaypointRenderer.updateMarkerWithLocation(waypoint);
+                    
+                    // Open popup for the newly added waypoint after location info is retrieved
+                    window.TripWeather.Managers.WaypointRenderer.openWaypointPopup(waypoint.sequence);
                 }
             })
             .catch(function(error) {

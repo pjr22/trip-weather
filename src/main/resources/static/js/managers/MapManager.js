@@ -314,9 +314,14 @@ window.TripWeather.Managers.Map = {
                 locationInfo
             );
             
-            // Close the popup after adding waypoint
+            // Close the user location popup
             if (this.userLocationMarker) {
                 this.userLocationMarker.closePopup();
+            }
+            
+            // Open popup for the newly added waypoint
+            if (waypoint && window.TripWeather.Managers.WaypointRenderer) {
+                window.TripWeather.Managers.WaypointRenderer.openWaypointPopup(waypoint.sequence);
             }
         } else {
             console.error('WaypointManager not available');

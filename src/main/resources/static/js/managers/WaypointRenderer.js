@@ -505,6 +505,43 @@ window.TripWeather.Managers.WaypointRenderer = {
     },
 
     /**
+     * Close all open pop-ups on the map
+     */
+    closeAllPopups: function() {
+        const map = window.TripWeather.Managers.Map.getMap();
+        if (map) {
+            map.eachLayer(function(layer) {
+                if (layer instanceof L.Marker && layer.getPopup()) {
+                    layer.closePopup();
+                }
+            });
+        }
+        
+        // Also close user location popup if it exists
+        if (window.TripWeather.Managers.Map.userLocationMarker) {
+            window.TripWeather.Managers.Map.userLocationMarker.closePopup();
+        }
+    },
+
+    /**
+     * Open popup for a specific waypoint
+     * @param {number} sequence - Waypoint sequence
+     */
+    openWaypointPopup: function(sequence) {
+        // Close all existing pop-ups first
+        this.closeAllPopups();
+        
+        // Find the marker for this waypoint
+        const marker = window.TripWeather.Managers.Waypoint.waypointMarkers.find(
+            m => m.waypointSequence === sequence
+        );
+        
+        if (marker) {
+            marker.openPopup();
+        }
+    },
+
+    /**
      * Currently dragged row (for drag and drop operations)
      */
     draggedRow: null
