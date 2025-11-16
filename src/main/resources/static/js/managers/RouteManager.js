@@ -10,6 +10,7 @@ window.TripWeather.Managers.Route = {
     
     // Route state
     routePolylines: [],
+    routeLabels: [],
     currentRoute: null,
     
     /**
@@ -131,6 +132,8 @@ window.TripWeather.Managers.Route = {
         // Update waypoint distances if segments are provided
         if (routeData.segments && routeData.segments.length > 0) {
             this.updateWaypointDistances(routeData.segments);
+            // Add distance labels to route segments
+            this.addDistanceLabels(routeData.segments, routeCoordinates);
         }
         
         // Fetch weather for all waypoints after route calculation
@@ -243,6 +246,151 @@ window.TripWeather.Managers.Route = {
     },
 
     /**
+     * Format distance for display
+     * @param {number} distanceInMiles - Distance in miles
+     * @returns {string} - Formatted distance string
+     */
+    formatDistance: function(distanceInMiles) {
+        if (distanceInMiles >= 0.1) {
+            // Display in miles with 1 decimal place
+            return distanceInMiles.toFixed(1) + ' mi';
+        } else {
+            // Display in feet (1 mile = 5280 feet)
+            const distanceInFeet = distanceInMiles * 5280;
+            return Math.round(distanceInFeet) + ' ft';
+        }
+    },
+
+    /**
+     * Calculate midpoint of a route segment for label placement
+     * @param {Array} segmentCoordinates - Array of coordinates for the segment
+     * @returns {Array} - Midpoint coordinates [lat, lng]
+     */
+    calculateSegmentMidpoint: function(segmentCoordinates) {
+        if (!segmentCoordinates || segmentCoordinates.length < 2) {
+            return null;
+        }
+        
+        // For simplicity, we'll use the midpoint of the first and last coordinates
+        // In a more complex implementation, we might want to find the actual midpoint
+        // along the path, but this should work well for most cases
+        const start = segmentCoordinates[0];
+        const end = segmentCoordinates[segmentCoordinates.length - 1];
+        
+        return [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2];
+    },
+
+    /**
+     * Add distance labels to route segments
+     * @param {Array} segments - Route segments from API response
+     * @param {Array} routeCoordinates - All route coordinates
+     */
+    addDistanceLabels: function(segments, routeCoordinates) {
+        const map = window.TripWeather.Managers.Map.getMap();
+        if (!map || !segments || segments.length === 0 || !routeCoordinates || routeCoordinates.length === 0) {
+            return;
+        }
+
+        // Clear existing labels
+        this.clearDistanceLabels();
+
+        // For each segment, create a label
+        segments.forEach((segment, index) => {
+            if (segment.distance !== undefined && segment.distance !== null) {
+                // Convert distance from meters to miles
+                const distanceInMiles = segment.distance * 0.0006213712;
+                const formattedDistance = this.formatDistance(distanceInMiles);
+                
+                // Find the midpoint for this segment
+                // Use the waypoints data to get more accurate segment coordinates
+                const waypoints = window.TripWeather.Managers.Waypoint.getAllWaypoints();
+                
+                let segmentCoords = [];
+                
+                // If we have waypoints, use them to determine segment boundaries
+                if (waypoints && waypoints.length > index + 1) {
+                    const startWaypoint = waypoints[index];
+                    const endWaypoint = waypoints[index + 1];
+                    
+                    // Find the coordinates closest to each waypoint
+                    const startIndex = this.findClosestCoordinateIndex(routeCoordinates, [startWaypoint.lat, startWaypoint.lng]);
+                    const endIndex = this.findClosestCoordinateIndex(routeCoordinates, [endWaypoint.lat, endWaypoint.lng]);
+                    
+                    if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
+                        segmentCoords = routeCoordinates.slice(startIndex, endIndex + 1);
+                    }
+                }
+                
+                // Fallback: divide route coordinates evenly among segments
+                if (segmentCoords.length === 0) {
+                    const coordsPerSegment = Math.max(1, Math.floor(routeCoordinates.length / segments.length));
+                    const segmentStartIndex = index * coordsPerSegment;
+                    const segmentEndIndex = Math.min((index + 1) * coordsPerSegment, routeCoordinates.length - 1);
+                    segmentCoords = routeCoordinates.slice(segmentStartIndex, segmentEndIndex + 1);
+                }
+                
+                const midpoint = this.calculateSegmentMidpoint(segmentCoords);
+                
+                if (midpoint) {
+                    // Create a custom icon for the distance label
+                    const labelIcon = L.divIcon({
+                        className: 'route-distance-label',
+                        html: `<div class="distance-label-content">${formattedDistance}</div>`,
+                        iconSize: [60, 20],
+                        iconAnchor: [30, 10]
+                    });
+                    
+                    // Create and add the marker
+                    const labelMarker = L.marker(midpoint, { icon: labelIcon }).addTo(map);
+                    this.routeLabels.push(labelMarker);
+                }
+            }
+        });
+    },
+
+    /**
+     * Find the index of the coordinate closest to the target point
+     * @param {Array} coordinates - Array of [lat, lng] coordinates
+     * @param {Array} targetPoint - Target point as [lat, lng]
+     * @returns {number} - Index of the closest coordinate
+     */
+    findClosestCoordinateIndex: function(coordinates, targetPoint) {
+        if (!coordinates || coordinates.length === 0 || !targetPoint || targetPoint.length < 2) {
+            return -1;
+        }
+        
+        let minDistance = Infinity;
+        let closestIndex = 0;
+        
+        coordinates.forEach((coord, index) => {
+            // Calculate distance using Haversine formula approximation
+            const latDiff = coord[0] - targetPoint[0];
+            const lngDiff = coord[1] - targetPoint[1];
+            const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+            
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestIndex = index;
+            }
+        });
+        
+        return closestIndex;
+    },
+
+    /**
+     * Clear distance labels from map
+     */
+    clearDistanceLabels: function() {
+        const map = window.TripWeather.Managers.Map.getMap();
+        if (map) {
+            this.routeLabels.forEach(function(label) {
+                map.removeLayer(label);
+            });
+        }
+        this.routeLabels = [];
+    },
+
+    /**
      * Clear route from map
      */
     clearRoute: function() {
@@ -254,6 +402,10 @@ window.TripWeather.Managers.Route = {
             });
         }
         this.routePolylines = [];
+        
+        // Clear distance labels
+        this.clearDistanceLabels();
+        
         this.currentRoute = null;
 
         // Reset button text

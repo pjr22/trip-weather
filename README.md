@@ -1,7 +1,7 @@
 # Trip Weather
 
 ## Repository owner's note:
- This project is largely an AI coding experiment. Approximately 95% (or more) of the code, including this README document, is AI generated, using a variety of AI tools and models. The rest was written by me (PJR22), the repository owner, as mostly bug fixes and minor improvements. A lot of the code is bad, and the UI could probably benefit from a complete rewrite using more modern technologies. Some improvements will continue to be made, and I may take on larger, more ambitious refactoring efforts at some point, as I find this to be a useful tool for planning road trips. It was, in fact, created out of frustration with the lack of a simple, user-friendly tool for planning road trips that includes weather information along the route. The code is offered as-is, without any warranty or guarantee of functionality. Use it as you see fit.
+This project is largely an AI coding experiment. Approximately 95% (or more) of code, including this README document, is AI generated, using a variety of AI tools and models. The rest was written by me (PJR22), as mostly bug fixes and minor improvements. A lot of code is bad, and the UI could probably benefit from a complete rewrite using more modern technologies. Some improvements will continue to be made, and I may take on larger, more ambitious refactoring efforts at some point, as I find this to be a useful tool for planning road trips. It was, in fact, created out of frustration with the lack of a simple, user-friendly tool for planning road trips that includes weather information along the route. The code is offered as-is, without any warranty or guarantee of functionality. Use it as you see fit.
 
 Trip Weather is a Spring Boot web application that helps users plan road trips by allowing them to:
 
@@ -27,7 +27,8 @@ Trip Weather is a Spring Boot web application that helps users plan road trips b
   - Display condition, temperature, wind, precipitation probability, and icon
 - **Route calculation**:
   - Calculate optimal routes between waypoints using OpenRouteService routing API
-  - Visualize routes with colored polylines on the map
+  - Visualize routes with colored polylines on map
+  - Display distance labels on route segments showing distance between waypoints
   - Automatic arrival time calculation based on travel time and waypoint durations
 - **Duration management**:
   - Add duration to waypoints representing time spent at each location
