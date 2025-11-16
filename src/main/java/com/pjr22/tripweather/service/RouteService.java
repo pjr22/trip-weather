@@ -125,6 +125,10 @@ public class RouteService {
                .body(requestBody)
                .retrieve()
                .body(JsonNode.class);
+         
+         if (departureDateTime.isBefore(ZonedDateTime.now())) {
+            departureDateTime = ZonedDateTime.now();
+         }
 
          return parseRouteResponseWithArrivalTimesAndDurations(response, waypoints, departureDateTime, durations);
 
