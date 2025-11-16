@@ -332,12 +332,15 @@ window.TripWeather.Managers.Route = {
                 const midpoint = this.calculateSegmentMidpoint(segmentCoords);
                 
                 if (midpoint) {
+                    // Format duration (segment.duration is in seconds)
+                    const formattedDuration = segment.duration ? this.formatSegmentDuration(segment.duration) : '';
+                    
                     // Create a custom icon for the distance label
                     const labelIcon = L.divIcon({
                         className: 'route-distance-label',
-                        html: `<div class="distance-label-content">${formattedDistance}</div>`,
-                        iconSize: [60, 20],
-                        iconAnchor: [30, 10]
+                        html: `<div class="distance-label-content">${formattedDistance}<br>${formattedDuration}</div>`,
+                        iconSize: [60, 30],
+                        iconAnchor: [30, 15]
                     });
                     
                     // Create and add the marker
@@ -375,6 +378,23 @@ window.TripWeather.Managers.Route = {
         });
         
         return closestIndex;
+    },
+
+    /**
+     * Format segment duration for display
+     * @param {number} durationInSeconds - Duration in seconds
+     * @returns {string} - Formatted duration string (e.g., "01h10m")
+     */
+    formatSegmentDuration: function(durationInSeconds) {
+        if (!durationInSeconds || durationInSeconds <= 0) {
+            return '';
+        }
+        
+        // Convert seconds to minutes
+        const durationInMinutes = Math.round(durationInSeconds / 60);
+        
+        // Use DurationUtils to format the duration
+        return window.TripWeather.Utils.Duration.formatDuration(durationInMinutes);
     },
 
     /**

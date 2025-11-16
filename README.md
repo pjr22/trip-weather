@@ -28,7 +28,7 @@ Trip Weather is a Spring Boot web application that helps users plan road trips b
 - **Route calculation**:
   - Calculate optimal routes between waypoints using OpenRouteService routing API
   - Visualize routes with colored polylines on map
-  - Display distance labels on route segments showing distance between waypoints
+  - Display distance and duration labels on route segments showing distance and travel time between waypoints
   - Automatic arrival time calculation based on travel time and waypoint durations
 - **Duration management**:
   - Add duration to waypoints representing time spent at each location
