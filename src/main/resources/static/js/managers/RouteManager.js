@@ -123,9 +123,14 @@ window.TripWeather.Managers.Route = {
         // Fit map to show entire route
         window.TripWeather.Managers.Map.fitBounds(routeCoordinates, { padding: [50, 50] });
 
-        // Update waypoint arrival times, durations, and timezones if provided
+        // Update waypoint arrival times, durations, distances, and timezones if provided
         if (routeData.waypoints && routeData.waypoints.length > 0) {
             this.updateWaypointsWithRouteData(routeData.waypoints);
+        }
+        
+        // Update waypoint distances if segments are provided
+        if (routeData.segments && routeData.segments.length > 0) {
+            this.updateWaypointDistances(routeData.segments);
         }
         
         // Fetch weather for all waypoints after route calculation
@@ -207,7 +212,33 @@ window.TripWeather.Managers.Route = {
             }
         });
         
-        // Update table to show new arrival times, durations, and timezones
+        // Update table to show new arrival times, durations, timezones, and distances
+        window.TripWeather.Managers.WaypointRenderer.updateTable();
+    },
+    
+    /**
+     * Update waypoint distances from route segments
+     * @param {Array} segments - Route segments from API response
+     */
+    updateWaypointDistances: function(segments) {
+        const waypoints = window.TripWeather.Managers.Waypoint.getAllWaypoints();
+        
+        // First waypoint always has distance 0
+        if (waypoints.length > 0) {
+            waypoints[0].distance = 0;
+        }
+        
+        // Update distances for remaining waypoints based on segment distances
+        for (let i = 0; i < segments.length && i < waypoints.length - 1; i++) {
+            const segment = segments[i];
+            if (segment.distance !== undefined && segment.distance !== null) {
+                // Convert distance from meters to miles (1 meter = 0.0006213712 miles)
+                const distanceInMiles = segment.distance * 0.0006213712;
+                waypoints[i + 1].distance = distanceInMiles;
+            }
+        }
+        
+        // Update table to show new distances
         window.TripWeather.Managers.WaypointRenderer.updateTable();
     },
 

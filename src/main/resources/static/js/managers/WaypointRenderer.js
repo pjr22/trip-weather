@@ -192,6 +192,7 @@ window.TripWeather.Managers.WaypointRenderer = {
             const safeTimezoneDisplay = helpers.escapeHtml(timezoneDisplay);
             const safeDurationValue = helpers.escapeHtml(window.TripWeather.Utils.Duration.formatDuration(waypoint.duration));
             const safeLocationValue = helpers.escapeHtml(waypoint.locationName || '');
+            const safeDistanceValue = helpers.escapeHtml(waypoint.distance ? `${waypoint.distance.toFixed(1)} mi` : '-');
             
             row.innerHTML = `
                 <td class="drag-handle-cell"><span class="drag-handle" title="Drag to reorder">☰</span></td>
@@ -215,6 +216,7 @@ window.TripWeather.Managers.WaypointRenderer = {
                     </div>
                 </td>
                 <td><input type="text" value="${safeLocationValue}" placeholder="Enter location name" data-waypoint-sequence="${waypoint.sequence}" data-field="locationName"></td>
+                <td class="distance-cell">${safeDistanceValue}</td>
                 ${weatherHtml}
                 <td class="actions-cell">
                     <button class="action-btn" data-waypoint-sequence="${waypoint.sequence}" data-action="center" title="Center on waypoint">
@@ -250,7 +252,7 @@ window.TripWeather.Managers.WaypointRenderer = {
             const dropZoneRow = tbody.insertRow();
             dropZoneRow.className = 'drop-zone-row';
             dropZoneRow.innerHTML = `
-                <td colspan="12" class="drop-zone-cell"></td>
+                <td colspan="13" class="drop-zone-cell"></td>
             `;
             this.setupDropZone(dropZoneRow);
         }

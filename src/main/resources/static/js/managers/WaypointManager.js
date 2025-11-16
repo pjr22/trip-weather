@@ -36,6 +36,7 @@ window.TripWeather.Managers.Waypoint = {
         this.timezoneDstAbbr = '';      // Daylight saving time abbreviation e.g., "MDT"
         this.duration = 0;
         this.locationName = '';
+        this.distance = 0;             // Distance from previous waypoint in miles (0 for first waypoint)
         this.weather = null;
         this.weatherLoading = false;
     },
@@ -87,6 +88,7 @@ window.TripWeather.Managers.Waypoint = {
             waypoint.date = existingWaypoint.date || '';
             waypoint.time = existingWaypoint.time || '';
             waypoint.duration = existingWaypoint.duration || 0;
+            waypoint.distance = existingWaypoint.distance || 0;
             
             // Copy timezone information if it exists
             if (existingWaypoint.timezoneName) {

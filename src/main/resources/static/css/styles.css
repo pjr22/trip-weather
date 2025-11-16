@@ -405,8 +405,21 @@ main {
     min-width: 200px;
 }
 
-#waypoints-table th:nth-child(8), /* Weather column */
+#waypoints-table th:nth-child(8), /* Distance column */
 #waypoints-table td:nth-child(8) {
+    width: 80px;
+    min-width: 80px;
+    text-align: center;
+}
+
+.distance-cell {
+    text-align: center;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+#waypoints-table th:nth-child(9), /* Weather column */
+#waypoints-table td:nth-child(9) {
     width: 160px;
     min-width: 160px;
     white-space: nowrap;
@@ -414,29 +427,29 @@ main {
     text-overflow: ellipsis;
 }
 
-#waypoints-table th:nth-child(9), /* Temp column */
-#waypoints-table td:nth-child(9) {
+#waypoints-table th:nth-child(10), /* Temp column */
+#waypoints-table td:nth-child(10) {
     width: 60px;
     min-width: 60px;
     text-align: center;
 }
 
-#waypoints-table th:nth-child(10), /* Wind column */
-#waypoints-table td:nth-child(10) {
+#waypoints-table th:nth-child(11), /* Wind column */
+#waypoints-table td:nth-child(11) {
     width: 115px;
     min-width: 115px;
     text-align: center;
 }
 
-#waypoints-table th:nth-child(11), /* Precip column */
-#waypoints-table td:nth-child(11) {
+#waypoints-table th:nth-child(12), /* Precip column */
+#waypoints-table td:nth-child(12) {
     width: 70px;
     min-width: 70px;
     text-align: center;
 }
 
-#waypoints-table th:nth-child(12), /* Actions column */
-#waypoints-table td:nth-child(12) {
+#waypoints-table th:nth-child(13), /* Actions column */
+#waypoints-table td:nth-child(13) {
     width: 180px;
     min-width: 180px;
     text-align: center;
