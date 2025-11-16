@@ -1031,18 +1031,18 @@ main {
     background: rgba(0, 102, 204, 0.9);
     border: 1px solid #0066cc;
     border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
     font-size: 12px;
     font-weight: 600;
     color: white;
     text-align: center;
     pointer-events: none;
     z-index: 1000;
+    white-space: nowrap;
 }
 
 .distance-label-content {
-    padding: 2px 6px;
     white-space: nowrap;
-    line-height: 1.2;
+    line-height: 1.3;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); /* Improve readability */
 }
-/* placeholder */

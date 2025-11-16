@@ -271,13 +271,113 @@ window.TripWeather.Managers.Route = {
             return null;
         }
         
-        // For simplicity, we'll use the midpoint of the first and last coordinates
-        // In a more complex implementation, we might want to find the actual midpoint
-        // along the path, but this should work well for most cases
-        const start = segmentCoordinates[0];
-        const end = segmentCoordinates[segmentCoordinates.length - 1];
+        // Calculate the actual midpoint along the path by measuring total distance
+        // and finding the point at half the total distance
+        const totalDistance = this.calculatePathDistance(segmentCoordinates);
+        const halfDistance = totalDistance / 2;
         
-        return [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2];
+        return this.findPointAtDistance(segmentCoordinates, halfDistance);
+    },
+
+    /**
+     * Calculate the total distance along a path
+     * @param {Array} coordinates - Array of [lat, lng] coordinates
+     * @returns {number} - Total distance in same units as coordinates
+     */
+    calculatePathDistance: function(coordinates) {
+        if (!coordinates || coordinates.length < 2) {
+            return 0;
+        }
+        
+        let totalDistance = 0;
+        for (let i = 0; i < coordinates.length - 1; i++) {
+            totalDistance += this.calculateDistance(coordinates[i], coordinates[i + 1]);
+        }
+        
+        return totalDistance;
+    },
+
+    /**
+     * Calculate distance between two points
+     * @param {Array} point1 - First point [lat, lng]
+     * @param {Array} point2 - Second point [lat, lng]
+     * @returns {number} - Distance between points
+     */
+    calculateDistance: function(point1, point2) {
+        const latDiff = point2[0] - point1[0];
+        const lngDiff = point2[1] - point1[1];
+        return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+    },
+
+    /**
+     * Find the point along a path at a specific distance from the start
+     * @param {Array} coordinates - Array of [lat, lng] coordinates
+     * @param {number} targetDistance - Distance from start to find point
+     * @returns {Array} - Point at target distance [lat, lng]
+     */
+    findPointAtDistance: function(coordinates, targetDistance) {
+        if (!coordinates || coordinates.length < 2) {
+            return null;
+        }
+        
+        let accumulatedDistance = 0;
+        
+        for (let i = 0; i < coordinates.length - 1; i++) {
+            const startPoint = coordinates[i];
+            const endPoint = coordinates[i + 1];
+            const segmentDistance = this.calculateDistance(startPoint, endPoint);
+            
+            // If the target distance is within this segment
+            if (accumulatedDistance + segmentDistance >= targetDistance) {
+                const remainingDistance = targetDistance - accumulatedDistance;
+                const ratio = remainingDistance / segmentDistance;
+                
+                // Interpolate between start and end points
+                return [
+                    startPoint[0] + (endPoint[0] - startPoint[0]) * ratio,
+                    startPoint[1] + (endPoint[1] - startPoint[1]) * ratio
+                ];
+            }
+            
+            accumulatedDistance += segmentDistance;
+        }
+        
+        // If we've gone through all segments, return the last point
+        return coordinates[coordinates.length - 1];
+    },
+
+    /**
+     * Calculate a perpendicular offset point from a line segment
+     * @param {Array} startPoint - Start point of segment [lat, lng]
+     * @param {Array} endPoint - End point of segment [lat, lng]
+     * @param {Array} midPoint - Midpoint of segment [lat, lng]
+     * @param {number} offsetDistance - Distance to offset (positive for right, negative for left)
+     * @returns {Array} - Offset point [lat, lng]
+     */
+    calculateOffsetPoint: function(startPoint, endPoint, midPoint, offsetDistance) {
+        // Calculate the direction vector of the segment
+        const dx = endPoint[1] - startPoint[1];
+        const dy = endPoint[0] - startPoint[0];
+        
+        // Normalize the direction vector
+        const length = Math.sqrt(dx * dx + dy * dy);
+        if (length === 0) return midPoint;
+        
+        const normalizedDx = dx / length;
+        const normalizedDy = dy / length;
+        
+        // Calculate perpendicular vector (rotate 90 degrees)
+        const perpDx = -normalizedDy;
+        const perpDy = normalizedDx;
+        
+        // Apply offset with a minimum threshold to ensure visibility
+        const adjustedOffset = Math.abs(offsetDistance) < 0.001 ?
+            (offsetDistance > 0 ? 0.001 : -0.001) : offsetDistance;
+        
+        return [
+            midPoint[0] + perpDy * adjustedOffset,
+            midPoint[1] + perpDx * adjustedOffset
+        ];
     },
 
     /**
@@ -329,9 +429,10 @@ window.TripWeather.Managers.Route = {
                     segmentCoords = routeCoordinates.slice(segmentStartIndex, segmentEndIndex + 1);
                 }
                 
+                // Calculate the actual midpoint along the path
                 const midpoint = this.calculateSegmentMidpoint(segmentCoords);
                 
-                if (midpoint) {
+                if (midpoint && segmentCoords.length >= 2) {
                     // Format duration (segment.duration is in seconds)
                     const formattedDuration = segment.duration ? this.formatSegmentDuration(segment.duration) : '';
                     
@@ -340,10 +441,10 @@ window.TripWeather.Managers.Route = {
                         className: 'route-distance-label',
                         html: `<div class="distance-label-content">${formattedDistance}<br>${formattedDuration}</div>`,
                         iconSize: [60, 30],
-                        iconAnchor: [30, 15]
+                        iconAnchor: [30, 15] // Center the icon on the point
                     });
                     
-                    // Create and add the marker
+                    // Create and add the marker directly on the route line at the midpoint
                     const labelMarker = L.marker(midpoint, { icon: labelIcon }).addTo(map);
                     this.routeLabels.push(labelMarker);
                 }
