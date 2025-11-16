@@ -5,7 +5,9 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -21,7 +23,9 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class RouteService {
 
@@ -32,6 +36,7 @@ public class RouteService {
    private final LocationService locationService;
 
    private static final String DIRECTIONS_ENDPOINT = "/v2/directions/driving-car/geojson";
+   private static final String SNAP_ENDPOINT = "/v2/snap/driving-car/geojson";
 
    public RouteService(
          @Value("${openrouteservice.api.key}") String apiKey,
@@ -43,6 +48,33 @@ public class RouteService {
       this.restClient = RestClient.builder().baseUrl(this.baseUrl).build();
       this.objectMapper = new ObjectMapper();
       this.locationService = locationService;
+   }
+
+   public LocationData snapToLocation(double latitude, double longitude) {
+      try {
+          if (apiKey == null || apiKey.isEmpty()) {
+              return null;
+          }
+          
+          // {"locations":[[8.669629,49.413025],[8.675841,49.418532],[8.665144,49.415594]],"radius":350}'
+          Map<String, Object> body = new HashMap<>();
+          body.put("locations", List.of(List.of(longitude, latitude)));
+          body.put("radius", Integer.valueOf(10000));
+
+          LocationData locationData = restClient.post()
+                  .uri(SNAP_ENDPOINT)
+                  .body(body)
+                  .header("Authorization", apiKey)
+                  .retrieve()
+                  .toEntity(LocationData.class)
+                  .getBody();
+
+          return locationData;
+       } catch (Exception e) {
+          log.info("Failed to get snap location info from: {}", SNAP_ENDPOINT);
+          log.error("Snap request failed.", e);
+          return null;
+      }
    }
 
    public RouteData calculateRoute(
@@ -62,11 +94,17 @@ public class RouteService {
          // Prepare request body for OpenRouteService
          RouteRequest request = new RouteRequest();
          request.setCoordinates(convertWaypointsToCoordinates(waypoints));
+         request.setRadiuses(List.of(-1));
 
          String requestBody = objectMapper.writeValueAsString(request);
 
-         JsonNode response = restClient.post().uri(DIRECTIONS_ENDPOINT + "?api_key=" + apiKey)
-               .header("Content-Type", "application/json").body(requestBody).retrieve().body(JsonNode.class);
+         JsonNode response = restClient.post()
+               .uri(DIRECTIONS_ENDPOINT)
+               .header("Authorization", apiKey)
+               .header("Content-Type", "application/json")               
+               .body(requestBody)
+               .retrieve()
+               .body(JsonNode.class);
 
          return parseRouteResponseWithArrivalTimesAndDurations(response, waypoints, departureDateTime, durations);
 
@@ -325,6 +363,7 @@ public class RouteService {
    @AllArgsConstructor
    public static class RouteRequest {
       private List<List<Double>> coordinates;
+      private List<Integer> radiuses;
       private String format = "geojson";
 
       @Setter

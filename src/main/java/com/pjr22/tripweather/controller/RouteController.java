@@ -1,6 +1,7 @@
 package com.pjr22.tripweather.controller;
 
 import com.pjr22.tripweather.Utils;
+import com.pjr22.tripweather.model.LocationData;
 import com.pjr22.tripweather.model.RouteData;
 import com.pjr22.tripweather.service.RouteService;
 
@@ -25,6 +26,14 @@ public class RouteController {
 
     public RouteController(RouteService routeService) {
         this.routeService = routeService;
+    }
+
+    @GetMapping("/snap")
+    public LocationData snapToLocation(
+            @RequestParam double lat,
+            @RequestParam double lon) {
+        
+        return routeService.snapToLocation(lat, lon);
     }
 
     @PostMapping("/calculate")
