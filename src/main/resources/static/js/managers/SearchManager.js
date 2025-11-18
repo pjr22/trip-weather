@@ -474,6 +474,9 @@ window.TripWeather.Managers.Search = {
                     // Convert waypoints from DTO format
                     const waypoints = window.TripWeather.Services.RoutePersistence.convertWaypointsFromDto(response.waypoints || []);
                     
+                    // Sort waypoints by sequence number to ensure correct order
+                    waypoints.sort((a, b) => a.sequence - b.sequence);
+                    
                     // Clear existing waypoints and add loaded ones
                     window.TripWeather.Managers.Waypoint.clearAllWaypoints();
                     

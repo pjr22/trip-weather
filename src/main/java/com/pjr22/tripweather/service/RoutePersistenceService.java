@@ -230,7 +230,11 @@ public class RoutePersistenceService {
         
         if (route.getWaypoints() != null) {
             List<WaypointDto> waypointDtos = new ArrayList<>();
-            for (Waypoint waypoint : route.getWaypoints()) {
+            // Sort waypoints by sequence number to ensure correct order
+            List<Waypoint> sortedWaypoints = route.getWaypoints().stream()
+                .sorted((w1, w2) -> Integer.compare(w1.getSequence(), w2.getSequence()))
+                .toList();
+            for (Waypoint waypoint : sortedWaypoints) {
                 waypointDtos.add(convertToDto(waypoint));
             }
             dto.setWaypoints(waypointDtos);
