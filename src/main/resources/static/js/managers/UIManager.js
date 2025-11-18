@@ -164,13 +164,17 @@ window.TripWeather.Managers.UI = {
         tooltip.textContent = title;
         tooltip.id = 'tooltip-' + Date.now();
         
-        // Add to page
+        // Add to page first
         document.body.appendChild(tooltip);
         
-        // Position tooltip
+        // Position tooltip after it's in the DOM
         const rect = element.getBoundingClientRect();
-        tooltip.style.left = rect.left + (rect.width / 2) - (tooltip.offsetWidth / 2) + 'px';
-        tooltip.style.top = rect.top - tooltip.offsetHeight - 5 + 'px';
+        const tooltipWidth = tooltip.offsetWidth;
+        const tooltipHeight = tooltip.offsetHeight;
+        
+        // Calculate position to center tooltip above element
+        tooltip.style.left = rect.left + (rect.width / 2) - (tooltipWidth / 2) + 'px';
+        tooltip.style.top = rect.top - tooltipHeight - 5 + 'px';
         
         // Show tooltip
         setTimeout(function() {
