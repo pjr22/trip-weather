@@ -358,6 +358,11 @@ window.TripWeather.Managers.Waypoint = {
         if (!locationInfo) {
             this.fetchLocationInfo(waypoint);
         }
+        
+        // Update layer time if needed (timezone might have changed)
+        if (window.TripWeather.Managers.Layer) {
+            window.TripWeather.Managers.Layer.updateLayerTime(waypoint);
+        }
     },
 
     /**
@@ -376,6 +381,11 @@ window.TripWeather.Managers.Waypoint = {
             // Fetch weather when date and time are set
             if ((field === 'date' || field === 'time') && waypoint.date && waypoint.time) {
                 this.fetchWeatherForWaypoint(waypoint);
+            }
+            
+            // Update layer time if date or time changed
+            if ((field === 'date' || field === 'time') && window.TripWeather.Managers.Layer) {
+                window.TripWeather.Managers.Layer.updateLayerTime(waypoint);
             }
         }
         

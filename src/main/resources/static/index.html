@@ -188,6 +188,35 @@
         </div>
     </div>
 
+    <div id="layers-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Map Layers</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p class="layers-modal-description">Select a weather layer to display on the map. The data will correspond to the arrival time at the selected waypoint.</p>
+                <div class="layer-options">
+                    <button class="layer-select-btn" data-layer="temperature">Temperature</button>
+                    <button class="layer-select-btn" data-layer="precipitation">Chance of Precipitation</button>
+                    <button class="layer-select-btn" data-layer="wind">Wind</button>
+                    <button class="layer-select-btn secondary" data-layer="none">None</button>
+                </div>
+                
+                <div class="layer-separator">
+                    <span>OR Select Other</span>
+                </div>
+                
+                <div class="other-layers-container">
+                    <select id="other-layer-select" class="layer-select">
+                        <option value="">-- Select a layer --</option>
+                    </select>
+                    <button id="other-layer-btn" class="modal-btn primary small-btn">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="location-loading-overlay" class="loading-overlay">
         <div class="loading-content">
             <div class="loading-spinner"></div>
@@ -229,6 +258,7 @@
     <script src="js/managers/SearchManager.js"></script>
     <script src="js/managers/UIManager.js"></script>
     <script src="js/managers/RouteManager.js"></script>
+    <script src="js/managers/LayerManager.js"></script>
     
     <!-- Main Application (coordinates everything) -->
     <script src="js/app.js"></script>

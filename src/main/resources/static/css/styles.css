@@ -1103,6 +1103,136 @@ main {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
+
 .tooltip-show {
     opacity: 1;
+}
+
+/* Layers Control */
+.layers-control {
+    background-color: #fff;
+    width: 34px;
+    height: 34px;
+    line-height: 34px;
+    text-align: center;
+    cursor: pointer;
+    border-bottom: 1px solid #ccc; /* If stack */
+    border: 2px solid rgba(0,0,0,0.2);
+    border-radius: 4px;
+}
+.layers-control:hover {
+    background-color: #f4f4f4;
+}
+.layers-icon {
+    width: 20px;
+    height: 20px;
+    margin-top: 5px;
+    fill: #464646;
+}
+
+/* Layers Modal */
+.layers-modal-description {
+    padding-bottom: 10px;
+}
+.layer-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.layer-select-btn {
+    padding: 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #2c3e50;
+    transition: all 0.2s;
+}
+
+.layer-select-btn:hover {
+    background-color: #e3f2fd;
+    border-color: #3498db;
+}
+
+.layer-select-btn.active {
+    background-color: #3498db;
+    color: white;
+    border-color: #2980b9;
+}
+
+.layer-select-btn.secondary {
+    background-color: #ecf0f1;
+    color: #7f8c8d;
+}
+.layer-select-btn.secondary:hover {
+    background-color: #bdc3c7;
+    color: #2c3e50;
+}
+
+.layer-separator {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 20px 0;
+    color: #95a5a6;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.layer-separator::before,
+.layer-separator::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #eee;
+}
+
+.layer-separator span {
+    padding: 0 10px;
+}
+
+.other-layers-container {
+    display: flex;
+    gap: 10px;
+}
+
+.layer-select {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.small-btn {
+    padding: 8px 16px;
+}
+
+/* Layer Info Control (Bottom Left) */
+.layer-info-control {
+    background: rgba(255, 255, 255, 0.8);
+    margin: 0 0 10px 10px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    color: #333;
+    font: 12px/1.5 "Segoe UI", Helvetica, Arial, sans-serif;
+    pointer-events: none;
+    max-width: 300px;
+    white-space: nowrap;
+}
+
+.layer-info-label {
+    font-weight: 600;
+    display: block;
+    color: #2c3e50;
+}
+
+.layer-info-time {
+    color: #555;
+    font-size: 11px;
 }
