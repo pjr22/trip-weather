@@ -153,6 +153,89 @@ window.TripWeather.Managers.Route = {
 
         // Update button text to show route is active
         window.TripWeather.Managers.UI.updateRouteButtonText('🔄 Recalculate Route');
+
+        // Update route statistics
+        this.updateRouteStats(routeData);
+    },
+
+    /**
+     * Update route statistics display
+     * @param {object} routeData - Route data from API
+     */
+    updateRouteStats: function(routeData) {
+        const statsContainer = document.getElementById('route-stats');
+        if (!statsContainer) return;
+
+        if (!routeData) {
+            statsContainer.style.display = 'none';
+            return;
+        }
+
+        statsContainer.style.display = 'flex';
+
+        // 1. Distance
+        const distanceEl = document.getElementById('route-total-distance');
+        if (distanceEl) {
+            const distanceInMiles = (routeData.distance || 0) * 0.0006213712;
+            distanceEl.textContent = this.formatDistance(distanceInMiles);
+        }
+
+        // 2. Drive Time
+        const timeEl = document.getElementById('route-total-time');
+        if (timeEl) {
+            const durationMinutes = Math.round((routeData.duration || 0) / 60);
+            timeEl.textContent = window.TripWeather.Utils.Duration.formatDuration(durationMinutes);
+        }
+
+        // 3. Elevation
+        const elevationContainer = document.getElementById('route-elevation');
+        if (elevationContainer && routeData.geometry && routeData.geometry.length > 0) {
+            let totalIncrease = 0;
+            let totalDecrease = 0;
+            let hasElevation = false;
+
+            // Iterate through geometry coordinates [lon, lat, ele]
+            // Note: OpenRouteService returns [lon, lat, ele] (GeoJSON format)
+            const coordinates = routeData.geometry;
+            
+            for (let i = 0; i < coordinates.length; i++) {
+                // Check if elevation data exists (3rd element)
+                if (coordinates[i].length > 2) {
+                    hasElevation = true;
+                    const ele = coordinates[i][2];
+                    
+                    if (i > 0 && coordinates[i-1].length > 2) {
+                        const prevEle = coordinates[i-1][2];
+                        const diff = ele - prevEle;
+                        
+                        if (diff > 0) {
+                            totalIncrease += diff;
+                        } else {
+                            totalDecrease += Math.abs(diff);
+                        }
+                    }
+                }
+            }
+            
+            // If we found elevation data
+            if (hasElevation) {
+                // Convert to feet (1 meter = 3.28084 feet)
+                const toFeet = (meters) => Math.round(meters * 3.28084);
+                
+                const increaseFt = toFeet(totalIncrease);
+                const decreaseFt = toFeet(totalDecrease);
+                const netChangeFt = increaseFt - decreaseFt;
+                const netSign = netChangeFt >= 0 ? '+' : '';
+                
+                elevationContainer.innerHTML = `
+                    <span class="elevation-up" title="Total Ascent">↑ ${increaseFt.toLocaleString()} ft</span>
+                    <span class="elevation-down" title="Total Descent">↓ ${decreaseFt.toLocaleString()} ft</span>
+                    <span class="elevation-net" title="Net Elevation Change">(${netSign}${netChangeFt.toLocaleString()} ft)</span>
+                `;
+            } else {
+                elevationContainer.innerHTML = '<span style="color: #999;">No elevation data</span>';
+            }
+        }
     },
 
     /**
@@ -531,6 +614,9 @@ window.TripWeather.Managers.Route = {
 
         // Reset button text
         window.TripWeather.Managers.UI.updateRouteButtonText('🛣️ Calculate Route');
+
+        // Clear route statistics
+        this.updateRouteStats(null);
     },
 
     /**
