@@ -211,8 +211,9 @@ window.TripWeather.Managers.Waypoint = {
             window.TripWeather.Managers.Route.clearRouteOnWaypointChange('add', this.waypoints.length - 1);
         }
         
-        // Fetch location info if not provided
-        if (!locationInfo) {
+        // Fetch location info if not provided and not loading from existing waypoint
+        // For loaded routes, preserve the custom location name from the waypoint data
+        if (!locationInfo && !existingWaypoint) {
             this.fetchLocationInfo(waypoint);
         }
         
