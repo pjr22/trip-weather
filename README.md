@@ -30,6 +30,15 @@ Trip Weather is a Spring Boot web application that helps users plan road trips b
   - Visualize routes with colored polylines on map
   - Display distance and duration labels on route segments showing distance and travel time between waypoints
   - Automatic arrival time calculation based on travel time and waypoint durations
+- **Route statistics**:
+  - Display total driving distance and time for the complete route
+  - Elevation profile showing total ascent, descent, and net elevation change
+  - Real-time statistics updates when routes are calculated or modified
+- **Map layers**:
+  - Weather overlay layers from National Weather Service (temperature, precipitation, wind)
+  - Layer selection modal with additional weather data options
+  - Time-based layer data corresponding to waypoint arrival times
+  - Interactive layer control with automatic visibility management
 - **Duration management**:
   - Add duration to waypoints representing time spent at each location
   - Support for flexible duration input (e.g., "3d2h10m", "48h22m", "1.5h")
@@ -53,10 +62,11 @@ Trip Weather is a Spring Boot web application that helps users plan road trips b
 - **Architecture**: Modular JavaScript with separation of concerns
   - Utilities (DurationUtils, TimezoneUtils, IconLoader, Helpers)
   - Services (LocationService, WeatherService, RoutePersistenceService)
-  - Managers (MapManager, WaypointManager, WaypointRenderer, SearchManager, UIManager, RouteManager)
+  - Managers (MapManager, WaypointManager, WaypointRenderer, SearchManager, UIManager, RouteManager, LayerManager)
   - Application coordinator (app.js)
 - **APIs**:
   - Weather: `https://api.weather.gov`
+  - Weather Layers: `https://digital.weather.gov/ndfd/wms`
   - Geocoding / Search: GeoApify (`geoapify.com`)
   - Routing: OpenRouteService (`openrouteservice.org`)
 - **Build**: Gradle
@@ -110,7 +120,8 @@ src/main/resources/static/js/
     ├── WaypointRenderer.js     # Table rendering and marker management
     ├── SearchManager.js         # Location search functionality
     ├── UIManager.js            # UI overlays and interactions
-    └── RouteManager.js         # Route calculation and display
+    ├── RouteManager.js         # Route calculation and display
+    └── LayerManager.js         # Map layers and weather overlays
 ```
 
 ## Database Schema
@@ -127,10 +138,11 @@ The application uses PostgreSQL with the following main entities:
 - `GET /api/weather/forecast` - Get weather forecast for coordinates and time
 - `GET /api/location/reverse` - Reverse geocode coordinates to location name
 - `GET /api/location/search` - Search for locations by query
-- `POST /api/route/calculate` - Calculate route between waypoints
+- `POST /api/route/calculate` - Calculate route between waypoints (includes elevation data)
 - `POST /api/routes` - Save a route
 - `GET /api/routes/{id}` - Load a route by ID
 - `GET /api/routes/search` - Search routes by name
+- `WMS: https://digital.weather.gov/ndfd/wms` - Weather map layers service
 
 ## Timezone Handling
 
@@ -152,6 +164,21 @@ Route calculation includes sophisticated timing features:
 - Handles timezone conversions for accurate arrival times
 - Visualizes routes with colored polylines on the map
 - Supports route recalculation when waypoints change
+- Provides comprehensive route statistics including total distance, driving time, and elevation profile
+- Displays elevation data showing total ascent, descent, and net elevation change
+- Shows distance and duration labels on route segments
+
+## Map Layers and Weather Overlays
+
+The application provides interactive weather map layers from the National Weather Service:
+
+- **Weather Layers**: Temperature, precipitation probability, and wind speed overlays
+- **Time-based Data**: Layer data corresponds to arrival times at selected waypoints
+- **Interactive Selection**: Click waypoints to display weather data for that specific time
+- **Layer Control**: Dedicated layers control button in the map interface
+- **Extended Options**: Additional weather data types available through dropdown selection
+- **Automatic Management**: Layers automatically show/hide based on waypoint selection
+- **Retry Mechanism**: Robust tile loading with exponential backoff for failed requests
 
 ## Future Enhancements
 
@@ -197,6 +224,9 @@ Route calculation includes sophisticated timing features:
 - Timezone calculations are handled server-side to ensure consistency
 - Database operations use transactions for data integrity
 - The application supports both guest users and authenticated users
+- Route statistics are calculated from OpenRouteService elevation data
+- Map layers use National Weather Service WMS with retry mechanisms for reliability
+- Layer data is time-synchronized with waypoint arrival times
 
 ## Troubleshooting
 
@@ -204,6 +234,9 @@ Route calculation includes sophisticated timing features:
 - **Database Connection**: Verify PostgreSQL is running and PostGIS extension is enabled
 - **Map Not Loading**: Check browser console for network issues or JavaScript errors
 - **Weather Not Loading**: Verify coordinates are valid and weather.gov API is accessible
+- **Route Statistics Not Showing**: Ensure route has been calculated and elevation data is available from OpenRouteService
+- **Map Layers Not Loading**: Check network connectivity to digital.weather.gov and verify WMS service is accessible
+- **Layer Data Not Updating**: Ensure waypoints have valid date/time set and waypoints are selected to trigger layer updates
 
 ## License
 
