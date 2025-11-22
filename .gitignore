@@ -42,3 +42,6 @@ out/
 ### jar files ###
 **.jar
 
+### XML files in root directory ###
+*.xml
+
