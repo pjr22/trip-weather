@@ -25,6 +25,10 @@ import lombok.extern.slf4j.Slf4j;
 
 @Service
 @Slf4j
+/**
+ * See: https://digital.weather.gov/staticpages/mapservices.php
+ * and: https://digital.weather.gov/ndfd.conus/wms?REQUEST=GetCapabilities
+ */
 public class WMSCapabilitiesService {
 
     private Map<String, CapabilitiesData> layerCapabilities = new HashMap<>();

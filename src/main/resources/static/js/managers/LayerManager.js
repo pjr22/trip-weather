@@ -33,6 +33,9 @@ window.TripWeather.Managers.Layer = {
         }
     },
 
+    // Cache for valid times to avoid repeated API calls
+    validTimesCache: {},
+
     /**
      * Initialize layer manager
      */
@@ -45,6 +48,9 @@ window.TripWeather.Managers.Layer = {
         
         // Cache for layer instances
         this.layerInstances = {};
+        
+        // Fetch available layers from backend
+        this.fetchAvailableLayers();
     },
 
     /**
@@ -241,6 +247,162 @@ window.TripWeather.Managers.Layer = {
             }
         }
     },
+    /**
+     * Fetch available layers from backend
+     */
+    fetchAvailableLayers: function() {
+        const self = this;
+        
+        fetch('/api/wms/layers')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Available WMS layers:', data);
+                self.populateOtherLayersDropdown(data);
+            })
+            .catch(error => {
+                console.error('Error fetching WMS layers:', error);
+                // Fallback to hardcoded layers if API call fails
+                self.populateFallbackLayers();
+            });
+    },
+
+    /**
+     * Fetch valid times for a specific layer from backend
+     * @param {string} layerName - Name of the layer
+     * @returns {Promise} - Promise that resolves to array of valid times
+     */
+    fetchValidTimes: function(layerName) {
+        const self = this;
+        
+        // Check cache first
+        if (this.validTimesCache[layerName]) {
+            return Promise.resolve(this.validTimesCache[layerName]);
+        }
+        
+        return fetch(`/api/wms/layer/validTimes?layerName=${encodeURIComponent(layerName)}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log(`Valid times for ${layerName}:`, data);
+                // Cache the valid times
+                self.validTimesCache[layerName] = data;
+                return data;
+            })
+            .catch(error => {
+                console.error(`Error fetching valid times for ${layerName}:`, error);
+                // Return empty array as fallback
+                return [];
+            });
+    },
+
+    /**
+     * Find the nearest valid time to the target time
+     * @param {Array} validTimes - Array of valid time strings in format "yyyy-MM-dd'T'HH:mm"
+     * @param {Date} targetTime - Target time to find nearest valid time for
+     * @returns {string|null} - Nearest valid time string or null if no valid times
+     */
+    findNearestValidTime: function(validTimes, targetTime) {
+        if (!validTimes || validTimes.length === 0) {
+            return null;
+        }
+        
+        const targetTimeMs = targetTime.getTime();
+        let nearestTime = validTimes[0];
+        let smallestDiff = Math.abs(new Date(validTimes[0]).getTime() - targetTimeMs);
+        
+        for (let i = 1; i < validTimes.length; i++) {
+            const validTimeMs = new Date(validTimes[i]).getTime();
+            const diff = Math.abs(validTimeMs - targetTimeMs);
+            
+            if (diff < smallestDiff) {
+                smallestDiff = diff;
+                nearestTime = validTimes[i];
+            }
+        }
+        
+        return nearestTime;
+    },
+
+    /**
+     * Populate "Other" layers dropdown with data from backend
+     */
+    populateOtherLayersDropdown: function(layersData) {
+        const select = document.getElementById('other-layer-select');
+        if (!select) return;
+
+        // Clear existing options except the first one
+        while (select.children.length > 1) {
+            select.removeChild(select.lastChild);
+        }
+
+        // Add layers from backend
+        for (const [layerId, layerTitle] of Object.entries(layersData)) {
+            // Skip the main layers that already have dedicated buttons
+            if (layerId === 'ndfd.conus.t' || layerId === 'ndfd.conus.pop12' || layerId === 'ndfd.conus.windspd') {
+                continue;
+            }
+            
+            const option = document.createElement('option');
+            option.value = layerId;
+            option.textContent = layerTitle;
+            select.appendChild(option);
+        }
+    },
+
+    /**
+     * Fallback method to populate dropdown with hardcoded layers
+     */
+    populateFallbackLayers: function() {
+        const select = document.getElementById('other-layer-select');
+        if (!select) return;
+
+        // Clear existing options except the first one
+        while (select.children.length > 1) {
+            select.removeChild(select.lastChild);
+        }
+
+        // Common useful layers from NDFD (fallback)
+        const fallbackLayers = [
+            { id: 'ndfd.conus.apparentt', name: 'Apparent Temperature' },
+            { id: 'ndfd.conus.apparentt.points', name: 'Apparent Temperature (Points)' },
+            { id: 'ndfd.conus.td', name: 'Dew Point' },
+            { id: 'ndfd.conus.td.points', name: 'Dew Point (Points)' },
+            { id: 'ndfd.conus.rh', name: 'Relative Humidity' },
+            { id: 'ndfd.conus.rh.points', name: 'Relative Humidity (Points)' },
+            { id: 'ndfd.conus.sky', name: 'Sky Cover' },
+            { id: 'ndfd.conus.sky.points', name: 'Sky Cover (Points)' },
+            { id: 'ndfd.conus.windgust', name: 'Wind Gust' },
+            { id: 'ndfd.conus.windgust.points', name: 'Wind Gust (Points)' },
+            { id: 'ndfd.conus.winddir', name: 'Wind Direction' },
+            { id: 'ndfd.conus.winddir.points', name: 'Wind Direction (Points)' },
+            { id: 'ndfd.conus.qpf', name: 'Quantitative Precip. Forecast' },
+            { id: 'ndfd.conus.qpf.points', name: 'Quantitative Precip. Forecast (Points)' },
+            { id: 'ndfd.conus.snowamt', name: 'Snow Amount' },
+            { id: 'ndfd.conus.snowamt.points', name: 'Snow Amount (Points)' },
+            { id: 'ndfd.conus.iceaccum', name: 'Ice Accumulation' },
+            { id: 'ndfd.conus.iceaccum.points', name: 'Ice Accumulation (Points)' },
+            { id: 'ndfd.conus.wwa', name: 'Watches, Warnings, Advisories' },
+            { id: 'ndfd.conus.wwa.points', name: 'Watches, Warnings, Advisories (Points)' },
+            { id: 'ndfd.conus.hazards', name: 'Hazards' }
+        ];
+
+        fallbackLayers.forEach(layer => {
+            const option = document.createElement('option');
+            option.value = layer.id;
+            option.textContent = layer.name;
+            select.appendChild(option);
+        });
+    },
+
 
     /**
      * Populate the "Other" layers dropdown
@@ -408,59 +570,95 @@ window.TripWeather.Managers.Layer = {
         const map = window.TripWeather.Managers.Map.getMap();
         if (!map) return;
 
-        // Calculate time
-        let validTime = new Date().toISOString().slice(0, 16); // Default to now
+        // Convert waypoint date/time to Date object
+        let targetDate = new Date(); // Default to now
         
         if (waypoint.date && waypoint.time) {
             const dateTimeStr = `${waypoint.date} ${waypoint.time}`;
-            const dateObj = new Date(dateTimeStr);
+            const parsedDate = new Date(dateTimeStr);
             
-            if (!isNaN(dateObj.getTime())) {
-                 validTime = dateObj.toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
+            if (!isNaN(parsedDate.getTime())) {
+                targetDate = parsedDate;
             }
         }
         
-        // Check if we already have an active layer for this configuration
-        if (this.activeLayer && this.activeLayer.wmsParams.layers === this.activeLayerConfig.layerId) {
-            // Same layer, just update params
-            console.log(`Updating existing layer ${this.activeLayerConfig.layerId} time to ${validTime}`);
-            this.activeLayer.setParams({ vtit: validTime });
-        } else {
-            // Different layer or no layer, create new
-            this.removeActiveLayer();
+        // Convert to UTC for comparison with valid times from backend
+        // The valid times from backend are in UTC format, so we need to compare with UTC time
+        const targetDateUTC = new Date(targetDate.getTime() + (targetDate.getTimezoneOffset() * 60000));
 
-            // Check cache first
-            const cacheKey = this.activeLayerConfig.layerId;
-            let layer = this.layerInstances[cacheKey];
+        // Fetch valid times for this layer
+        this.fetchValidTimes(this.activeLayerConfig.layerId)
+            .then(validTimes => {
+                if (!validTimes || validTimes.length === 0) {
+                    console.warn(`No valid times available for layer ${this.activeLayerConfig.layerId}`);
+                    window.TripWeather.Managers.UI.showToast(
+                        `No valid times available for this layer`,
+                        'warning'
+                    );
+                    return;
+                }
 
-            if (!layer) {
-                console.log(`Creating new WMS layer ${this.activeLayerConfig.layerId}`);
-                layer = new L.TileLayer.WMS.Retrying(this.wmsUrl, {
-                    layers: this.activeLayerConfig.layerId,
-                    format: 'image/png',
-                    transparent: true,
-                    version: '1.3.0',
-                    vtit: validTime,
-                    opacity: this.activeLayerConfig.opacity,
-                    attribution: 'National Weather Service',
-                    maxRetries: 10,
-                    retryDelay: 1000
-                });
-                this.layerInstances[cacheKey] = layer;
-            } else {
-                console.log(`Reusing cached layer ${this.activeLayerConfig.layerId}`);
-                layer.setParams({ vtit: validTime });
-            }
-            
-            this.activeLayer = layer;
-            this.activeLayer.addTo(map);
-        }
-        
-        // Update info display
-        if (window.TripWeather.Managers.WaypointRenderer && typeof window.TripWeather.Managers.WaypointRenderer.formatWaypointTime === 'function') {
-            const displayTime = window.TripWeather.Managers.WaypointRenderer.formatWaypointTime(waypoint, false);
-            this.updateLayerInfoDisplay(this.activeLayerConfig.name, displayTime);
-        }
+                // Find nearest valid time to target date (in UTC)
+                const nearestValidTime = this.findNearestValidTime(validTimes, targetDateUTC);
+                
+                if (!nearestValidTime) {
+                    console.warn(`Could not find a valid time for layer ${this.activeLayerConfig.layerId}`);
+                    return;
+                }
+
+                // Check if we already have an active layer for this configuration
+                if (this.activeLayer && this.activeLayer.wmsParams.layers === this.activeLayerConfig.layerId) {
+                    // Same layer, just update params
+                    console.log(`Updating existing layer ${this.activeLayerConfig.layerId} time to ${nearestValidTime}`);
+                    this.activeLayer.setParams({ vtit: nearestValidTime });
+                } else {
+                    // Different layer or no layer, create new
+                    this.removeActiveLayer();
+
+                    // Check cache first
+                    const cacheKey = this.activeLayerConfig.layerId;
+                    let layer = this.layerInstances[cacheKey];
+
+                    if (!layer) {
+                        console.log(`Creating new WMS layer ${this.activeLayerConfig.layerId}`);
+                        layer = new L.TileLayer.WMS.Retrying(this.wmsUrl, {
+                            layers: this.activeLayerConfig.layerId,
+                            format: 'image/png',
+                            transparent: true,
+                            version: '1.3.0',
+                            vtit: nearestValidTime,
+                            opacity: this.activeLayerConfig.opacity,
+                            attribution: 'National Weather Service',
+                            maxRetries: 10,
+                            retryDelay: 1000
+                        });
+                        this.layerInstances[cacheKey] = layer;
+                    } else {
+                        console.log(`Reusing cached layer ${this.activeLayerConfig.layerId}`);
+                        layer.setParams({ vtit: nearestValidTime });
+                    }
+                    
+                    this.activeLayer = layer;
+                    this.activeLayer.addTo(map);
+                }
+                
+                // Update info display with both waypoint time and actual valid time used
+                if (window.TripWeather.Managers.WaypointRenderer && typeof window.TripWeather.Managers.WaypointRenderer.formatWaypointTime === 'function') {
+                    const waypointDisplayTime = window.TripWeather.Managers.WaypointRenderer.formatWaypointTime(waypoint, false);
+                    
+                    this.updateLayerInfoDisplay(
+                        this.activeLayerConfig.name,
+                        `${waypointDisplayTime} (using: ${nearestValidTime} UTC)`
+                    );
+                }
+            })
+            .catch(error => {
+                console.error(`Error updating layer time:`, error);
+                window.TripWeather.Managers.UI.showToast(
+                    `Failed to update layer data: ${error.message}`,
+                    'error'
+                );
+            });
     },
 
 

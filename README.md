@@ -142,6 +142,10 @@ The application uses PostgreSQL with the following main entities:
 - `POST /api/routes` - Save a route
 - `GET /api/routes/{id}` - Load a route by ID
 - `GET /api/routes/search` - Search routes by name
+- `GET /api/wms/layers` - Get available WMS layers (returns layer name:title pairs)
+- `GET /api/wms/layer/validTimes?layerName=<layer name>` - Get valid times for a specific WMS layer
+- `GET /api/wms/layer/boundingBox?layerName=<layer name>` - Get bounding box for a specific WMS layer
+- `GET /api/wms/layer/resolutions?layerName=<layer name>` - Get resolutions for a specific WMS layer
 - `WMS: https://digital.weather.gov/ndfd/wms` - Weather map layers service
 
 ## Timezone Handling
@@ -173,12 +177,15 @@ Route calculation includes sophisticated timing features:
 The application provides interactive weather map layers from the National Weather Service:
 
 - **Weather Layers**: Temperature, precipitation probability, and wind speed overlays
-- **Time-based Data**: Layer data corresponds to arrival times at selected waypoints
+- **Dynamic Layer Discovery**: Automatically fetches available WMS layers from backend service
+- **Valid Time Integration**: Uses backend API to retrieve valid times for each layer and selects the nearest valid time to waypoint arrival
+- **Time-based Data**: Layer data corresponds to the nearest valid time to waypoint arrival times
 - **Interactive Selection**: Click waypoints to display weather data for that specific time
 - **Layer Control**: Dedicated layers control button in the map interface
-- **Extended Options**: Additional weather data types available through dropdown selection
+- **Extended Options**: Additional weather data types available through dropdown selection populated from backend
 - **Automatic Management**: Layers automatically show/hide based on waypoint selection
 - **Retry Mechanism**: Robust tile loading with exponential backoff for failed requests
+- **Caching**: Valid times are cached in memory to avoid repeated API calls
 
 ## Future Enhancements
 
@@ -226,7 +233,9 @@ The application provides interactive weather map layers from the National Weathe
 - The application supports both guest users and authenticated users
 - Route statistics are calculated from OpenRouteService elevation data
 - Map layers use National Weather Service WMS with retry mechanisms for reliability
-- Layer data is time-synchronized with waypoint arrival times
+- Layer data is synchronized with the nearest valid time to waypoint arrival times
+- WMS layers and valid times are dynamically fetched from backend services
+- Valid times are cached in memory to optimize performance and reduce API calls
 
 ## Troubleshooting
 
