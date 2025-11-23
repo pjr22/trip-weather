@@ -208,10 +208,11 @@
                 </div>
                 
                 <div class="other-layers-container">
-                    <select id="other-layer-select" class="layer-select">
-                        <option value="">-- Select a layer --</option>
-                    </select>
-                    <button id="other-layer-btn" class="modal-btn primary small-btn">Apply</button>
+                    <div class="searchable-combo-container">
+                        <input type="text" id="other-layer-input" class="layer-search-input" placeholder="Type to search layers..." autocomplete="off">
+                        <button id="other-layer-btn" class="modal-btn primary small-btn">Apply</button>
+                        <div id="layer-search-results" class="layer-search-results" style="display: none;"></div>
+                    </div>
                 </div>
             </div>
         </div>

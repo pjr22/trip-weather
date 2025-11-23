@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -198,11 +199,11 @@ public class WMSCapabilitiesService {
     }
 
     public Map<String, String> getLayerNames() {
-        return layerCapabilities.entrySet().stream()
-            .collect(Collectors.toMap(
-                Map.Entry::getKey,
-                entry -> entry.getValue().getLayerTitle()
-            ));
+        Map<String, String> layers = new TreeMap<>();        
+        layerCapabilities.entrySet().stream().forEach(entry ->
+              layers.put(entry.getKey(), entry.getValue().getLayerDescription()));
+
+        return layers;
     }
 
     public BoundingBox getLayerBoundingBox(String layerName) {

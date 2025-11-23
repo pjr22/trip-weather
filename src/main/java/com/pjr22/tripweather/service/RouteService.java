@@ -63,6 +63,7 @@ public class RouteService {
                   .uri(SNAP_ENDPOINT)
                   .body(body)
                   .header("Authorization", apiKey)
+                  .header("Accepts", "application/json")
                   .retrieve()
                   .toEntity(LocationData.class)
                   .getBody();
@@ -121,7 +122,8 @@ public class RouteService {
          JsonNode response = restClient.post()
                .uri(DIRECTIONS_ENDPOINT)
                .header("Authorization", apiKey)
-               .header("Content-Type", "application/json")               
+               .header("Content-Type", "application/json")
+               .header("Accepts", "application/json")
                .body(requestBody)
                .retrieve()
                .body(JsonNode.class);

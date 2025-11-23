@@ -36,6 +36,10 @@ window.TripWeather.Managers.Layer = {
     // Cache for valid times to avoid repeated API calls
     validTimesCache: {},
 
+    // Available layers from backend for searchable combo
+    availableLayers: {},
+    selectedLayerId: null,
+
     /**
      * Initialize layer manager
      */
@@ -233,15 +237,34 @@ window.TripWeather.Managers.Layer = {
                 });
             });
 
-            // Other layer dropdown
-            const otherLayerSelect = document.getElementById('other-layer-select');
+            // Other layer searchable combo
+            const otherLayerInput = document.getElementById('other-layer-input');
             const otherLayerBtn = document.getElementById('other-layer-btn');
-            if (otherLayerBtn && otherLayerSelect) {
+            const layerSearchResults = document.getElementById('layer-search-results');
+            
+            if (otherLayerInput && otherLayerBtn && layerSearchResults) {
+                // Search input event
+                otherLayerInput.addEventListener('input', (e) => {
+                    this.handleLayerSearch(e.target.value);
+                });
+
+                // Apply button event
                 otherLayerBtn.addEventListener('click', () => {
-                    const layerId = otherLayerSelect.value;
-                    if (layerId) {
-                        this.selectCustomLayer(layerId);
+                    if (this.selectedLayerId) {
+                        this.selectCustomLayer(this.selectedLayerId);
                         this.hideLayersModal();
+                    }
+                });
+
+                // Keyboard navigation
+                otherLayerInput.addEventListener('keydown', (e) => {
+                    this.handleSearchKeydown(e);
+                });
+
+                // Close search results when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!e.target.closest('.searchable-combo-container')) {
+                        layerSearchResults.style.display = 'none';
                     }
                 });
             }
@@ -262,6 +285,7 @@ window.TripWeather.Managers.Layer = {
             })
             .then(data => {
                 console.log('Available WMS layers:', data);
+                self.availableLayers = data;
                 self.populateOtherLayersDropdown(data);
             })
             .catch(error => {
@@ -336,41 +360,16 @@ window.TripWeather.Managers.Layer = {
      * Populate "Other" layers dropdown with data from backend
      */
     populateOtherLayersDropdown: function(layersData) {
-        const select = document.getElementById('other-layer-select');
-        if (!select) return;
-
-        // Clear existing options except the first one
-        while (select.children.length > 1) {
-            select.removeChild(select.lastChild);
-        }
-
-        // Add layers from backend
-        for (const [layerId, layerTitle] of Object.entries(layersData)) {
-            // Skip the main layers that already have dedicated buttons
-            if (layerId === 'ndfd.conus.t' || layerId === 'ndfd.conus.pop12' || layerId === 'ndfd.conus.windspd') {
-                continue;
-            }
-            
-            const option = document.createElement('option');
-            option.value = layerId;
-            option.textContent = layerTitle;
-            select.appendChild(option);
-        }
+        // This method is kept for compatibility but the searchable combo
+        // will use the availableLayers data directly
+        console.log('Layers data loaded for searchable combo:', layersData);
     },
 
     /**
      * Fallback method to populate dropdown with hardcoded layers
      */
     populateFallbackLayers: function() {
-        const select = document.getElementById('other-layer-select');
-        if (!select) return;
-
-        // Clear existing options except the first one
-        while (select.children.length > 1) {
-            select.removeChild(select.lastChild);
-        }
-
-        // Common useful layers from NDFD (fallback)
+        // Convert fallback layers to the format expected by searchable combo
         const fallbackLayers = [
             { id: 'ndfd.conus.apparentt', name: 'Apparent Temperature' },
             { id: 'ndfd.conus.apparentt.points', name: 'Apparent Temperature (Points)' },
@@ -395,12 +394,13 @@ window.TripWeather.Managers.Layer = {
             { id: 'ndfd.conus.hazards', name: 'Hazards' }
         ];
 
+        const fallbackData = {};
         fallbackLayers.forEach(layer => {
-            const option = document.createElement('option');
-            option.value = layer.id;
-            option.textContent = layer.name;
-            select.appendChild(option);
+            fallbackData[layer.id] = layer.name;
         });
+        
+        this.availableLayers = fallbackData;
+        console.log('Using fallback layers for searchable combo');
     },
 
 
@@ -692,6 +692,152 @@ window.TripWeather.Managers.Layer = {
         const modal = document.getElementById('layers-modal');
         if (modal) {
             modal.style.display = 'none';
+        }
+        // Clear search when modal is hidden
+        const searchInput = document.getElementById('other-layer-input');
+        const searchResults = document.getElementById('layer-search-results');
+        if (searchInput) {
+            searchInput.value = '';
+        }
+        if (searchResults) {
+            searchResults.style.display = 'none';
+        }
+        this.selectedLayerId = null;
+    },
+
+    /**
+     * Handle layer search input
+     * @param {string} query - Search query
+     */
+    handleLayerSearch: function(query) {
+        const searchResults = document.getElementById('layer-search-results');
+        if (!searchResults) return;
+
+        // Clear previous results
+        searchResults.innerHTML = '';
+        this.selectedLayerId = null;
+
+        if (!query.trim()) {
+            searchResults.style.display = 'none';
+            return;
+        }
+
+        const queryLower = query.toLowerCase();
+        const matches = [];
+
+        // Search through available layers
+        for (const [layerId, layerTitle] of Object.entries(this.availableLayers)) {
+            // Skip the main layers that already have dedicated buttons
+            if (layerId === 'ndfd.conus.t' || layerId === 'ndfd.conus.pop12' || layerId === 'ndfd.conus.windspd') {
+                continue;
+            }
+
+            const titleLower = layerTitle.toLowerCase();
+            const idLower = layerId.toLowerCase();
+            
+            if (titleLower.includes(queryLower) || idLower.includes(queryLower)) {
+                matches.push({ id: layerId, title: layerTitle });
+            }
+        }
+
+        if (matches.length === 0) {
+            searchResults.innerHTML = '<div class="layer-search-no-results">No layers found</div>';
+        } else {
+            matches.forEach(match => {
+                const item = document.createElement('div');
+                item.className = 'layer-search-result-item';
+                item.innerHTML = `
+                    <div>${match.title}</div>
+                    <div class="layer-id">${match.id}</div>
+                `;
+                item.addEventListener('click', () => {
+                    this.selectLayerFromSearch(match.id, match.title);
+                });
+                searchResults.appendChild(item);
+            });
+        }
+
+        searchResults.style.display = 'block';
+    },
+
+    /**
+     * Handle keyboard navigation in search results
+     * @param {KeyboardEvent} e - Keyboard event
+     */
+    handleSearchKeydown: function(e) {
+        const searchResults = document.getElementById('layer-search-results');
+        if (!searchResults || searchResults.style.display === 'none') return;
+
+        const items = searchResults.querySelectorAll('.layer-search-result-item');
+        if (items.length === 0) return;
+
+        let selectedIndex = -1;
+        items.forEach((item, index) => {
+            if (item.classList.contains('selected')) {
+                selectedIndex = index;
+            }
+        });
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                this.updateSearchSelection(items, selectedIndex);
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, 0);
+                this.updateSearchSelection(items, selectedIndex);
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (selectedIndex >= 0) {
+                    const selectedItem = items[selectedIndex];
+                    const layerId = selectedItem.querySelector('.layer-id').textContent;
+                    const layerTitle = selectedItem.querySelector('div').textContent;
+                    this.selectLayerFromSearch(layerId, layerTitle);
+                }
+                break;
+            case 'Escape':
+                searchResults.style.display = 'none';
+                break;
+        }
+    },
+
+    /**
+     * Update search selection highlight
+     * @param {NodeList} items - Search result items
+     * @param {number} selectedIndex - Index of selected item
+     */
+    updateSearchSelection: function(items, selectedIndex) {
+        items.forEach((item, index) => {
+            if (index === selectedIndex) {
+                item.classList.add('selected');
+                // Scroll into view if needed
+                item.scrollIntoView({ block: 'nearest' });
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+    },
+
+    /**
+     * Select a layer from search results
+     * @param {string} layerId - Layer ID
+     * @param {string} layerTitle - Layer title
+     */
+    selectLayerFromSearch: function(layerId, layerTitle) {
+        const searchInput = document.getElementById('other-layer-input');
+        const searchResults = document.getElementById('layer-search-results');
+        
+        if (searchInput) {
+            searchInput.value = layerTitle;
+        }
+        
+        this.selectedLayerId = layerId;
+        
+        if (searchResults) {
+            searchResults.style.display = 'none';
         }
     }
 };
