@@ -13,6 +13,7 @@ window.TripWeather.Managers.Layer = {
     activeLayerName: null,
     activeLayer: null,
     selectedWaypointSequence: null,
+    lastWaypointForLayer: null, // Track the last waypoint used for layer display
     
     // Available layers
     layers: {
@@ -470,7 +471,7 @@ window.TripWeather.Managers.Layer = {
         const marker = e.popup._source;
         if (marker && marker.waypointSequence === this.selectedWaypointSequence) {
             this.selectedWaypointSequence = null;
-            this.hideActiveLayer(); // Requirement: hide layer if no waypoint selected
+            // Don't hide the layer - keep it showing data from the last selected waypoint
         }
     },
 
@@ -482,6 +483,7 @@ window.TripWeather.Managers.Layer = {
         if (layerKey === 'none') {
             this.activeLayerName = null;
             this.activeLayerConfig = null; // Clear config too
+            this.lastWaypointForLayer = null; // Clear the last waypoint too
             this.removeActiveLayer();
             window.TripWeather.Managers.UI.showToast('Layer removed', 'info');
             
@@ -496,9 +498,14 @@ window.TripWeather.Managers.Layer = {
         if (this.layers[layerKey]) {
             this.activeLayerName = layerKey;
             this.activeLayerConfig = this.layers[layerKey];
+            
             // If a waypoint is already selected, show the layer immediately
             if (this.selectedWaypointSequence) {
                 this.updateLayerForSelectedWaypoint();
+                window.TripWeather.Managers.UI.showToast(`Selected layer: ${this.layers[layerKey].name}`, 'info');
+            } else if (this.lastWaypointForLayer) {
+                // If no waypoint is selected but we have a last waypoint, use that
+                this.updateLayerTime(this.lastWaypointForLayer);
                 window.TripWeather.Managers.UI.showToast(`Selected layer: ${this.layers[layerKey].name}`, 'info');
             } else {
                 window.TripWeather.Managers.UI.showToast(`${this.layers[layerKey].name} layer selected. Select a waypoint to view data.`, 'info');
@@ -521,6 +528,10 @@ window.TripWeather.Managers.Layer = {
         if (this.selectedWaypointSequence) {
             this.updateLayerForSelectedWaypoint();
             window.TripWeather.Managers.UI.showToast(`Selected layer: ${layerId}`, 'info');
+        } else if (this.lastWaypointForLayer) {
+            // If no waypoint is selected but we have a last waypoint, use that
+            this.updateLayerTime(this.lastWaypointForLayer);
+            window.TripWeather.Managers.UI.showToast(`Selected layer: ${layerId}`, 'info');
         } else {
             window.TripWeather.Managers.UI.showToast(`${layerId} layer selected. Select a waypoint to view data.`, 'info');
         }
@@ -535,6 +546,8 @@ window.TripWeather.Managers.Layer = {
         const waypoint = window.TripWeather.Managers.Waypoint.getWaypoint(this.selectedWaypointSequence);
         if (!waypoint) return;
 
+        // Store this waypoint as the last one used for layer display
+        this.lastWaypointForLayer = waypoint;
         this.updateLayerTime(waypoint);
     },
 
@@ -563,8 +576,8 @@ window.TripWeather.Managers.Layer = {
      * @param {object} waypoint - Waypoint object
      */
     updateLayerTime: function(waypoint) {
-        // If this isn't the selected waypoint, ignore
-        if (waypoint.sequence !== this.selectedWaypointSequence) return;
+        // Update if this is the selected waypoint OR if we're updating with the last stored waypoint
+        if (waypoint.sequence !== this.selectedWaypointSequence && waypoint !== this.lastWaypointForLayer) return;
         if (!this.activeLayerName || !this.activeLayerConfig) return;
 
         const map = window.TripWeather.Managers.Map.getMap();
