@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.pjr22.tripweather.model.BoundingBox;
 import com.pjr22.tripweather.model.CapabilitiesData;
@@ -34,12 +35,17 @@ public class WMSCapabilitiesService {
 
     private Map<String, CapabilitiesData> layerCapabilities = new HashMap<>();
     private Map<String, List<Double>> layerResolutions = new HashMap<>();
+    private Map<String, String> layerDescriptions = new HashMap<>();
     private static final String CAPABILITIES_FILE = "conus_capabilities.xml";
+    private static final String LAYER_DESCRIPTIONS_FILE = "ndfd.conus_layer_descriptions.json";
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
 
     @PostConstruct
     public void initialize() {
         try {
+            // Load layer descriptions first
+            loadLayerDescriptions();
+            
             log.info("Loading WMS capabilities from {}", CAPABILITIES_FILE);
             InputStream inputStream = getClass().getClassLoader().getResourceAsStream(CAPABILITIES_FILE);
             
@@ -121,8 +127,8 @@ public class WMSCapabilitiesService {
             String layerName = layerNode.path("Name").asText();
             String layerTitle = layerNode.path("Title").asText();
             
-            // Use title as description for now
-            String layerDescription = layerTitle;
+            // Use description from JSON file if available, otherwise fall back to title
+            String layerDescription = layerDescriptions.getOrDefault(layerName, layerTitle);
             
             // Parse SRS values
             List<String> srsValues = new ArrayList<>();
@@ -285,6 +291,33 @@ public class WMSCapabilitiesService {
         } catch (Exception e) {
             log.warn("Could not calculate time interval for layer {}", layerName, e);
             return 60;
+        }
+    }
+    
+    private void loadLayerDescriptions() {
+        try {
+            log.info("Loading layer descriptions from {}", LAYER_DESCRIPTIONS_FILE);
+            InputStream inputStream = getClass().getClassLoader().getResourceAsStream(LAYER_DESCRIPTIONS_FILE);
+            
+            if (inputStream == null) {
+                log.error("Could not find {}", LAYER_DESCRIPTIONS_FILE);
+                return;
+            }
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(inputStream);
+            
+            // Parse the JSON object and populate the layerDescriptions map
+            rootNode.fields().forEachRemaining(entry -> {
+                String layerName = entry.getKey();
+                String description = entry.getValue().asText();
+                layerDescriptions.put(layerName, description);
+            });
+            
+            log.info("Successfully loaded {} layer descriptions", layerDescriptions.size());
+            
+        } catch (Exception e) {
+            log.error("Error loading layer descriptions", e);
         }
     }
 }
