@@ -23,8 +23,8 @@ window.TripWeather.Managers.Layer = {
             opacity: 0.6
         },
         'precipitation': {
-            name: 'Chance of Precipitation',
-            layerId: 'ndfd.conus.pop12',
+            name: 'General Weather Conditions',
+            layerId: 'ndfd.conus.wx',
             opacity: 0.6
         },
         'wind': {
@@ -741,9 +741,9 @@ window.TripWeather.Managers.Layer = {
         // Search through available layers
         for (const [layerId, layerTitle] of Object.entries(this.availableLayers)) {
             // Skip the main layers that already have dedicated buttons
-            if (layerId === 'ndfd.conus.t' || layerId === 'ndfd.conus.pop12' || layerId === 'ndfd.conus.windspd') {
-                continue;
-            }
+            // if (layerId === 'ndfd.conus.t' || layerId === 'ndfd.conus.pop12' || layerId === 'ndfd.conus.windspd') {
+            //     continue;
+            // }
 
             const titleLower = layerTitle.toLowerCase();
             const idLower = layerId.toLowerCase();
