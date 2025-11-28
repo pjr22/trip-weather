@@ -1,0 +1,17 @@
+#!/bin/bash
+
+FORMAT=geojson
+API_KEY=`cat developer.nrel.gov_api_key.txt`
+FUEL_TYPE=ELEC
+STATUS=E
+ACCESS=public
+EV_NETWORK='Electrify%20America'
+STATE=UT
+EV_CHARGING_LEVEL=dc_fast
+EV_CONNECTOR_TYPE=J1772COMBO
+ZIP=84654
+LIMIT=1
+
+URL="https://developer.nrel.gov/api/alt-fuel-stations/v1.${FORMAT}?api_key=${API_KEY}&fuel_type=${FUEL_TYPE}&status=${STATUS}&access=${ACCESS}&ev_network=${EV_NETWORK}&ev_charging_level=${EV_CHARGING_LEVEL}&ev_connector_type=${EV_CONNECTOR_TYPE}&state=${STATE}&zip=${ZIP}&limit=${LIMIT}"
+
+curl -s "$URL"
