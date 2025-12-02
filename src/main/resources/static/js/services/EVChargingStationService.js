@@ -22,7 +22,7 @@ window.TripWeather.Services.EVChargingStation = {
         // Default parameters for EV charging search
         const defaultParams = {
             format: 'geojson',
-            distance: 0.5,
+            distance: 1.0,
             fuel_type: 'ELEC',
             status: 'E',
             access: 'public',

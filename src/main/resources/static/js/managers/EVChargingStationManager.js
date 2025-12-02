@@ -229,44 +229,91 @@ window.TripWeather.Managers.EVChargingStation = {
             return;
         }
         
-        // Create location info object
-        const locationInfo = {
-            locationName: station.name,
-            timezoneName: '',
-            timezoneStdOffset: '',
-            timezoneDstOffset: '',
-            timezoneStdAbbr: '',
-            timezoneDstAbbr: ''
-        };
+        const self = this;
         
-        // Add waypoint using WaypointManager
-        if (window.TripWeather.Managers.Waypoint) {
-            const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(
-                station.latitude,
-                station.longitude,
-                0, // Elevation (not available from EV API)
-                locationInfo,
-                null, // No existing waypoint object
-                false // Perform validation
-            );
-            
-            if (waypoint) {
-                // Close any open popups
-                this.stationMarkers.forEach(function(marker) {
-                    marker.closePopup();
-                });
+        // First, try to get timezone information using reverse geocoding
+        window.TripWeather.Services.Location.reverseGeocode(station.latitude, station.longitude)
+            .then(function(locationInfo) {
+                // Create location info object with timezone data
+                const completeLocationInfo = {
+                    locationName: station.name,
+                    timezoneName: locationInfo.timezoneName || '',
+                    timezoneStdOffset: locationInfo.timezoneStdOffset || '',
+                    timezoneDstOffset: locationInfo.timezoneDstOffset || '',
+                    timezoneStdAbbr: locationInfo.timezoneStdAbbr || '',
+                    timezoneDstAbbr: locationInfo.timezoneDstAbbr || ''
+                };
                 
-                // Open popup for the newly added waypoint
-                if (window.TripWeather.Managers.WaypointRenderer) {
-                    window.TripWeather.Managers.WaypointRenderer.openWaypointPopup(waypoint.sequence);
+                // Add waypoint using WaypointManager with complete location info
+                if (window.TripWeather.Managers.Waypoint) {
+                    const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(
+                        station.latitude,
+                        station.longitude,
+                        0, // Elevation (not available from EV API)
+                        completeLocationInfo,
+                        null, // No existing waypoint object
+                        false // Perform validation
+                    );
+                    
+                    if (waypoint) {
+                        // Close any open popups
+                        self.stationMarkers.forEach(function(marker) {
+                            marker.closePopup();
+                        });
+                        
+                        // Open popup for the newly added waypoint
+                        if (window.TripWeather.Managers.WaypointRenderer) {
+                            window.TripWeather.Managers.WaypointRenderer.openWaypointPopup(waypoint.sequence);
+                        }
+                        
+                        window.TripWeather.Managers.UI.showToast(`Added "${station.name}" to waypoints`, 'success');
+                    }
+                } else {
+                    console.error('WaypointManager not available');
+                    window.TripWeather.Managers.UI.showToast('Unable to add waypoint. Please try again.', 'error');
                 }
+            })
+            .catch(function(error) {
+                console.warn('Failed to get timezone info for EV charging station:', error);
                 
-                window.TripWeather.Managers.UI.showToast(`Added "${station.name}" to waypoints`, 'success');
-            }
-        } else {
-            console.error('WaypointManager not available');
-            window.TripWeather.Managers.UI.showToast('Unable to add waypoint. Please try again.', 'error');
-        }
+                // Fallback: create waypoint without timezone info
+                const fallbackLocationInfo = {
+                    locationName: station.name,
+                    timezoneName: '',
+                    timezoneStdOffset: '',
+                    timezoneDstOffset: '',
+                    timezoneStdAbbr: '',
+                    timezoneDstAbbr: ''
+                };
+                
+                if (window.TripWeather.Managers.Waypoint) {
+                    const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(
+                        station.latitude,
+                        station.longitude,
+                        0, // Elevation (not available from EV API)
+                        fallbackLocationInfo,
+                        null, // No existing waypoint object
+                        false // Perform validation
+                    );
+                    
+                    if (waypoint) {
+                        // Close any open popups
+                        self.stationMarkers.forEach(function(marker) {
+                            marker.closePopup();
+                        });
+                        
+                        // Open popup for the newly added waypoint
+                        if (window.TripWeather.Managers.WaypointRenderer) {
+                            window.TripWeather.Managers.WaypointRenderer.openWaypointPopup(waypoint.sequence);
+                        }
+                        
+                        window.TripWeather.Managers.UI.showToast(`Added "${station.name}" to waypoints (timezone unavailable)`, 'warning');
+                    }
+                } else {
+                    console.error('WaypointManager not available');
+                    window.TripWeather.Managers.UI.showToast('Unable to add waypoint. Please try again.', 'error');
+                }
+            });
     },
     
     /**
