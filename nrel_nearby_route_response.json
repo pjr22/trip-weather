@@ -1,0 +1,4341 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "station_locator_url": "https://afdc.energy.gov/stations/",
+    "total_results": 81,
+    "station_counts": {
+      "total": 187,
+      "fuels": {
+        "BD": {
+          "total": 0
+        },
+        "E85": {
+          "total": 0
+        },
+        "ELEC": {
+          "total": 187,
+          "stations": {
+            "total": 81
+          }
+        },
+        "HY": {
+          "total": 0
+        },
+        "LNG": {
+          "total": 0
+        },
+        "CNG": {
+          "total": 0
+        },
+        "LPG": {
+          "total": 0
+        },
+        "RD": {
+          "total": 0
+        }
+      }
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.96206,
+          39.57924
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 216615,
+        "maximum_vehicle_class": null,
+        "open_date": "2022-05-06",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "Regency Cherrywood SC (Centennial, CO)",
+        "station_phone": "833-632-2778",
+        "updated_at": "2025-12-02T03:24:59Z",
+        "geocode_status": "GPS",
+        "city": "Centennial",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "7575 S University Blvd",
+        "zip": "80122",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 4,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "Electrify America",
+        "ev_network_web": "https://www.electrifyamerica.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "210486"
+          ],
+          "posts": [
+            "210486-01",
+            "210486-02",
+            "210486-03",
+            "210486-04"
+          ]
+        },
+        "distance": 4.0389,
+        "distance_km": 6.49998
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.988404,
+          39.61241
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-01",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 416895,
+        "maximum_vehicle_class": null,
+        "open_date": "2025-07-25",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "Littleton Square",
+        "station_phone": "877-455-3833",
+        "updated_at": "2025-12-02T00:00:35Z",
+        "geocode_status": "GPS",
+        "city": "Littleton",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "100 W Littleton Blvd",
+        "zip": "80120",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "CHADEMO",
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 4,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "eVgo Network",
+        "ev_network_web": "https://www.evgo.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "eVgo Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 100.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 100.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "eVgo Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 100.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 100.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "eVgo Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 100.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "eVgo Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 100.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "81489"
+          ],
+          "posts": [
+            "519451",
+            "519453",
+            "519455",
+            "519457"
+          ]
+        },
+        "distance": 4.47611,
+        "distance_km": 7.2036
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.902229,
+          39.651556
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 416946,
+        "maximum_vehicle_class": null,
+        "open_date": "2025-07-25",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "Whole Foods Tamarac",
+        "station_phone": "877-455-3833",
+        "updated_at": "2025-12-02T00:01:15Z",
+        "geocode_status": "GPS",
+        "city": "Denver",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "7400 E Hampden Ave",
+        "zip": "80231",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "CHADEMO",
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 4,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "eVgo Network",
+        "ev_network_web": "https://www.evgo.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "eVgo Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 100.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 100.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "eVgo Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 100.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 100.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "eVgo Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "eVgo Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "81543"
+          ],
+          "posts": [
+            "519560",
+            "519562",
+            "519564",
+            "519565"
+          ]
+        },
+        "distance": 1.93418,
+        "distance_km": 3.11276
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.913944,
+          39.679047
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 331248,
+        "maximum_vehicle_class": null,
+        "open_date": "2024-03-28",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "QT CHARGERS 4221-STATION 2",
+        "station_phone": "888-758-4389",
+        "updated_at": "2025-12-02T02:28:07Z",
+        "geocode_status": "GPS",
+        "city": "Denver",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "6447 E Evans Ave",
+        "zip": "80222",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "CHADEMO",
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 1,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "ChargePoint Network",
+        "ev_network_web": "https://www.chargepoint.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "ChargePoint Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 250.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 250.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "USCPIL15658701"
+          ],
+          "posts": [
+            "25250151"
+          ]
+        },
+        "distance": 3.885,
+        "distance_km": 6.2523
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.913853,
+          39.679045
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 331249,
+        "maximum_vehicle_class": null,
+        "open_date": "2024-03-28",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "QT CHARGERS 4221-STATION 1",
+        "station_phone": "888-758-4389",
+        "updated_at": "2025-12-02T02:28:07Z",
+        "geocode_status": "GPS",
+        "city": "Denver",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "6447 E Evans Ave",
+        "zip": "80222",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "CHADEMO",
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 1,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "ChargePoint Network",
+        "ev_network_web": "https://www.chargepoint.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "ChargePoint Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 250.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 250.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "USCPIL15658721"
+          ],
+          "posts": [
+            "25250171"
+          ]
+        },
+        "distance": 3.88419,
+        "distance_km": 6.251
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.862544,
+          39.666657
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": "A D Debit M V",
+        "date_last_confirmed": "2025-07-03",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 398468,
+        "maximum_vehicle_class": "LD",
+        "open_date": "2025-06-13",
+        "owner_type_code": "P",
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": "SHOPPING_CENTER",
+        "station_name": "H Mart - Tesla Supercharger",
+        "station_phone": "877-798-3752",
+        "updated_at": "2025-07-03T19:15:09Z",
+        "geocode_status": "GPS",
+        "city": "Aurora",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "2751 S Parker Rd",
+        "zip": "80014",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "J1772COMBO",
+          "TESLA"
+        ],
+        "ev_dc_fast_num": 16,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "Tesla",
+        "ev_network_web": "https://www.tesla.com/supercharger",
+        "ev_other_evse": null,
+        "ev_pricing": "$0.49 per kWh",
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "Tesla",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": 325.0,
+                "port_count": 16
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 325.0,
+                "port_count": 16
+              }
+            },
+            "port_count": 16,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "distance": 3.65435,
+        "distance_km": 5.88111
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.885,
+          39.6258
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 279324,
+        "maximum_vehicle_class": null,
+        "open_date": "2023-06-22",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "Regency Belleview Square (Greenwood Village, CO)",
+        "station_phone": "833-632-2778",
+        "updated_at": "2025-12-02T03:25:17Z",
+        "geocode_status": "GPS",
+        "city": "Greenwood Village",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "4910 S Yosemit Street",
+        "zip": "80111",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 6,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "Electrify America",
+        "ev_network_web": "https://www.electrifyamerica.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "240220"
+          ],
+          "posts": [
+            "240220-01",
+            "240220-02",
+            "240220-03",
+            "240220-04",
+            "240220-05",
+            "240220-06"
+          ]
+        },
+        "distance": 0.87276,
+        "distance_km": 1.40457
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.809522,
+          39.638854
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 372755,
+        "maximum_vehicle_class": null,
+        "open_date": "2024-12-11",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "GPM INVESTMENTS 4581 DC2",
+        "station_phone": "888-758-4389",
+        "updated_at": "2025-12-02T02:40:20Z",
+        "geocode_status": "GPS",
+        "city": "Aurora",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "15303 E Quincy Ave",
+        "zip": "80015",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "CHADEMO",
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 1,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "ChargePoint Network",
+        "ev_network_web": "https://www.chargepoint.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "ChargePoint Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 320.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 320.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "USCPIL16724681"
+          ],
+          "posts": [
+            "26522971"
+          ]
+        },
+        "distance": 4.88642,
+        "distance_km": 7.86393
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.809493,
+          39.638852
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 372394,
+        "maximum_vehicle_class": null,
+        "open_date": "2024-12-05",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "GPM INVESTMENTS 4581 DC1",
+        "station_phone": "888-758-4389",
+        "updated_at": "2025-12-02T02:20:57Z",
+        "geocode_status": "GPS",
+        "city": "Aurora",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "15303 E Quincy Ave",
+        "zip": "80015",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "CHADEMO",
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 1,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "ChargePoint Network",
+        "ev_network_web": "https://www.chargepoint.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "ChargePoint Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 320.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 320.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "USCPIL14200831"
+          ],
+          "posts": [
+            "23688101"
+          ]
+        },
+        "distance": 4.88777,
+        "distance_km": 7.8661
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.88263,
+          39.59369
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 170200,
+        "maximum_vehicle_class": null,
+        "open_date": "2020-12-16",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "Target T0147- Englewood, CO",
+        "station_phone": "833-632-2778",
+        "updated_at": "2025-12-02T03:26:17Z",
+        "geocode_status": "GPS",
+        "city": "Englewood",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "6767 S. Clinton St.",
+        "zip": "80112",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "J1772",
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 3,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": 1,
+        "ev_network": "Electrify America",
+        "ev_network_web": "https://www.electrifyamerica.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 150.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 150.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 150.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": 7.0,
+                "port_count": 1
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": null,
+                "port_count": 0
+              }
+            },
+            "port_count": 1,
+            "charging_level": "2",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "200024"
+          ],
+          "posts": [
+            "200024-01",
+            "200024-02",
+            "200024-03",
+            "200024-50"
+          ]
+        },
+        "distance": 0.08549,
+        "distance_km": 0.13758
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.87253,
+          39.59426
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "Dealership business hours",
+        "access_detail_code": "CALL",
+        "cards_accepted": null,
+        "date_last_confirmed": "2024-02-12",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public - Call ahead",
+        "id": 46524,
+        "maximum_vehicle_class": "LD",
+        "open_date": "2012-01-31",
+        "owner_type_code": "P",
+        "related_stations": [
+          {
+            "id": 46525,
+            "access_code": "private",
+            "fuel_type_code": "ELEC"
+          }
+        ],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": "CAR_DEALER",
+        "station_name": "Larry H Miller Nissan - Arapahoe",
+        "station_phone": "303-790-7333  855-900-7584",
+        "updated_at": "2025-02-12T00:16:32Z",
+        "geocode_status": "200-8",
+        "city": "Centennial",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "10030 E Arapahoe Rd",
+        "zip": "80112",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "CHADEMO",
+          "J1772",
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 1,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": 2,
+        "ev_network": "Non-Networked",
+        "ev_network_web": null,
+        "ev_other_evse": null,
+        "ev_pricing": "Free",
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public - Appeler à l'avance",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "Non-Networked",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 1
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": null,
+                "port_count": 0
+              }
+            },
+            "port_count": 1,
+            "charging_level": "2",
+            "funding_sources": []
+          },
+          {
+            "network": "Non-Networked",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 1
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": null,
+                "port_count": 0
+              }
+            },
+            "port_count": 1,
+            "charging_level": "2",
+            "funding_sources": []
+          },
+          {
+            "network": "Non-Networked",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 50.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 50.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "distance": 0.59069,
+        "distance_km": 0.95062
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.81337,
+          39.6136
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 190430,
+        "maximum_vehicle_class": null,
+        "open_date": "2021-05-30",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "Walmart 1689 (Aurora, CO)",
+        "station_phone": "833-632-2778",
+        "updated_at": "2025-12-02T03:25:33Z",
+        "geocode_status": "GPS",
+        "city": "Aurora",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "5650 S Chambers Rd",
+        "zip": "80015",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 4,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "Electrify America",
+        "ev_network_web": "https://www.electrifyamerica.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "210134"
+          ],
+          "posts": [
+            "210134-01",
+            "210134-02",
+            "210134-03",
+            "210134-04"
+          ]
+        },
+        "distance": 3.99616,
+        "distance_km": 6.4312
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.8289455,
+          39.5914691
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 204795,
+        "maximum_vehicle_class": null,
+        "open_date": "2021-08-01",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "Winn-Marion HQ",
+        "station_phone": "949-945-2000",
+        "updated_at": "2025-12-02T04:38:22Z",
+        "geocode_status": "GPS",
+        "city": "Centennial",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "7151 South Blackhawk Street",
+        "zip": "80112",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "J1772",
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 2,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": 6,
+        "ev_network": "EVGATEWAY",
+        "ev_network_web": "https://evgateway.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "EVGATEWAY",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 120.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "EVGATEWAY",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 120.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "EVGATEWAY",
+            "connectors": {
+              "J1772": {
+                "power_kw": 9.6,
+                "port_count": 1
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": null,
+                "port_count": 0
+              }
+            },
+            "port_count": 1,
+            "charging_level": "2",
+            "funding_sources": []
+          },
+          {
+            "network": "EVGATEWAY",
+            "connectors": {
+              "J1772": {
+                "power_kw": 9.6,
+                "port_count": 1
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": null,
+                "port_count": 0
+              }
+            },
+            "port_count": 1,
+            "charging_level": "2",
+            "funding_sources": []
+          },
+          {
+            "network": "EVGATEWAY",
+            "connectors": {
+              "J1772": {
+                "power_kw": 16.6,
+                "port_count": 1
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": null,
+                "port_count": 0
+              }
+            },
+            "port_count": 1,
+            "charging_level": "2",
+            "funding_sources": []
+          },
+          {
+            "network": "EVGATEWAY",
+            "connectors": {
+              "J1772": {
+                "power_kw": 9.6,
+                "port_count": 1
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": null,
+                "port_count": 0
+              }
+            },
+            "port_count": 1,
+            "charging_level": "2",
+            "funding_sources": []
+          },
+          {
+            "network": "EVGATEWAY",
+            "connectors": {
+              "J1772": {
+                "power_kw": 16.6,
+                "port_count": 1
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": null,
+                "port_count": 0
+              }
+            },
+            "port_count": 1,
+            "charging_level": "2",
+            "funding_sources": []
+          },
+          {
+            "network": "EVGATEWAY",
+            "connectors": {
+              "J1772": {
+                "power_kw": 16.6,
+                "port_count": 1
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": null,
+                "port_count": 0
+              }
+            },
+            "port_count": 1,
+            "charging_level": "2",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "26e2a055-40ea-48ac-bf54-174143e9d87b"
+          ],
+          "posts": [
+            "0a46e622-5976-4df4-928c-51d70971ca0b",
+            "0e2bcde7-7888-4e72-a6fc-c2cdc65579f2",
+            "3b8948c5-f065-4422-b2c2-4c888f6c9b66",
+            "3c504911-dbd2-4bd9-a62f-e67a4b0cd5d7",
+            "5f1d531a-ae7e-402a-a7be-954695f6aa12",
+            "64745b12-1cf7-422a-b0b3-83b34ccdbcfb",
+            "7bce7a60-d809-4f75-af21-574b731eae35",
+            "f1e94e43-87c6-401e-96db-f9a7543b235a"
+          ]
+        },
+        "distance": 2.63232,
+        "distance_km": 4.23631
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.892998,
+          39.565244
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 348009,
+        "maximum_vehicle_class": null,
+        "open_date": "2024-06-15",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "John Elway Cadillac Of Park Meadows",
+        "station_phone": "866-816-7584",
+        "updated_at": "2025-12-02T03:39:32Z",
+        "geocode_status": "GPS",
+        "city": "LONE TREE",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "8201 PARKWAY DR",
+        "zip": "80124",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 1,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "EV Connect",
+        "ev_network_web": "https://www.evconnect.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "EV Connect",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 24.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "4fcddea2-160b-4cd1-ad71-3895bd2aa4ce"
+          ],
+          "posts": [
+            "666af93d0d9b2e2d7c9257aa"
+          ]
+        },
+        "distance": 1.08689,
+        "distance_km": 1.74918
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.91247,
+          39.56171
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 170313,
+        "maximum_vehicle_class": null,
+        "open_date": "2020-12-18",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "Walmart 1252 (Highlands Ranch, CO)",
+        "station_phone": "833-632-2778",
+        "updated_at": "2025-12-02T03:25:18Z",
+        "geocode_status": "GPS",
+        "city": "HIGHLANDS RANCH",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "6675 BUSINESS CENTER DR",
+        "zip": "80130",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 4,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "Electrify America",
+        "ev_network_web": "https://www.electrifyamerica.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 350.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "210147"
+          ],
+          "posts": [
+            "210147-01",
+            "210147-02",
+            "210147-03",
+            "210147-04"
+          ]
+        },
+        "distance": 2.14004,
+        "distance_km": 3.44406
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.875729,
+          39.56381
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "Mon: 6:00am-11:59pm; Tue: 6:00am-11:59pm; Wed: 6:00am-11:59pm; Thu: 6:00am-11:59pm; Fri: 6:00am-11:59pm; Sat: 6:00am-11:59pm; Sun: 6:00am-11:59pm",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 212409,
+        "maximum_vehicle_class": "LD",
+        "open_date": "2022-03-25",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "Park Meadows DCFC",
+        "station_phone": "855-900-7584",
+        "updated_at": "2025-12-02T03:20:46Z",
+        "geocode_status": "GPS",
+        "city": "Lone Tree",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "8401 Park Meadows Center Dr.",
+        "zip": "80124",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 1,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "SHELL_RECHARGE",
+        "ev_network_web": "https://www.shell.us/motorist/electric-vehicle-charging.html",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "SHELL_RECHARGE",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 50.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "6132"
+          ],
+          "posts": [
+            "24K7-01"
+          ]
+        },
+        "distance": 0.19362,
+        "distance_km": 0.3116
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.78379,
+          39.55953
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 199191,
+        "maximum_vehicle_class": null,
+        "open_date": "2021-10-27",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "Kroger King Soopers 126 (Parker, CO)",
+        "station_phone": "833-632-2778",
+        "updated_at": "2025-12-02T03:25:42Z",
+        "geocode_status": "GPS",
+        "city": "Parker",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "17761 COTTONWOOD DRIVE",
+        "zip": "80134",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "CHADEMO",
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 4,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "Electrify America",
+        "ev_network_web": "https://www.electrifyamerica.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 150.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 150.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 50.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 150.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "Electrify America",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 150.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "210138"
+          ],
+          "posts": [
+            "210138-01",
+            "210138-02",
+            "210138-03",
+            "210138-04"
+          ]
+        },
+        "distance": 4.59269,
+        "distance_km": 7.39122
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.8827,
+          39.534177
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 173990,
+        "maximum_vehicle_class": null,
+        "open_date": "2021-01-27",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "LINCOLN COMMONS LONE TREE DCFC",
+        "station_phone": "888-758-4389",
+        "updated_at": "2025-12-02T01:18:48Z",
+        "geocode_status": "GPS",
+        "city": "Lone Tree",
+        "country": "US",
+        "intersection_directions": "S Wall Ground Floor Deck. Plenty of shops and restaurants on upper deck.",
+        "plus4": null,
+        "state": "CO",
+        "street_address": "10003 Commons St",
+        "zip": "80124",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "CHADEMO",
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 1,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "ChargePoint Network",
+        "ev_network_web": "https://www.chargepoint.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "ChargePoint Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 62.5,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 62.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "USCPIL1732941"
+          ],
+          "posts": [
+            "2028211"
+          ]
+        },
+        "distance": 0.75019,
+        "distance_km": 1.20731
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.875677,
+          39.47252
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 320867,
+        "maximum_vehicle_class": null,
+        "open_date": "2023-11-29",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "Phillips 66 Castle Pines Pkwy",
+        "station_phone": "866-816-7584",
+        "updated_at": "2025-12-02T03:40:59Z",
+        "geocode_status": "GPS",
+        "city": "Castle Pines",
+        "country": "US",
+        "intersection_directions": null,
+        "plus4": null,
+        "state": "CO",
+        "street_address": "7610 N Debbie Ln",
+        "zip": "80104",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 4,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "EV Connect",
+        "ev_network_web": "https://www.evconnect.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "EV Connect",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 200.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "EV Connect",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 200.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "EV Connect",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 200.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          },
+          {
+            "network": "EV Connect",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 200.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "87bc9431-cc41-4d22-886d-a286b6f6f053"
+          ],
+          "posts": [
+            "656673ae0d5ed1588309a358",
+            "656673ae0d5ed1588309a359",
+            "65667445793f654b75deccb2",
+            "65667445793f654b75deccb3"
+          ]
+        },
+        "distance": 0.15084,
+        "distance_km": 0.24275
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -104.96771,
+          39.442127
+        ]
+      },
+      "properties": {
+        "access_code": "public",
+        "access_days_time": "24 hours daily",
+        "access_detail_code": null,
+        "cards_accepted": null,
+        "date_last_confirmed": "2025-12-02",
+        "expected_date": null,
+        "fuel_type_code": "ELEC",
+        "groups_with_access_code": "Public",
+        "id": 197930,
+        "maximum_vehicle_class": null,
+        "open_date": "2021-10-20",
+        "owner_type_code": null,
+        "related_stations": [],
+        "restricted_access": false,
+        "status_code": "E",
+        "funding_sources": null,
+        "facility_type": null,
+        "station_name": "SHQ PUBLIC SEDALIA DC2",
+        "station_phone": "888-758-4389",
+        "updated_at": "2025-12-02T01:49:49Z",
+        "geocode_status": "GPS",
+        "city": "Sedalia",
+        "country": "US",
+        "intersection_directions": "Front Parking Member Spot",
+        "plus4": null,
+        "state": "CO",
+        "street_address": "5496 US HIGHWAY 85",
+        "zip": "80135",
+        "bd_blends": null,
+        "cng_dispenser_num": null,
+        "cng_fill_type_code": null,
+        "cng_has_rng": null,
+        "cng_psi": null,
+        "cng_renewable_source": null,
+        "cng_total_compression": null,
+        "cng_total_storage": null,
+        "cng_vehicle_class": null,
+        "e85_blender_pump": null,
+        "e85_other_ethanol_blends": null,
+        "ev_connector_types": [
+          "CHADEMO",
+          "J1772COMBO"
+        ],
+        "ev_dc_fast_num": 1,
+        "ev_level1_evse_num": null,
+        "ev_level2_evse_num": null,
+        "ev_network": "ChargePoint Network",
+        "ev_network_web": "https://www.chargepoint.com",
+        "ev_other_evse": null,
+        "ev_pricing": null,
+        "ev_renewable_source": null,
+        "ev_workplace_charging": false,
+        "hy_is_retail": null,
+        "hy_pressures": null,
+        "hy_standards": null,
+        "hy_status_link": null,
+        "lng_has_rng": null,
+        "lng_renewable_source": null,
+        "lng_vehicle_class": null,
+        "lpg_nozzle_types": null,
+        "lpg_primary": null,
+        "ng_fill_type_code": null,
+        "ng_psi": null,
+        "ng_vehicle_class": null,
+        "rd_blended_with_biodiesel": null,
+        "rd_blends": null,
+        "rd_blends_fr": null,
+        "rd_max_biodiesel_level": null,
+        "nps_unit_name": null,
+        "access_days_time_fr": null,
+        "intersection_directions_fr": null,
+        "bd_blends_fr": null,
+        "groups_with_access_code_fr": "Public",
+        "ev_pricing_fr": null,
+        "ev_charging_units": [
+          {
+            "network": "ChargePoint Network",
+            "connectors": {
+              "J1772": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J3271": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "TESLA": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "CHADEMO": {
+                "power_kw": 125.0,
+                "port_count": 1
+              },
+              "NEMA515": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA520": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "NEMA1450": {
+                "power_kw": null,
+                "port_count": 0
+              },
+              "J1772COMBO": {
+                "power_kw": 125.0,
+                "port_count": 1
+              }
+            },
+            "port_count": 1,
+            "charging_level": "dc_fast",
+            "funding_sources": []
+          }
+        ],
+        "ev_network_ids": {
+          "station": [
+            "USCPIL10222261"
+          ],
+          "posts": [
+            "18219051"
+          ]
+        },
+        "distance": 4.73378,
+        "distance_km": 7.61828
+      }
+    }
+  ]
+}

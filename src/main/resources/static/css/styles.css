@@ -1308,3 +1308,165 @@ main {
     font-style: italic;
     text-align: center;
 }
+
+/* EV Charging Station Styles */
+.ev-charging-control {
+    background-color: #fff;
+    width: 34px;
+    height: 34px;
+    line-height: 34px;
+    text-align: center;
+    cursor: pointer;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.ev-charging-control:hover:not(.disabled) {
+    background-color: #e8f5e9;
+}
+
+.ev-charging-control.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ev-charging-control.active {
+    background-color: #27ae60;
+}
+
+.ev-charging-control.active .ev-charging-icon {
+    fill: white;
+}
+
+.ev-charging-control.loading {
+    opacity: 0.7;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
+
+.ev-charging-icon {
+    width: 20px;
+    height: 20px;
+    margin-top: 5px;
+    fill: #f39c12;
+}
+
+/* EV Station Marker */
+.ev-station-marker {
+    background-color: #0df;
+    border: 3px solid white;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    transition: transform 0.2s ease;
+}
+
+.ev-station-marker:hover {
+    transform: scale(1.15);
+}
+
+.ev-station-icon {
+    font-size: 16px;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* EV Station Popup */
+.ev-station-popup-container .leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.ev-station-popup {
+    min-width: 250px;
+    max-width: 300px;
+}
+
+.ev-station-popup h4 {
+    /* margin: 0 0 12px 0;
+    color: #27ae60;
+    font-size: 16px; */
+    font-weight: 600;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 8px;
+}
+
+.ev-station-popup .station-details {
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.ev-station-popup .station-detail-row {
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.ev-station-popup .station-detail-label {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-right: 8px;
+}
+
+.ev-station-popup .station-detail-value {
+    color: #555;
+    text-align: right;
+}
+
+.ev-station-popup .station-address {
+    color: #555;
+    margin-bottom: 10px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.ev-station-popup .connector-types {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+.ev-station-popup .connector-type {
+    display: inline-block;
+    background-color: #e8f5e9;
+    border: 1px solid #81c784;
+    border-radius: 4px;
+    padding: 3px 8px;
+    margin: 3px 3px 3px 0;
+    font-size: 11px;
+    color: #2e7d32;
+    font-weight: 500;
+}
+
+.ev-station-popup .ev-station-actions {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e0e0e0;
+    text-align: center;
+}
+
+.ev-add-waypoint-btn {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+}
+
+.ev-add-waypoint-btn:hover {
+    background-color: #229954;
+}

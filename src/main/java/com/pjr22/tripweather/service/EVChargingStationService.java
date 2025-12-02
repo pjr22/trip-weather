@@ -2,7 +2,10 @@ package com.pjr22.tripweather.service;
 
 import com.pjr22.tripweather.dto.EVChargingStationRequest;
 import com.pjr22.tripweather.dto.EVChargingStationResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -13,6 +16,7 @@ import java.util.Map;
  * Service for interacting with the NREL EV Charging Stations API
  */
 @Service
+@Slf4j
 public class EVChargingStationService {
 
     private final RestClient restClient;
@@ -26,6 +30,7 @@ public class EVChargingStationService {
         this.nrelApiKey = nrelApiKey;
         this.restClient = RestClient.builder()
                 .baseUrl(nrelBaseUrl)
+                .messageConverters(converters -> converters.add(new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter()))
                 .build();
     }
 
@@ -40,30 +45,50 @@ public class EVChargingStationService {
             // Convert route coordinates to Well Known Text LINESTRING format
             String routeWkt = convertRouteToWkt(request.getRoute());
             
-            // Build the URI with query parameters
+            log.info("Making request to NREL EV charging stations API");
+            log.info("Route WKT: {}...", routeWkt.subSequence(0, 80));
+            log.info("Request parameters: {}", request.getParameters());
+            
+            // Build the URI with only the API key (all parameters will be in request body)
             UriComponentsBuilder uriBuilder = UriComponentsBuilder
                     .fromPath("/api/alt-fuel-stations/v1/nearby-route.geojson")
-                    .queryParam("api_key", nrelApiKey)
-                    .queryParam("route", routeWkt);
+                    .queryParam("api_key", nrelApiKey);
             
-            // Add additional parameters from the request
+            String requestUrl = uriBuilder.build().toUriString();
+            log.info("NREL API request URL: {}", requestUrl);
+            
+            // Create request body with route data and all parameters
+            Map<String, Object> requestBody = new java.util.HashMap<>();
+            requestBody.put("route", routeWkt);
+            
+            // Add all parameters to request body (including route parameters)
             if (request.getParameters() != null) {
                 for (Map.Entry<String, Object> entry : request.getParameters().entrySet()) {
                     if (entry.getValue() != null) {
-                        uriBuilder.queryParam(entry.getKey(), entry.getValue());
+                        requestBody.put(entry.getKey(), entry.getValue());
                     }
                 }
             }
             
-            // Make the GET request to NREL API
-            EVChargingStationResponse response = restClient.get()
-                    .uri(uriBuilder.build().toUriString())
-                    .retrieve()
-                    .body(EVChargingStationResponse.class);
+            log.info("NREL API request body: {}", requestBody);
+            
+            // Make the POST request to NREL API with route in request body
+            EVChargingStationResponse response = restClient.post()
+                  .uri(requestUrl)
+                  .header("Content-Type", MediaType.APPLICATION_JSON.toString())
+                  .header("Accept", MediaType.APPLICATION_JSON.toString())
+                  .body(requestBody)
+                  .retrieve()
+                  .body(EVChargingStationResponse.class);
+            
+            log.info("NREL API response received");
+            log.info("Response type: {}", response != null ? response.getType() : "null");
+            log.info("Number of features: {}", response != null && response.getFeatures() != null ? response.getFeatures().size() : 0);
             
             return response;
             
         } catch (Exception e) {
+            log.error("Error calling NREL EV charging stations API", e);
             // Create an error response
             EVChargingStationResponse errorResponse = new EVChargingStationResponse();
             errorResponse.setType("FeatureCollection");
@@ -84,7 +109,7 @@ public class EVChargingStationService {
             throw new IllegalArgumentException("Route cannot be null or empty");
         }
         
-        StringBuilder wktBuilder = new StringBuilder("LINESTRING(");
+        StringBuilder wktBuilder = new StringBuilder("LINESTRING (");
         
         for (int i = 0; i < route.size(); i++) {
             java.util.List<Double> point = route.get(i);
@@ -96,7 +121,7 @@ public class EVChargingStationService {
             wktBuilder.append(point.get(0)).append(" ").append(point.get(1));
             
             if (i < route.size() - 1) {
-                wktBuilder.append(",");
+                wktBuilder.append(", ");
             }
         }
         

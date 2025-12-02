@@ -156,6 +156,11 @@ window.TripWeather.Managers.Route = {
 
         // Update route statistics
         this.updateRouteStats(routeData);
+        
+        // Notify EV Charging Station Manager
+        if (window.TripWeather.Managers.EVChargingStation) {
+            window.TripWeather.Managers.EVChargingStation.onRouteCalculated(routeData);
+        }
     },
 
     /**
@@ -617,6 +622,11 @@ window.TripWeather.Managers.Route = {
 
         // Clear route statistics
         this.updateRouteStats(null);
+        
+        // Notify EV Charging Station Manager
+        if (window.TripWeather.Managers.EVChargingStation) {
+            window.TripWeather.Managers.EVChargingStation.onRouteCleared();
+        }
     },
 
     /**

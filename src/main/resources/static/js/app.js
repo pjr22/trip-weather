@@ -106,7 +106,7 @@ window.TripWeather.App = {
         // They attach to window.TripWeather.Services namespace automatically
         
         // Verify services are available
-        const requiredServices = ['Location', 'Weather', 'RoutePersistence'];
+        const requiredServices = ['Location', 'Weather', 'RoutePersistence', 'EVChargingStation'];
         requiredServices.forEach(function(serviceName) {
             if (!window.TripWeather.Services[serviceName]) {
                 throw new Error(`Required service ${serviceName} not found`);
@@ -126,7 +126,7 @@ window.TripWeather.App = {
         // They attach to window.TripWeather.Managers namespace automatically
         
         // Verify managers are available
-        const requiredManagers = ['Map', 'Waypoint', 'WaypointRenderer', 'Search', 'UI', 'Route', 'Layer'];
+        const requiredManagers = ['Map', 'Waypoint', 'WaypointRenderer', 'Search', 'UI', 'Route', 'Layer', 'EVChargingStation'];
         requiredManagers.forEach(function(managerName) {
             if (!window.TripWeather.Managers[managerName]) {
                 throw new Error(`Required manager ${managerName} not found`);
@@ -139,6 +139,7 @@ window.TripWeather.App = {
         window.TripWeather.Managers.Search.initialize();
         window.TripWeather.Managers.Route.initialize();
         window.TripWeather.Managers.Layer.initialize();
+        window.TripWeather.Managers.EVChargingStation.initialize();
         
         console.log('Managers initialized');
     },
