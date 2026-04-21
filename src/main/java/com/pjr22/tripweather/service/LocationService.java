@@ -32,48 +32,41 @@ public class LocationService {
     }
 
     public LocationData reverseGeocode(double latitude, double longitude) {
-        String url = String.format("/geocode/reverse?lat=%.6f&lon=%.6f&apiKey=%s", latitude, longitude, apiKey);
-        try {
-            if (apiKey == null || apiKey.isEmpty()) {
-                return null;
-            }
+        requireApiKey();
+        String path = String.format("/geocode/reverse?lat=%.6f&lon=%.6f&apiKey=%s", latitude, longitude, apiKey);
 
-            Double elevation = routeService.getElevation(latitude, longitude);
-            LocationData locationData = restClient.get()
-                    .uri(url)
-                    .retrieve()
-                    .body(LocationData.class);
+        Double elevation = routeService.getElevation(latitude, longitude);
+        LocationData locationData = restClient.get()
+                .uri(path)
+                .retrieve()
+                .body(LocationData.class);
 
-            if (elevation != null) {
-               locationData.getFeatures().get(0).getGeometry().getCoordinates().add(elevation);
-            }
-
-            return locationData;
-         } catch (Exception e) {
-            log.info("Failed to get formatted location info from: {}", url);
-            log.error("Reverse GeoCode request failed.", e);
-            return null;
+        if (elevation != null && locationData != null
+                && locationData.getFeatures() != null
+                && !locationData.getFeatures().isEmpty()) {
+            locationData.getFeatures().get(0).getGeometry().getCoordinates().add(elevation);
         }
+
+        return locationData;
     }
 
     public JsonNode searchLocations(String searchText) {
-        try {
-            if (apiKey == null || apiKey.isEmpty()) {
-                return null;
-            }
+        requireApiKey();
+        String path = String.format("/geocode/search?apiKey=%s&text=%s", apiKey, searchText);
+        return restClient.get()
+                .uri(path)
+                .retrieve()
+                .body(JsonNode.class);
+    }
 
-            String url = String.format("/geocode/search?apiKey=%s&text=%s",
-                    apiKey, searchText);
-
-            JsonNode response = restClient.get()
-                    .uri(url)
-                    .retrieve()
-                    .body(JsonNode.class);
-
-            return response;
-        } catch (Exception e) {
-            log.error("GeoCode search request failed.", e);
-            return null;
+    private void requireApiKey() {
+        if (apiKey == null || apiKey.isBlank()
+                || apiKey.startsWith("set with ")) {
+            // The default value in application.properties is a placeholder string; treat
+            // that as unconfigured too.
+            throw new IllegalStateException(
+                    "GEOAPIFY_API_KEY environment variable is not set. "
+                  + "Location services are unavailable until it is configured.");
         }
     }
 

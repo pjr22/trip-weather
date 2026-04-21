@@ -201,9 +201,10 @@ window.TripWeather.Managers.Layer = {
     updateLayerInfoDisplay: function(layerName, displayTime) {
         const container = document.getElementById('layer-info-display');
         if (container) {
+            const helpers = window.TripWeather.Utils.Helpers;
             container.innerHTML = `
-                <span class="layer-info-label">${layerName}</span>
-                <span class="layer-info-time">${displayTime}</span>
+                <span class="layer-info-label">${helpers.escapeHtml(layerName)}</span>
+                <span class="layer-info-time">${helpers.escapeHtml(displayTime)}</span>
             `;
             container.style.display = 'block';
         }
@@ -759,10 +760,16 @@ window.TripWeather.Managers.Layer = {
             matches.forEach(match => {
                 const item = document.createElement('div');
                 item.className = 'layer-search-result-item';
-                item.innerHTML = `
-                    <div>${match.title}</div>
-                    <div class="layer-id">${match.id}</div>
-                `;
+
+                const title = document.createElement('div');
+                title.textContent = match.title;
+
+                const id = document.createElement('div');
+                id.className = 'layer-id';
+                id.textContent = match.id;
+
+                item.appendChild(title);
+                item.appendChild(id);
                 item.addEventListener('click', () => {
                     this.selectLayerFromSearch(match.id, match.title);
                 });

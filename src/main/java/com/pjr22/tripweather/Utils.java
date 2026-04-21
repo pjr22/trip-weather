@@ -5,6 +5,9 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class Utils {
 
    public static final DateTimeFormatter date_time_formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -31,8 +34,7 @@ public class Utils {
 
          return toZonedDateTime.format(date_time_formatter);
       } catch (Exception e) {
-         System.err
-               .println("Error converting datetime from " + fromTimezone + " to " + toTimezone + ": " + e.getMessage());
+         log.error("Error converting datetime from {} to {}", fromTimezone, toTimezone, e);
          return dateTimeStr; // Return original if conversion fails
       }
    }

@@ -3,13 +3,16 @@
 # Test script for NREL Nearby Route API
 # This script sends a POST request to the NREL API with the contents of nrel_nearby_route_request.json
 
+# Run from this script's directory so sibling files and ../ references resolve consistently.
+cd "$(dirname "$0")" || exit 1
+
 # API endpoint
 API_URL="https://developer.nrel.gov/api/alt-fuel-stations/v1/nearby-route"
 
-# API KEY
-API_KEY=`cat developer.nrel.gov_api_key.txt`
+# API KEY (kept in project root, ignored by .gitignore)
+API_KEY=`cat ../developer.nrel.gov_api_key.txt`
 
-# Request file
+# Request file (sibling)
 REQUEST_FILE="nrel_nearby_route_request.json"
 
 # Check if the request file exists

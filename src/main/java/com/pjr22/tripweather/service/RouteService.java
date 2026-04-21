@@ -153,7 +153,7 @@ public class RouteService {
 
          return resultZonedDateTime.format(formatter);
       } catch (Exception e) {
-         System.err.println("Error adding minutes to datetime: " + e.getMessage());
+         log.error("Error adding minutes to datetime: {}", dateTimeStr, e);
          return dateTimeStr; // Return original if addition fails
       }
    }
@@ -330,8 +330,7 @@ public class RouteService {
          return waypointsWithTimes;
 
       } catch (Exception e) {
-         // If there's an error parsing the departure time, return waypoints without arrival times
-         System.err.println("Error calculating arrival times with durations and timezones: " + e.getMessage());
+         log.error("Error calculating arrival times with durations and timezones", e);
          // Return basic waypoints without arrival times
          List<RouteData.WaypointCoordinates> fallbackWaypoints = new ArrayList<>();
          for (RouteRequest.Waypoint wp : originalWaypoints) {

@@ -10,7 +10,7 @@ description = 'Trip Weather application for forcasting weather along a driven ro
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
+		languageVersion = JavaLanguageVersion.of(21)
 	}
 }
 
@@ -18,13 +18,21 @@ repositories {
 	mavenCentral()
 }
 
+// Versions for dependencies not managed by the Spring Boot BOM.
+// Spring-Boot-managed deps below stay version-less on purpose; add new non-BOM versions here.
+ext {
+	bucket4jVersion = '8.14.0'
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.postgresql:postgresql'
 	implementation 'org.hibernate.orm:hibernate-spatial'
 	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
 	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	implementation "com.bucket4j:bucket4j_jdk17-core:${bucket4jVersion}"
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 

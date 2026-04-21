@@ -10,9 +10,9 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Controller for EV charging station endpoints
  */
+// No @CrossOrigin: see note in RouteController regarding cross-origin configuration.
 @RestController
 @RequestMapping("/api/ev-charging")
-@CrossOrigin(origins = "*")
 @Slf4j
 public class EVChargingStationController {
 
@@ -32,14 +32,14 @@ public class EVChargingStationController {
     public ResponseEntity<EVChargingStationResponse> getStationsAlongRoute(
             @RequestBody EVChargingStationRequest request) {
         
-        log.info("Received request for EV charging stations along route with {} points", 
+        log.debug("Received request for EV charging stations along route with {} points",
                 request.getRoute() != null ? request.getRoute().size() : 0);
-        
+
         try {
             EVChargingStationResponse response = evChargingStationService.getStationsAlongRoute(request);
-            
+
             if (response != null) {
-                log.info("Successfully retrieved {} EV charging stations", 
+                log.debug("Successfully retrieved {} EV charging stations",
                         response.getFeatures() != null ? response.getFeatures().size() : 0);
                 return ResponseEntity.ok(response);
             } else {

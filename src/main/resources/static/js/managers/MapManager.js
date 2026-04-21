@@ -136,31 +136,58 @@ window.TripWeather.Managers.Map = {
     },
 
     /**
-     * Update the popup content for user location marker
+     * Update the popup content for the user-location marker. Returns a DOM element so
+     * buttons can use addEventListener instead of inline onclick, and so text fields
+     * coming from the geocoding API are set via textContent (no interpolation).
      */
     updateUserLocationPopup: function() {
         if (!this.userLocationMarker) return;
-        
-        let popupContent = '<strong>Your Location</strong><br>';
-        popupContent += `Latitude: ${this.userLocation.lat}<br>`;
-        popupContent += `Longitude: ${this.userLocation.lng}<br>`;
-        popupContent += `Elevation: ${window.TripWeather.Utils.Helpers.formatElevation(this.userLocation.alt)}<br>`;
-        
+
+        const helpers = window.TripWeather.Utils.Helpers;
+        const container = document.createElement('div');
+
+        // Display-only markup: interpolate numeric/formatted values only, escape any
+        // external strings (name/timezone come from the geocoding API).
+        let html = '<strong>Your Location</strong><br>';
+        html += `Latitude: ${helpers.escapeHtml(this.userLocation.lat)}<br>`;
+        html += `Longitude: ${helpers.escapeHtml(this.userLocation.lng)}<br>`;
+        html += `Elevation: ${helpers.escapeHtml(helpers.formatElevation(this.userLocation.alt))}<br>`;
+
         if (this.userLocation.name) {
-            popupContent += `<br><br><strong>${this.userLocation.name}</strong>`;
+            html += `<br><br><strong>${helpers.escapeHtml(this.userLocation.name)}</strong>`;
         }
-        
+
         if (this.userLocation.timezoneName) {
-            popupContent += `<br>Timezone: ${this.userLocation.timezoneName}`;
+            html += `<br>Timezone: ${helpers.escapeHtml(this.userLocation.timezoneName)}`;
         }
-        
-        // Add action buttons at the bottom
-        popupContent += `<br><br><div style="display: flex; gap: 8px; justify-content: center;">`;
-        popupContent += `<button onclick="window.TripWeather.Managers.Map.refreshUserLocation()" style="background-color: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">Update</button>`;
-        popupContent += `<button onclick="window.TripWeather.Managers.Map.addCurrentLocationAsWaypoint()" style="background-color: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">Add To Waypoints</button>`;
-        popupContent += `</div>`;
-        
-        this.userLocationMarker.bindPopup(popupContent);
+
+        container.innerHTML = html;
+
+        // Interactive content: build with createElement + addEventListener.
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display: flex; gap: 8px; justify-content: center; margin-top: 12px;';
+
+        const updateBtn = document.createElement('button');
+        updateBtn.type = 'button';
+        updateBtn.textContent = 'Update';
+        updateBtn.style.cssText = 'background-color: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;';
+        updateBtn.addEventListener('click', function() {
+            window.TripWeather.Managers.Map.refreshUserLocation();
+        });
+
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.textContent = 'Add To Waypoints';
+        addBtn.style.cssText = 'background-color: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;';
+        addBtn.addEventListener('click', function() {
+            window.TripWeather.Managers.Map.addCurrentLocationAsWaypoint();
+        });
+
+        actions.appendChild(updateBtn);
+        actions.appendChild(addBtn);
+        container.appendChild(actions);
+
+        this.userLocationMarker.bindPopup(container);
     },
 
     /**

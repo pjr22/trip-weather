@@ -138,30 +138,35 @@ window.TripWeather.Managers.Search = {
         }
         
         resultsContainer.innerHTML = '';
-        
+
         data.features.forEach(feature => {
-            const properties = feature.properties;
             const coordinates = feature.geometry.coordinates;
-            
-            const resultItem = document.createElement('div');
-            resultItem.className = 'search-result-item';
-            
+
             // Use the LocationService to get consistent location naming
-            const locationInfo = window.TripWeather.Services.Location.extractLocationFromFeature(feature);
             const displayInfo = window.TripWeather.Services.Location.formatLocationDisplay(feature);
             const label = displayInfo.label;
             const details = displayInfo.details;
-            
-            resultItem.innerHTML = `
-                <div class="result-label">${label}</div>
-                <div class="result-details">${details}</div>
-            `;
-            
-            // Pass the complete feature data to avoid redundant geocode calls
-            resultItem.onclick = function() {
+
+            // Build result items with createElement + textContent so external strings
+            // from the geocoding API can't inject markup.
+            const resultItem = document.createElement('div');
+            resultItem.className = 'search-result-item';
+
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'result-label';
+            labelDiv.textContent = label;
+
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'result-details';
+            detailsDiv.textContent = details;
+
+            resultItem.appendChild(labelDiv);
+            resultItem.appendChild(detailsDiv);
+
+            resultItem.addEventListener('click', function() {
                 window.TripWeather.Managers.Search.selectSearchResult(coordinates[1], coordinates[0], label, feature);
-            };
-            
+            });
+
             resultsContainer.appendChild(resultItem);
         });
     },
@@ -435,22 +440,31 @@ window.TripWeather.Managers.Search = {
         }
         
         resultsContainer.innerHTML = '';
-        
+
         data.forEach(route => {
+            const createdDate = route.created ? new Date(route.created).toLocaleDateString() : 'Unknown date';
+
+            // Build result items with createElement + textContent. route.name is user-typed
+            // text stored in the DB — interpolating it into innerHTML would be a stored-XSS
+            // vector.
             const resultItem = document.createElement('div');
             resultItem.className = 'search-result-item';
-            
-            const createdDate = route.created ? new Date(route.created).toLocaleDateString() : 'Unknown date';
-            
-            resultItem.innerHTML = `
-                <div class="result-label">${route.name}</div>
-                <div class="result-details">Created: ${createdDate}</div>
-            `;
-            
-            resultItem.onclick = function() {
+
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'result-label';
+            labelDiv.textContent = route.name;
+
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'result-details';
+            detailsDiv.textContent = `Created: ${createdDate}`;
+
+            resultItem.appendChild(labelDiv);
+            resultItem.appendChild(detailsDiv);
+
+            resultItem.addEventListener('click', function() {
                 window.TripWeather.Managers.Search.selectRouteSearchResult(route.id);
-            };
-            
+            });
+
             resultsContainer.appendChild(resultItem);
         });
     },

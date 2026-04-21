@@ -632,42 +632,56 @@ window.TripWeather.App = {
      * @param {string} link - Shareable link
      */
     showShareableLinkDialog: function(link) {
-        const message = `Share this link with others:\n\n${link}\n\n(Copy this link manually)`;
-        
-        // Create a simple modal for the link
+        // Build the modal entirely with createElement so the link (which contains a URL
+        // with a user-controllable routeId query param) is set via input.value rather
+        // than interpolated into an HTML attribute.
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'block';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Share Route</h3>
-                    <span class="close">&times;</span>
-                </div>
-                <div class="modal-body">
-                    <p>Copy this link to share your route:</p>
-                    <input type="text" value="${link}" readonly style="width: 100%; padding: 8px; margin: 10px 0;">
-                    <button id="copy-link-btn" class="modal-btn primary">Copy Link</button>
-                </div>
-            </div>
-        `;
-        
+
+        const content = document.createElement('div');
+        content.className = 'modal-content';
+
+        const header = document.createElement('div');
+        header.className = 'modal-header';
+        const headerTitle = document.createElement('h3');
+        headerTitle.textContent = 'Share Route';
+        const closeBtn = document.createElement('span');
+        closeBtn.className = 'close';
+        closeBtn.innerHTML = '&times;';
+        header.appendChild(headerTitle);
+        header.appendChild(closeBtn);
+
+        const body = document.createElement('div');
+        body.className = 'modal-body';
+        const instructions = document.createElement('p');
+        instructions.textContent = 'Copy this link to share your route:';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.readOnly = true;
+        input.value = link;
+        input.style.cssText = 'width: 100%; padding: 8px; margin: 10px 0;';
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'modal-btn primary';
+        copyBtn.textContent = 'Copy Link';
+        body.appendChild(instructions);
+        body.appendChild(input);
+        body.appendChild(copyBtn);
+
+        content.appendChild(header);
+        content.appendChild(body);
+        modal.appendChild(content);
         document.body.appendChild(modal);
-        
-        // Setup event listeners
-        const closeBtn = modal.querySelector('.close');
-        const copyBtn = modal.getElementById('copy-link-btn');
-        const input = modal.querySelector('input');
-        
+
         const closeModal = () => {
             document.body.removeChild(modal);
         };
-        
+
         closeBtn.addEventListener('click', closeModal);
         modal.addEventListener('click', (e) => {
             if (e.target === modal) closeModal();
         });
-        
         copyBtn.addEventListener('click', () => {
             input.select();
             document.execCommand('copy');
@@ -838,17 +852,39 @@ window.TripWeather.App = {
      */
     handleInitializationError: function(error) {
         console.error('Application initialization failed:', error);
-        
-        // Show user-friendly error message
+
+        // Build the error view with createElement so error.message (which could contain
+        // anything) is set via textContent and the refresh button uses addEventListener.
         const errorContainer = document.createElement('div');
         errorContainer.className = 'initialization-error';
-        errorContainer.innerHTML = `
-            <h2>Application Failed to Load</h2>
-            <p>Sorry, but the Trip Weather application could not be initialized.</p>
-            <p><strong>Error:</strong> ${error.message}</p>
-            <p>Please try refreshing the page or contact support if the problem persists.</p>
-            <button onclick="window.location.reload()">Refresh Page</button>
-        `;
+
+        const heading = document.createElement('h2');
+        heading.textContent = 'Application Failed to Load';
+
+        const intro = document.createElement('p');
+        intro.textContent = 'Sorry, but the Trip Weather application could not be initialized.';
+
+        const errorLine = document.createElement('p');
+        const errorLabel = document.createElement('strong');
+        errorLabel.textContent = 'Error:';
+        errorLine.appendChild(errorLabel);
+        errorLine.appendChild(document.createTextNode(' ' + (error && error.message ? error.message : 'Unknown error')));
+
+        const advice = document.createElement('p');
+        advice.textContent = 'Please try refreshing the page or contact support if the problem persists.';
+
+        const refreshBtn = document.createElement('button');
+        refreshBtn.type = 'button';
+        refreshBtn.textContent = 'Refresh Page';
+        refreshBtn.addEventListener('click', function() {
+            window.location.reload();
+        });
+
+        errorContainer.appendChild(heading);
+        errorContainer.appendChild(intro);
+        errorContainer.appendChild(errorLine);
+        errorContainer.appendChild(advice);
+        errorContainer.appendChild(refreshBtn);
         
         // Hide main content and show error
         const main = document.querySelector('main');

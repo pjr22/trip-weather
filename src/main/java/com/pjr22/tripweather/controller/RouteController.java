@@ -1,24 +1,27 @@
 package com.pjr22.tripweather.controller;
 
 import com.pjr22.tripweather.Utils;
+import com.pjr22.tripweather.dto.RouteCalculateRequest;
 import com.pjr22.tripweather.model.LocationData;
 import com.pjr22.tripweather.model.RouteData;
 import com.pjr22.tripweather.service.RouteService;
 
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 
+// No @CrossOrigin: the SPA is served from the same origin as this API. If the frontend
+// is ever hosted on a different origin (e.g. a separate dev server), add a CorsFilter /
+// WebMvcConfigurer driven by an allowlist env var instead of re-adding @CrossOrigin here.
 @RestController
 @RequestMapping("/api/route")
-@CrossOrigin(origins = "*")
 @Slf4j
 public class RouteController {
 
@@ -45,50 +48,37 @@ public class RouteController {
     }
 
     @PostMapping("/calculate")
-    public ResponseEntity<RouteData> calculateRoute(@RequestBody List<Map<String, Object>> waypoints) {
-        if (waypoints == null || waypoints.isEmpty()) {
-           return ResponseEntity.badRequest().build();
-        }
-
+    public ResponseEntity<RouteData> calculateRoute(@Valid @RequestBody RouteCalculateRequest request) {
         try {
-            // Convert request waypoints to RouteService waypoints and extract durations
             List<RouteService.RouteRequest.Waypoint> routeWaypoints = new ArrayList<>();
             List<Integer> durations = new ArrayList<>();
 
-            int i = 0;
             ZonedDateTime departureDateTime = ZonedDateTime.now(ZoneId.of(Utils.default_timezone_name));
-            for (Map<String, Object> wp : waypoints) {
-                Double lat = ((Number) wp.get("latitude")).doubleValue();
-                Double lng = ((Number) wp.get("longitude")).doubleValue();
-                String name = wp.get("name") != null ? wp.get("name").toString() : "";
-                String timezoneName = (String) wp.get("timezoneName");
-                routeWaypoints.add(new RouteService.RouteRequest.Waypoint(lat, lng, name, timezoneName));
-                if (++i == 1) {
-                   // First waypoint dictates departure time
-                   try {
-                      String date = (String) wp.get("date");
-                      String time = (String) wp.get("time");
-                      ZoneId zone = timezoneName != null && !timezoneName.isBlank() ? ZoneId.of(timezoneName) : ZoneId.of(Utils.default_timezone_name);
-                      if (date != null && !date.isBlank() && time != null && !time.isBlank()) {
-                         departureDateTime = Utils.getZonedDateTime(date, time, zone);
-                      } else {
-                         departureDateTime = ZonedDateTime.now(zone);
-                      }
-                   } catch (Exception e) {
-                      // don't care
-                   }
-                }
+            List<RouteCalculateRequest.WaypointInput> waypoints = request.getWaypoints();
+            for (int i = 0; i < waypoints.size(); i++) {
+                RouteCalculateRequest.WaypointInput wp = waypoints.get(i);
+                String name = wp.getName() != null ? wp.getName() : "";
+                String timezoneName = wp.getTimezoneName();
+                routeWaypoints.add(new RouteService.RouteRequest.Waypoint(
+                        wp.getLatitude(), wp.getLongitude(), name, timezoneName));
 
-                // Extract duration (in minutes), default to 0 if not provided
-                Integer duration = 0;
-                if (wp.get("duration") != null) {
+                if (i == 0) {
+                    // First waypoint dictates departure time
                     try {
-                        duration = Integer.parseInt(wp.get("duration").toString());
-                    } catch (NumberFormatException e) {
-                        duration = 0;
+                        ZoneId zone = timezoneName != null && !timezoneName.isBlank()
+                                ? ZoneId.of(timezoneName) : ZoneId.of(Utils.default_timezone_name);
+                        if (wp.getDate() != null && !wp.getDate().isBlank()
+                                && wp.getTime() != null && !wp.getTime().isBlank()) {
+                            departureDateTime = Utils.getZonedDateTime(wp.getDate(), wp.getTime(), zone);
+                        } else {
+                            departureDateTime = ZonedDateTime.now(zone);
+                        }
+                    } catch (Exception e) {
+                        // fall back to default departure time
                     }
                 }
-                durations.add(duration);
+
+                durations.add(wp.getDuration() != null ? wp.getDuration() : 0);
             }
 
             RouteData routeData = routeService.calculateRoute(routeWaypoints, departureDateTime, durations);

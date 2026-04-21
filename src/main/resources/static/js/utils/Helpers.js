@@ -376,39 +376,76 @@ window.TripWeather.Utils.Helpers = {
     },
 
     /**
-     * Make HTTP GET request with error handling
-     * @param {string} url - Request URL
-     * @returns {Promise} - Promise that resolves to response data
+     * Shared fetch wrapper. Contract:
+     *   - 2xx with a JSON body        -> resolves to parsed object/array
+     *   - 2xx with an empty body      -> resolves to null (so callers can fall through
+     *                                    instead of crashing on JSON.parse of "")
+     *   - 4xx / 5xx                   -> rejects with an Error whose .status is the
+     *                                    HTTP status code and .body is the parsed
+     *                                    response body (JSON if parseable, else text).
+     *                                    Error.message includes the server error message
+     *                                    when the body is {"error":"..."} or similar.
+     *   - network failure             -> rejects with the underlying fetch error
+     *
+     * @param {string} url
+     * @param {RequestInit} [init]
+     * @returns {Promise<any>}
      */
-    httpGet: function(url) {
-        return fetch(url)
-            .then(function(response) {
-                if (!response.ok) {
-                    throw new Error('HTTP error! status: ' + response.status);
+    request: function(url, init) {
+        return fetch(url, init).then(function(response) {
+            return response.text().then(function(bodyText) {
+                var body = null;
+                if (bodyText) {
+                    try {
+                        body = JSON.parse(bodyText);
+                    } catch (e) {
+                        body = bodyText;
+                    }
                 }
-                return response.json();
+
+                if (response.ok) {
+                    return body;
+                }
+
+                var serverMessage = null;
+                if (body && typeof body === 'object') {
+                    serverMessage = body.error || body.message;
+                } else if (typeof body === 'string') {
+                    serverMessage = body;
+                }
+
+                var errorMessage = 'HTTP ' + response.status;
+                if (serverMessage) {
+                    errorMessage += ': ' + serverMessage;
+                }
+                var error = new Error(errorMessage);
+                error.status = response.status;
+                error.body = body;
+                throw error;
             });
+        });
     },
 
     /**
-     * Make HTTP POST request with error handling
+     * Make HTTP GET request. See request() for the resolve / reject contract.
      * @param {string} url - Request URL
-     * @param {object} data - Data to send
-     * @returns {Promise} - Promise that resolves to response data
+     * @returns {Promise<any>}
+     */
+    httpGet: function(url) {
+        return this.request(url);
+    },
+
+    /**
+     * Make HTTP POST request with a JSON body. See request() for the resolve / reject contract.
+     * @param {string} url - Request URL
+     * @param {object} data - Data to send as JSON
+     * @returns {Promise<any>}
      */
     httpPost: function(url, data) {
-        return fetch(url, {
+        return this.request(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
-        })
-        .then(function(response) {
-            if (!response.ok) {
-                throw new Error('HTTP error! status: ' + response.status);
-            }
-            return response.json();
         });
     }
 };

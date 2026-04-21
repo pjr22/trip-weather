@@ -45,22 +45,23 @@ public class EVChargingStationService {
             // Convert route coordinates to Well Known Text LINESTRING format
             String routeWkt = convertRouteToWkt(request.getRoute());
             
-            log.info("Making request to NREL EV charging stations API");
-            log.info("Route WKT: {}...", routeWkt.subSequence(0, 80));
-            log.info("Request parameters: {}", request.getParameters());
-            
+            log.debug("Making request to NREL EV charging stations API");
+            log.debug("Route WKT: {}...", routeWkt.subSequence(0, 80));
+            log.debug("Request parameters: {}", request.getParameters());
+
             // Build the URI with only the API key (all parameters will be in request body)
             UriComponentsBuilder uriBuilder = UriComponentsBuilder
                     .fromPath("/api/alt-fuel-stations/v1/nearby-route.geojson")
                     .queryParam("api_key", nrelApiKey);
-            
+
             String requestUrl = uriBuilder.build().toUriString();
-            log.info("NREL API request URL: {}", requestUrl);
-            
+            // Log the path only; the full URL contains api_key=<secret> in the query string.
+            log.debug("NREL API request path: /api/alt-fuel-stations/v1/nearby-route.geojson");
+
             // Create request body with route data and all parameters
             Map<String, Object> requestBody = new java.util.HashMap<>();
             requestBody.put("route", routeWkt);
-            
+
             // Add all parameters to request body (including route parameters)
             if (request.getParameters() != null) {
                 for (Map.Entry<String, Object> entry : request.getParameters().entrySet()) {
@@ -69,9 +70,9 @@ public class EVChargingStationService {
                     }
                 }
             }
-            
-            log.info("NREL API request body: {}", requestBody);
-            
+
+            log.debug("NREL API request body: {}", requestBody);
+
             // Make the POST request to NREL API with route in request body
             EVChargingStationResponse response = restClient.post()
                   .uri(requestUrl)
@@ -80,11 +81,11 @@ public class EVChargingStationService {
                   .body(requestBody)
                   .retrieve()
                   .body(EVChargingStationResponse.class);
-            
-            log.info("NREL API response received");
-            log.info("Response type: {}", response != null ? response.getType() : "null");
-            log.info("Number of features: {}", response != null && response.getFeatures() != null ? response.getFeatures().size() : 0);
-            
+
+            log.debug("NREL API response received; type={}, features={}",
+                    response != null ? response.getType() : "null",
+                    response != null && response.getFeatures() != null ? response.getFeatures().size() : 0);
+
             return response;
             
         } catch (Exception e) {

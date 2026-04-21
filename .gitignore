@@ -42,6 +42,7 @@ out/
 ### jar files ###
 **.jar
 
-### XML files in root directory ###
+### Large XML reference dumps (matches at any depth — applies to examples/conus_layers*.xml etc.) ###
+### Note: examples/capabilities.xml is grandfathered in (already tracked before this rule existed). ###
 *.xml
 

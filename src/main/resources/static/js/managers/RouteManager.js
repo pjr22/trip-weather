@@ -73,7 +73,7 @@ window.TripWeather.Managers.Route = {
             };
         });
 
-        window.TripWeather.Utils.Helpers.httpPost('/api/route/calculate', waypointData)
+        window.TripWeather.Utils.Helpers.httpPost('/api/route/calculate', { waypoints: waypointData })
             .then(function(routeData) {
                 if (routeData && routeData.geometry && routeData.geometry.length > 0) {
                     window.TripWeather.Managers.Route.displayRoute(routeData);

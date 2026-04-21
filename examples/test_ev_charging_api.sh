@@ -2,8 +2,11 @@
 
 # Test script for EV Charging Station API endpoint
 
-# Source environment variables
-source setEnvVariables.source
+# Run from this script's directory so ../ references resolve consistently.
+cd "$(dirname "$0")" || exit 1
+
+# Source environment variables (kept in project root)
+source ../setEnvVariables.source
 
 # Define the base URL
 BASE_URL="http://localhost:8090"

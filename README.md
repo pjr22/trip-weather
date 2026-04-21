@@ -1,252 +1,132 @@
 # Trip Weather
 
-## Repository owner's note:
-This project is largely an AI coding experiment. Approximately 95% (or more) of code, including this README document, is AI generated, using a variety of AI tools and models. The rest was written by me (PJR22), as mostly bug fixes and minor improvements. A lot of code is bad, and the UI could probably benefit from a complete rewrite using more modern technologies. Some improvements will continue to be made, and I may take on larger, more ambitious refactoring efforts at some point, as I find this to be a useful tool for planning road trips. It was, in fact, created out of frustration with the lack of a simple, user-friendly tool for planning road trips that includes weather information along the route. The code is offered as-is, without any warranty or guarantee of functionality. Use it as you see fit.
+Plan a road trip, see the weather along the way, and find EV charging stations on your route.
 
-Trip Weather is a Spring Boot web application that helps users plan road trips by allowing them to:
+**Try it live:** https://trip-weather.pjr22.com
 
-- Plot a route on an interactive map (OpenStreetMap via Leaflet.js)
-- Add waypoints by clicking on map or searching for locations
-- Assign a date, time, and duration to each waypoint
-- View real-time weather forecasts for each waypoint using National Weather Service API (weather.gov)
-- Calculate optimal routes between waypoints using OpenRouteService API
-- Save, load, and share routes with PostgreSQL database persistence
+![Trip Weather is a web app for planning driving trips that shows you the weather forecast at each stop, at the time you'll actually be there.](src/main/resources/static/favicon-192x192.png)
 
-## Current Features
+## What it does
 
-- **Map display** with automatic centering on user's location (fallback to continental US center)
-- **Waypoint management**:
-  - Add, delete, reorder (drag-and-drop) waypoints
-  - Edit waypoint metadata (date, time, duration, custom location name)
-- **Location services**:
-  - Reverse-geocode waypoint coordinates via GeoApify with timezone information
-  - Search for locations by name/address using GeoApify
-  - Timezone data automatically included in location responses for accurate time calculations
-- **Weather integration**:
-  - Fetch hourly forecasts for a waypoint's latitude/longitude, date, and time
-  - Display condition, temperature, wind, precipitation probability, and icon
-- **Route calculation**:
-  - Calculate optimal routes between waypoints using OpenRouteService routing API
-  - Visualize routes with colored polylines on map
-  - Display distance and duration labels on route segments showing distance and travel time between waypoints
-  - Automatic arrival time calculation based on travel time and waypoint durations
-- **Route statistics**:
-  - Display total driving distance and time for the complete route
-  - Elevation profile showing total ascent, descent, and net elevation change
-  - Real-time statistics updates when routes are calculated or modified
-- **Map layers**:
-  - Weather overlay layers from National Weather Service (temperature, precipitation, wind)
-  - Layer selection modal with additional weather data options
-  - Time-based layer data corresponding to waypoint arrival times
-  - Interactive layer control with automatic visibility management
-- **Duration management**:
-  - Add duration to waypoints representing time spent at each location
-  - Support for flexible duration input (e.g., "3d2h10m", "48h22m", "1.5h")
-  - Increment/decrement duration with arrow buttons
-- **Route persistence**:
-  - Save routes to PostgreSQL database with user management
-  - Load previously saved routes
-  - Share routes via shareable links
-  - Route naming and organization
-- **User interface**:
-  - Responsive table showing waypoint data and weather
-  - Loading indicators for location and weather requests
-  - Controls for recentering on user's location and for searching locations
-  - Modern, modular JavaScript architecture
+Trip Weather is a free web app for planning a driving trip. You drop pins on a map for each stop, set when you plan to arrive and how long you're staying, and it figures out:
 
-## Technology Stack
+- the **driving route** between your stops
+- the **weather forecast** at each stop for the time you'll be there
+- the **arrival and departure times** at each stop, accounting for drive time and any time zones you cross
+- **EV charging stations** along your route (United States, via NREL)
+- **map weather overlays** (temperature, precipitation probability, wind) for the time you'll be at each stop
 
-- **Backend**: Spring Boot 3.5.7, Java 17
-- **Database**: PostgreSQL with PostGIS for spatial data
-- **Frontend**: HTML5, CSS, JavaScript (ES6+), Leaflet.js
-- **Architecture**: Modular JavaScript with separation of concerns
-  - Utilities (DurationUtils, TimezoneUtils, IconLoader, Helpers)
-  - Services (LocationService, WeatherService, RoutePersistenceService)
-  - Managers (MapManager, WaypointManager, WaypointRenderer, SearchManager, UIManager, RouteManager, LayerManager)
-  - Application coordinator (app.js)
-- **APIs**:
-  - Weather: `https://api.weather.gov`
-  - Weather Layers: `https://digital.weather.gov/ndfd/wms`
-  - Geocoding / Search: GeoApify (`geoapify.com`)
-  - Routing: OpenRouteService (`openrouteservice.org`)
-- **Build**: Gradle
+You can save routes, share them with a link, and come back later to load them.
 
-## Getting Started
+---
 
-1. Ensure Java 17 is installed. Gradle wrapper is included in the project.
-2. Set up PostgreSQL database with PostGIS extension:
-   ```bash
-   # Create database
-   createdb tripweather
-   
-   # Enable PostGIS extension
-   psql tripweather -c "CREATE EXTENSION postgis;"
-   ```
-3. Set up API keys as environment variables:
-   ```bash
-   # Source the provided script or set manually
-   export OPENROUTESERVICE_API_KEY=your_openrouteservice_key
-   export GEOAPIFY_API_KEY=your_geoapify_key
-   ```
-4. Configure database connection in `src/main/resources/application.properties`:
-   ```properties
-   spring.datasource.url=jdbc:postgresql://localhost:5432/tripweather
-   spring.datasource.username=your_username
-   spring.datasource.password=your_password
-   ```
-5. Run the application:
-   ```bash
-   ./gradlew bootRun
-   ```
-6. Open `http://localhost:8090` in a browser.
+## A note from the author
 
-## Project Structure
+This project is largely an AI coding experiment. Roughly 95% of the code, and most of this README, was written by an AI. The rest is my own bug fixes and tweaks. Some of the code is rough, and the UI could use a rewrite with more modern tooling. I may get around to that; in the meantime, I find it a genuinely useful tool for planning road trips — which is what it was built for, out of frustration with the lack of anything simple that combined routing and weather. Use it as-is, no warranty, no guarantees.
 
-```
-src/main/resources/static/js/
-├── app.js                    # Main application coordinator
-├── utils/                     # Utility functions
-│   ├── DurationUtils.js        # Duration parsing, formatting, validation
-│   ├── TimezoneUtils.js        # Timezone handling and DST support
-│   ├── IconLoader.js          # SVG icon loading
-│   └── Helpers.js             # General utilities and HTTP helpers
-├── services/                  # API service layer
-│   ├── LocationService.js       # Geocoding and location services
-│   ├── WeatherService.js       # Weather API integration
-│   └── RoutePersistenceService.js # Route save/load functionality
-└── managers/                  # UI and feature managers
-    ├── MapManager.js           # Map initialization and controls
-    ├── WaypointManager.js      # Waypoint data management
-    ├── WaypointRenderer.js     # Table rendering and marker management
-    ├── SearchManager.js         # Location search functionality
-    ├── UIManager.js            # UI overlays and interactions
-    ├── RouteManager.js         # Route calculation and display
-    └── LayerManager.js         # Map layers and weather overlays
-```
+— PJR22
 
-## Database Schema
+---
 
-The application uses PostgreSQL with the following main entities:
+## Using the app
 
-- **Users**: Simple user management with guest user support
-- **Routes**: Named collections of waypoints with creation timestamps
-- **Waypoints**: Individual route points with coordinates, dates, times, and metadata
+### Add a stop
+- **Click the map** to drop a waypoint at that spot, or
+- **Use the search box** to find a place by name or address.
 
-## API Endpoints
+The app automatically fills in the location name and the correct time zone.
 
-- `GET /` - Serves the main application page
-- `GET /api/weather/forecast` - Get weather forecast for coordinates and time
-- `GET /api/location/reverse` - Reverse geocode coordinates to location name
-- `GET /api/location/search` - Search for locations by query
-- `POST /api/route/calculate` - Calculate route between waypoints (includes elevation data)
-- `POST /api/routes` - Save a route
-- `GET /api/routes/{id}` - Load a route by ID
-- `GET /api/routes/search` - Search routes by name
-- `GET /api/wms/layers` - Get available WMS layers (returns layer name:title pairs)
-- `GET /api/wms/layer/validTimes?layerName=<layer name>` - Get valid times for a specific WMS layer
-- `GET /api/wms/layer/boundingBox?layerName=<layer name>` - Get bounding box for a specific WMS layer
-- `GET /api/wms/layer/resolutions?layerName=<layer name>` - Get resolutions for a specific WMS layer
-- `WMS: https://digital.weather.gov/ndfd/wms` - Weather map layers service
+### Set when you'll be there
+Each waypoint has a **date**, **time**, and **duration** (how long you're staying). Duration accepts flexible formats like `1h30m`, `2d4h`, `90m`, or `1.5h`. Use the arrow buttons to nudge values up or down. The app recalculates arrival times at later stops automatically.
 
-## Timezone Handling
+### See the weather
+Each waypoint shows the forecast for the hour you'll be there: condition icon, temperature, wind, and precipitation probability. Forecasts come from the National Weather Service (U.S. only).
 
-The application provides comprehensive timezone support:
+### See the route
+Once you have two or more waypoints, the app calculates the driving route between them, shows it on the map with distance and drive-time labels, and displays overall stats: total distance, total drive time, and elevation gain/loss.
 
-- Timezone information is automatically fetched from GeoApify when adding waypoints
-- Supports both standard and daylight saving time offsets
-- Automatic timezone abbreviation display based on date
-- Proper time conversion when calculating arrival times across timezones
-- Timezone data is stored with waypoints for persistence
+### Map weather overlays
+Click the **layers** button on the map to toggle weather overlays — temperature, precipitation probability, wind, and more. The overlay's time matches the arrival time at the currently selected waypoint, so you see the forecast for when you'll actually be there.
 
-## Route Calculation and Timing
+### Find EV charging stations
+Click the **EV charging** button to search for charging stations along your route. You can add any station to your trip as a waypoint. (United States only — data comes from the U.S. Department of Energy's NREL API.)
 
-Route calculation includes sophisticated timing features:
+### Reorder, edit, delete
+- **Drag** waypoints in the list to reorder them.
+- **Click** a waypoint's name to rename it.
+- **Delete** removes a stop and recalculates the route.
 
-- Calculates optimal driving routes between consecutive waypoints
-- Computes travel times and distances
-- Adds waypoint durations to calculate departure times
-- Handles timezone conversions for accurate arrival times
-- Visualizes routes with colored polylines on the map
-- Supports route recalculation when waypoints change
-- Provides comprehensive route statistics including total distance, driving time, and elevation profile
-- Displays elevation data showing total ascent, descent, and net elevation change
-- Shows distance and duration labels on route segments
+### Save and share
+- **Save** names a route and stores it.
+- **Share** copies a link you can send to anyone; opening that link loads the same route in their browser.
+- **Load** opens a saved route by name.
 
-## Map Layers and Weather Overlays
+> Note: saved routes are currently stored under a shared guest user and are reachable by anyone with the link (or who enumerates route IDs). Don't save anything you want to keep private.
 
-The application provides interactive weather map layers from the National Weather Service:
+---
 
-- **Weather Layers**: Temperature, precipitation probability, and wind speed overlays
-- **Dynamic Layer Discovery**: Automatically fetches available WMS layers from backend service
-- **Valid Time Integration**: Uses backend API to retrieve valid times for each layer and selects the nearest valid time to waypoint arrival
-- **Time-based Data**: Layer data corresponds to the nearest valid time to waypoint arrival times
-- **Interactive Selection**: Click waypoints to display weather data for that specific time
-- **Layer Control**: Dedicated layers control button in the map interface
-- **Extended Options**: Additional weather data types available through dropdown selection populated from backend
-- **Automatic Management**: Layers automatically show/hide based on waypoint selection
-- **Retry Mechanism**: Robust tile loading with exponential backoff for failed requests
-- **Caching**: Valid times are cached in memory to avoid repeated API calls
+## Coverage and limits
 
-## Future Enhancements
+- **Weather forecasts** and **weather map overlays** are from the U.S. National Weather Service and cover the continental United States, Alaska, Hawaii, and U.S. territories. Forecasts for locations outside that coverage will not load.
+- **EV charging stations** are from NREL and cover the United States only.
+- **Routing** (OpenRouteService) and **geocoding/search** (GeoApify) work worldwide.
+- **Units** are imperial (miles, °F, feet).
 
-1. **Export / Reporting**:
-   - Generate PDF/HTML trip summaries with waypoints, dates, and weather
-   - Printable map snapshot integration
-   - Export route data to GPX format for GPS devices
-
-2. **Advanced UI Features**:
-   - Dark mode toggle with CSS custom properties
-   - Enhanced mobile touch interactions
-   - Keyboard shortcuts for common actions
-   - Improved accessibility features
-
-3. **Route Optimization Options**:
-   - Multiple route preferences (fastest, shortest, scenic)
-   - Route comparison interface
-   - Alternative route suggestions
-   - Avoidance options (tolls, highways, etc.)
-
-4. **Advanced Weather Features**:
-   - Historical weather data for planning
-   - Weather alerts and warnings
-   - Extended forecast support
-   - Weather-based route recommendations
-
-5. **Collaboration Features**:
-   - Multi-user trip planning
-   - Comment and annotation system
-   - Trip sharing with permissions
-   - Real-time collaboration
-
-6. **Performance and Scalability**:
-   - Caching improvements for weather and location data
-   - Batch route calculations
-   - Progressive web app (PWA) support
-   - Offline functionality
-
-## Development Notes
-
-- The project uses a modular JavaScript architecture for maintainability
-- All API calls include proper error handling and user feedback
-- Timezone calculations are handled server-side to ensure consistency
-- Database operations use transactions for data integrity
-- The application supports both guest users and authenticated users
-- Route statistics are calculated from OpenRouteService elevation data
-- Map layers use National Weather Service WMS with retry mechanisms for reliability
-- Layer data is synchronized with the nearest valid time to waypoint arrival times
-- WMS layers and valid times are dynamically fetched from backend services
-- Valid times are cached in memory to optimize performance and reduce API calls
+---
 
 ## Troubleshooting
 
-- **API Key Issues**: Ensure both OPENROUTESERVICE_API_KEY and GEOAPIFY_API_KEY are set
-- **Database Connection**: Verify PostgreSQL is running and PostGIS extension is enabled
-- **Map Not Loading**: Check browser console for network issues or JavaScript errors
-- **Weather Not Loading**: Verify coordinates are valid and weather.gov API is accessible
-- **Route Statistics Not Showing**: Ensure route has been calculated and elevation data is available from OpenRouteService
-- **Map Layers Not Loading**: Check network connectivity to digital.weather.gov and verify WMS service is accessible
-- **Layer Data Not Updating**: Ensure waypoints have valid date/time set and waypoints are selected to trigger layer updates
+- **"Location not found" or no weather:** you may be outside the National Weather Service coverage area. Try a U.S. location.
+- **Route isn't calculating:** make sure you have at least two waypoints and that each has valid coordinates. Refresh the page if the map didn't finish loading.
+- **Map is blank:** check your network — the app loads map tiles from OpenStreetMap and the weather overlays from digital.weather.gov.
+- **Saved route won't load:** saved routes use numeric IDs; verify the share link hasn't been truncated.
+- **Times look wrong:** each waypoint stores its own time zone (detected when you add it). If you move a waypoint to a different zone, delete and re-add it so the zone is re-detected.
+
+For bugs or suggestions, please open an issue on the project's GitHub page.
+
+---
+
+## Running it yourself
+
+If you'd rather run a copy locally, you'll need Java 17 and PostgreSQL with PostGIS, plus free API keys from:
+
+- [OpenRouteService](https://openrouteservice.org/) — routing
+- [GeoApify](https://www.geoapify.com/) — geocoding and search
+- [NREL Developer Network](https://developer.nrel.gov/) — EV charging stations
+
+Quick start:
+
+```bash
+# 1. database (PostGIS)
+createdb tripweather
+psql tripweather -c "CREATE EXTENSION postgis;"
+
+# 2. API keys
+export OPENROUTESERVICE_API_KEY=...
+export GEOAPIFY_API_KEY=...
+export NREL_API_KEY=...
+
+# 3. database connection — edit src/main/resources/application.properties
+#    to point at your database
+
+# 4. run
+./gradlew bootRun
+```
+
+Then open http://localhost:8090.
+
+Developer documentation — architecture, module layout, API endpoints, WMS layer handling — lives in [HOWTO_LOCAL_MAP.md](HOWTO_LOCAL_MAP.md) and inline in the source. A full code review with known issues and priorities is in [CODE_REVIEW.md](CODE_REVIEW.md).
+
+---
+
+## Credits
+
+- Maps: [OpenStreetMap](https://www.openstreetmap.org/) tiles via [Leaflet](https://leafletjs.com/)
+- Weather data and map overlays: [National Weather Service](https://www.weather.gov/) (weather.gov, digital.weather.gov)
+- Routing: [OpenRouteService](https://openrouteservice.org/)
+- Geocoding and location search: [GeoApify](https://www.geoapify.com/)
+- EV charging station data: [NREL Alternative Fuels Data Center](https://developer.nrel.gov/docs/transportation/alt-fuel-stations-v1/)
 
 ## License
 
-This project is licensed under the MIT License.
+MIT.

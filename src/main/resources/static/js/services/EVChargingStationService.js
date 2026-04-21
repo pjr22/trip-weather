@@ -104,46 +104,42 @@ window.TripWeather.Services.EVChargingStation = {
     },
         
     /**
-     * Create popup content HTML for a station
+     * Create popup content for a station. Returns an HTMLElement (accepted by Leaflet's
+     * bindPopup) rather than an HTML string, so interactive pieces can use addEventListener
+     * instead of inline onclick.
      * @param {object} station - Formatted station data
-     * @returns {string} - HTML content for popup
+     * @returns {HTMLElement}
      */
     createStationPopupContent: function(station) {
-        const lightningIcon = '⚡';
-        let html = '<div class="ev-station-popup">';
+        const container = document.createElement('div');
+        container.className = 'ev-station-popup';
+
+        // Display-only markup goes through innerHTML with every interpolated value escaped.
+        let html = '';
         html += `<h4>${this.escapeHtml(station.name)}</h4>`;
         html += '<div class="station-details">';
-        
-        // Address
-        html += '<div class="station-detail-row">';
-        html += '<span class="station-detail-label">Address:</span>';
-        html += '</div>';
-        html += '<div class="station-address">';
-        html += this.escapeHtml(station.address).replace(/\n/g, '<br>');
-        html += '</div>';
-        
-        // Network
+        html += '<div class="station-detail-row"><span class="station-detail-label">Address:</span></div>';
+        html += `<div class="station-address">${this.escapeHtml(station.address).replace(/\n/g, '<br>')}</div>`;
+
         if (station.network && station.network !== 'Unknown') {
             html += '<div class="station-detail-row">';
             html += '<span class="station-detail-label">Network:</span>';
             html += `<span class="station-detail-value">${this.escapeHtml(station.network)}</span>`;
             html += '</div>';
         }
-        
-        // Charging ports summary
+
         html += '<div class="station-detail-row">';
         html += '<span class="station-detail-label">DC Fast Chargers:</span>';
-        html += `<span class="station-detail-value">${station.evDCFastNum}</span>`;
+        html += `<span class="station-detail-value">${this.escapeHtml(station.evDCFastNum)}</span>`;
         html += '</div>';
-        
+
         if (station.evLevel2Num > 0) {
             html += '<div class="station-detail-row">';
             html += '<span class="station-detail-label">Level 2 Chargers:</span>';
-            html += `<span class="station-detail-value">${station.evLevel2Num}</span>`;
+            html += `<span class="station-detail-value">${this.escapeHtml(station.evLevel2Num)}</span>`;
             html += '</div>';
         }
-        
-        // Connector types
+
         if (station.evConnectorTypes && station.evConnectorTypes.length > 0) {
             html += '<div class="connector-types">';
             html += '<span class="station-detail-label">Connectors:</span><br>';
@@ -152,33 +148,41 @@ window.TripWeather.Services.EVChargingStation = {
             }.bind(this));
             html += '</div>';
         }
-        
-        // Access hours
+
         if (station.accessDaysTime) {
             html += '<div class="station-detail-row" style="margin-top: 8px;">';
             html += '<span class="station-detail-label">Hours:</span>';
             html += `<span class="station-detail-value">${this.escapeHtml(station.accessDaysTime)}</span>`;
             html += '</div>';
         }
-        
-        // Phone
+
         if (station.phone) {
             html += '<div class="station-detail-row">';
             html += '<span class="station-detail-label">Phone:</span>';
             html += `<span class="station-detail-value">${this.escapeHtml(station.phone)}</span>`;
             html += '</div>';
         }
-        
+
         html += '</div>';
-        
-        // Add to waypoints button
-        html += '<div class="ev-station-actions">';
-        html += `<button onclick="window.TripWeather.Managers.EVChargingStation.addStationAsWaypoint('${station.id}')" class="ev-add-waypoint-btn">Add To Waypoints</button>`;
-        html += '</div>';
-        
-        html += '</div>';
-        
-        return html;
+        container.innerHTML = html;
+
+        // Interactive content: build with createElement + addEventListener so the station id
+        // is captured by closure rather than interpolated into an inline onclick attribute.
+        const actions = document.createElement('div');
+        actions.className = 'ev-station-actions';
+
+        const addButton = document.createElement('button');
+        addButton.type = 'button';
+        addButton.className = 'ev-add-waypoint-btn';
+        addButton.textContent = 'Add To Waypoints';
+        addButton.addEventListener('click', function() {
+            window.TripWeather.Managers.EVChargingStation.addStationAsWaypoint(station.id);
+        });
+
+        actions.appendChild(addButton);
+        container.appendChild(actions);
+
+        return container;
     },
     
     /**

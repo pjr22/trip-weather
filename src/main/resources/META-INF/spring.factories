@@ -1,0 +1,2 @@
+org.springframework.boot.env.EnvironmentPostProcessor=\
+com.pjr22.tripweather.config.StartupConfigValidator
