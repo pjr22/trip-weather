@@ -188,12 +188,10 @@ window.TripWeather.Managers.Waypoint = {
         }
 
         this.waypoints.push(waypoint);
-        
-        // Add marker to map and ensure marker array stays synchronized
+
+        // addMarkerToMap pushes onto this.waypointMarkers itself; do not double-push here.
         if (window.TripWeather.Managers.WaypointRenderer) {
-            const marker = window.TripWeather.Managers.WaypointRenderer.addMarkerToMap(waypoint, this.waypoints.length);
-            // Ensure the marker array stays in sync with waypoints array
-            this.waypointMarkers.push(marker);
+            window.TripWeather.Managers.WaypointRenderer.addMarkerToMap(waypoint, this.waypoints.length);
         }
         
         // Update UI
@@ -526,12 +524,10 @@ window.TripWeather.Managers.Waypoint = {
         }
         this.waypointMarkers = [];
         
-        // Recreate all markers with new order numbers and ensure synchronization
+        // addMarkerToMap pushes onto this.waypointMarkers itself; do not double-push here.
         if (window.TripWeather.Managers.WaypointRenderer) {
             this.waypoints.forEach((waypoint, index) => {
-                const marker = window.TripWeather.Managers.WaypointRenderer.addMarkerToMap(waypoint, index + 1);
-                // Ensure the marker array stays in sync with waypoints array
-                this.waypointMarkers.push(marker);
+                window.TripWeather.Managers.WaypointRenderer.addMarkerToMap(waypoint, index + 1);
             });
         }
     },

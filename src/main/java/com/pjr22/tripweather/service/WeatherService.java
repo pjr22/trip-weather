@@ -2,6 +2,8 @@ package com.pjr22.tripweather.service;
 
 import com.pjr22.tripweather.model.WeatherData;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -10,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 
 @Service
+@Slf4j
 public class WeatherService {
 
     private final RestClient restClient;
@@ -51,6 +54,7 @@ public class WeatherService {
             return extractWeatherData(matchingPeriod);
 
         } catch (Exception e) {
+            log.error("Failed to fetch weather forecast for ({}, {}) at {} {}", latitude, longitude, date, time, e);
             return WeatherData.createError("Error fetching weather: " + e.getMessage());
         }
     }
@@ -74,6 +78,7 @@ public class WeatherService {
             }
             return null;
         } catch (Exception e) {
+            log.error("Failed to look up forecast URL for ({}, {})", latitude, longitude, e);
             return null;
         }
     }

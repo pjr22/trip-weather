@@ -13,20 +13,21 @@ window.TripWeather.Managers.EVChargingStation = {
     currentStations: [],
     stationsVisible: false,
     isLoading: false,
-    
+    initialized: false,
+
     /**
      * Initialize EV Charging Station Manager
      */
     initialize: function() {
-        console.log('Initializing EV Charging Station Manager...');
+        if (this.initialized) {
+            return;
+        }
+        this.initialized = true;
+        // setupMapControl polls for the map and adds the button asynchronously;
+        // updateButtonState is invoked from addEVChargingControl once the button exists.
         this.setupMapControl();
-        // Initialize button state after a short delay to ensure DOM is ready
-        setTimeout(() => {
-            this.updateButtonState();
-        }, 500);
-        console.log('EV Charging Station Manager initialized');
     },
-    
+
     /**
      * Setup the EV charging search control on the map
      */
@@ -36,7 +37,6 @@ window.TripWeather.Managers.EVChargingStation = {
             if (map) {
                 clearInterval(checkMapInterval);
                 this.addEVChargingControl(map);
-                console.log('EV Charging Station Manager: Map control added');
             }
         }, 500);
     },
@@ -83,6 +83,9 @@ window.TripWeather.Managers.EVChargingStation = {
         });
         
         map.addControl(new EVChargingControl());
+
+        // Now that #ev-charging-btn exists in the DOM, set its initial state.
+        this.updateButtonState();
     },
     
     /**
@@ -327,13 +330,7 @@ window.TripWeather.Managers.EVChargingStation = {
         }
         
         const routeActive = window.TripWeather.Managers.Route.isRouteActive();
-        console.log('EV Charging Station - updateButtonState:', {
-            routeActive: routeActive,
-            isLoading: this.isLoading,
-            stationsVisible: this.stationsVisible,
-            currentStationsCount: this.currentStations.length
-        });
-        
+
         if (this.isLoading) {
             container.classList.add('loading');
             container.classList.remove('disabled');

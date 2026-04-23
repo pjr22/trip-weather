@@ -34,26 +34,34 @@ window.TripWeather.Managers.Layer = {
         }
     },
 
-    // Cache for valid times to avoid repeated API calls
+    // Cache for valid times to avoid repeated API calls. Entries expire after VALID_TIMES_TTL_MS
+    // so a long-lived session eventually picks up newly-published forecast windows.
     validTimesCache: {},
+    VALID_TIMES_TTL_MS: 15 * 60 * 1000,
 
     // Available layers from backend for searchable combo
     availableLayers: {},
     selectedLayerId: null,
 
+    initialized: false,
+
     /**
      * Initialize layer manager
      */
     initialize: function() {
+        if (this.initialized) {
+            return;
+        }
+        this.initialized = true;
         console.log('Initializing Layer Manager...');
         this.defineRetryingLayer();
         this.setupMapEvents();
         this.setupUI(); // Only sets up modal events, control added via map
         this.setupOtherLayersList();
-        
+
         // Cache for layer instances
         this.layerInstances = {};
-        
+
         // Fetch available layers from backend
         this.fetchAvailableLayers();
     },
@@ -304,12 +312,12 @@ window.TripWeather.Managers.Layer = {
      */
     fetchValidTimes: function(layerName) {
         const self = this;
-        
-        // Check cache first
-        if (this.validTimesCache[layerName]) {
-            return Promise.resolve(this.validTimesCache[layerName]);
+
+        const cached = this.validTimesCache[layerName];
+        if (cached && cached.expiresAt > Date.now()) {
+            return Promise.resolve(cached.value);
         }
-        
+
         return fetch(`/api/wms/layer/validTimes?layerName=${encodeURIComponent(layerName)}`)
             .then(response => {
                 if (!response.ok) {
@@ -319,8 +327,10 @@ window.TripWeather.Managers.Layer = {
             })
             .then(data => {
                 console.log(`Valid times for ${layerName}:`, data);
-                // Cache the valid times
-                self.validTimesCache[layerName] = data;
+                self.validTimesCache[layerName] = {
+                    value: data,
+                    expiresAt: Date.now() + self.VALID_TIMES_TTL_MS
+                };
                 return data;
             })
             .catch(error => {

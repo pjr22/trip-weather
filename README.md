@@ -88,7 +88,7 @@ For bugs or suggestions, please open an issue on the project's GitHub page.
 
 ## Running it yourself
 
-If you'd rather run a copy locally, you'll need Java 17 and PostgreSQL with PostGIS, plus free API keys from:
+If you'd rather run a copy locally, you'll need Java 21 and PostgreSQL with PostGIS, plus free API keys from:
 
 - [OpenRouteService](https://openrouteservice.org/) — routing
 - [GeoApify](https://www.geoapify.com/) — geocoding and search
@@ -97,17 +97,19 @@ If you'd rather run a copy locally, you'll need Java 17 and PostgreSQL with Post
 Quick start:
 
 ```bash
-# 1. database (PostGIS)
-createdb tripweather
-psql tripweather -c "CREATE EXTENSION postgis;"
+# 1. database (PostGIS) — by default the app connects to the standard `postgres` database;
+#    just enable the PostGIS extension on it. To use a separate database, see step 3.
+psql postgres -c "CREATE EXTENSION IF NOT EXISTS postgis;"
 
-# 2. API keys
+# 2. API keys and database password
 export OPENROUTESERVICE_API_KEY=...
 export GEOAPIFY_API_KEY=...
 export NREL_API_KEY=...
+export TRIP_DB_PASSWORD=...   # required; app refuses to start without it
 
-# 3. database connection — edit src/main/resources/application.properties
-#    to point at your database
+# 3. (optional) point at a different database
+# export TRIP_DB_URL='jdbc:postgresql://localhost:5432/yourdb'
+# export TRIP_DB_USERNAME='youruser'
 
 # 4. run
 ./gradlew bootRun

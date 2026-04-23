@@ -7,9 +7,12 @@ import com.pjr22.tripweather.model.RouteData;
 import com.pjr22.tripweather.service.RouteService;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +25,7 @@ import java.util.ArrayList;
 // WebMvcConfigurer driven by an allowlist env var instead of re-adding @CrossOrigin here.
 @RestController
 @RequestMapping("/api/route")
+@Validated
 @Slf4j
 public class RouteController {
 
@@ -33,17 +37,17 @@ public class RouteController {
 
     @GetMapping("/snap")
     public LocationData snapToLocation(
-            @RequestParam double lat,
-            @RequestParam double lon) {
-        
+            @RequestParam @DecimalMin("-90.0") @DecimalMax("90.0") double lat,
+            @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") double lon) {
+
         return routeService.snapToLocation(lat, lon);
     }
 
     @GetMapping("/elevation")
     public Double getElevationAtPoint(
-            @RequestParam double lat,
-            @RequestParam double lon) {
-        
+            @RequestParam @DecimalMin("-90.0") @DecimalMax("90.0") double lat,
+            @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") double lon) {
+
         return routeService.getElevation(lat, lon);
     }
 

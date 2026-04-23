@@ -86,53 +86,126 @@ window.TripWeather.Managers.Map = {
         }
     },
 
+    // Geolocation tuning. Goal is sub-100m accuracy (street/building level — better than
+    // city-level Wi-Fi triangulation). HIGH_ACCURACY_TIMEOUT_MS caps how long we keep the
+    // GPS hot waiting for a precise fix.
+    ACCURACY_GOAL_M: 100,
+    HIGH_ACCURACY_TIMEOUT_MS: 30000,
+
     /**
-     * Get user's current location and recenter map
+     * High-accuracy geolocation via watchPosition. Reports each accuracy improvement via
+     * options.onPosition; stops once accuracy <= ACCURACY_GOAL_M or HIGH_ACCURACY_TIMEOUT_MS
+     * elapses. options.onError fires once if the watch fails before any position arrives.
+     *
+     * maxCacheAgeMs=0 forces a fresh acquisition (used by the "Update" button); any non-zero
+     * value lets the browser return a cached position up to that age (used on initial load).
+     *
+     * A two-phase pattern (fast coarse fix + refining watch) was tried but the coarse phase
+     * never resolved on desktop browsers without Wi-Fi positioning data — added complexity
+     * without delivering value. Cache hits cover the fast-path use case.
+     */
+    acquireUserLocation: function(options) {
+        const ACCURACY_GOAL_M = this.ACCURACY_GOAL_M;
+        const HIGH_ACCURACY_TIMEOUT_MS = this.HIGH_ACCURACY_TIMEOUT_MS;
+
+        let bestAccuracy = Infinity;
+        let watchId = null;
+        let watchTimeoutId = null;
+        let errorFired = false;
+
+        const stopWatch = function() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            if (watchTimeoutId !== null) {
+                clearTimeout(watchTimeoutId);
+                watchTimeoutId = null;
+            }
+        };
+
+        const handlePosition = function(position) {
+            if (position.coords.accuracy < bestAccuracy) {
+                bestAccuracy = position.coords.accuracy;
+                options.onPosition(position);
+            }
+            if (position.coords.accuracy <= ACCURACY_GOAL_M) {
+                stopWatch();
+            }
+        };
+
+        watchId = navigator.geolocation.watchPosition(
+            handlePosition,
+            function(error) {
+                console.warn('Geolocation failed:', error.message);
+                stopWatch();
+                if (errorFired || bestAccuracy < Infinity) {
+                    return;
+                }
+                errorFired = true;
+                options.onError(error);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: HIGH_ACCURACY_TIMEOUT_MS,
+                maximumAge: options.maxCacheAgeMs
+            }
+        );
+
+        watchTimeoutId = setTimeout(stopWatch, HIGH_ACCURACY_TIMEOUT_MS);
+    },
+
+    /**
+     * Get user's current location and recenter map. Bypasses the browser's geolocation
+     * cache (maximumAge: 0) so the fresh fix replaces whatever was cached before.
      */
     recenterOnUserLocation: function() {
         if (!("geolocation" in navigator)) {
             window.TripWeather.Utils.Helpers.showToast('Geolocation is not supported by your browser.', 'warning');
             return;
         }
-        
-        window.TripWeather.Utils.Helpers.showLoading('location-loading-overlay');
-        
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
+
+        const self = this;
+        const helpers = window.TripWeather.Utils.Helpers;
+        helpers.showLoading('location-loading-overlay');
+        let firstFixShown = false;
+
+        this.acquireUserLocation({
+            maxCacheAgeMs: 0,
+            onPosition: function(position) {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
-                const currentZoom = window.TripWeather.Managers.Map.map.getZoom();
-                
-                window.TripWeather.Managers.Map.userLocation.lat = window.TripWeather.Utils.Helpers.formatCoordinate(lat);
-                window.TripWeather.Managers.Map.userLocation.lng = window.TripWeather.Utils.Helpers.formatCoordinate(lng);
-                
-                window.TripWeather.Managers.Map.map.setView([lat, lng], currentZoom);
-                
-                if (window.TripWeather.Managers.Map.userLocationMarker) {
-                    window.TripWeather.Managers.Map.userLocationMarker.setLatLng([lat, lng]);
-                    window.TripWeather.Managers.Map.updateUserLocationPopup();
-                    window.TripWeather.Managers.Map.userLocationMarker.openPopup();
+                const currentZoom = self.map.getZoom();
+
+                self.userLocation.lat = helpers.formatCoordinate(lat);
+                self.userLocation.lng = helpers.formatCoordinate(lng);
+                self.map.setView([lat, lng], currentZoom);
+
+                if (self.userLocationMarker) {
+                    self.userLocationMarker.setLatLng([lat, lng]);
                 } else {
-                    window.TripWeather.Managers.Map.userLocationMarker = L.marker([lat, lng]).addTo(window.TripWeather.Managers.Map.map);
-                    window.TripWeather.Managers.Map.updateUserLocationPopup();
-                    window.TripWeather.Managers.Map.userLocationMarker.openPopup();
+                    self.userLocationMarker = L.marker([lat, lng]).addTo(self.map);
                 }
-                
-                window.TripWeather.Managers.Map.fetchLocationInfo().finally(function() {
-                    window.TripWeather.Utils.Helpers.hideLoading('location-loading-overlay');
-                });
+                self.updateUserLocationPopup();
+                self.userLocationMarker.openPopup();
+
+                if (!firstFixShown) {
+                    firstFixShown = true;
+                    self.fetchLocationInfo().finally(function() {
+                        helpers.hideLoading('location-loading-overlay');
+                    });
+                } else {
+                    // Refining update — re-fetch location info quietly in case the more
+                    // precise fix crosses a timezone or locality boundary.
+                    self.fetchLocationInfo();
+                }
             },
-            function(error) {
+            onError: function(error) {
                 console.warn('Geolocation error:', error.message);
-                window.TripWeather.Utils.Helpers.hideLoading('location-loading-overlay');
-                window.TripWeather.Utils.Helpers.showToast('Unable to get your current location. Please check your browser permissions.', 'error');
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 5000,
-                maximumAge: 0
+                helpers.hideLoading('location-loading-overlay');
+                helpers.showToast('Unable to get your current location. Please check your browser permissions.', 'error');
             }
-        );
+        });
     },
 
     /**
@@ -213,43 +286,57 @@ window.TripWeather.Managers.Map = {
         });
     },
 
+    // Initial-load geolocation cache window. A page reload within this window can re-use the
+    // browser's cached high-accuracy fix instantly. The "Update" button bypasses this cache
+    // (maximumAge: 0) when the user wants a fresh acquisition.
+    INITIAL_LOAD_CACHE_MS: 600000,
+
     /**
-     * Initialize map with user location or default location
+     * Initialize map with user location or default location.
      */
     initializeWithUserLocation: function() {
-        if ("geolocation" in navigator) {
-            window.TripWeather.Utils.Helpers.showLoading('location-loading-overlay');
-            
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    window.TripWeather.Managers.Map.initialize(lat, lng, window.TripWeather.Managers.Map.USER_ZOOM);
-                    
-                    window.TripWeather.Managers.Map.fetchLocationInfo().finally(function() {
-                        window.TripWeather.Utils.Helpers.hideLoading('location-loading-overlay');
-                    });
-                },
-                function(error) {
-                    console.warn('Geolocation error:', error.message);
-                    console.log('Using default location (center of USA)');
-                    window.TripWeather.Utils.Helpers.hideLoading('location-loading-overlay');
-                    window.TripWeather.Managers.Map.initialize(
-                        window.TripWeather.Managers.Map.DEFAULT_LAT, 
-                        window.TripWeather.Managers.Map.DEFAULT_LNG, 
-                        window.TripWeather.Managers.Map.DEFAULT_ZOOM
-                    );
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 5000,
-                    maximumAge: 0
-                }
-            );
-        } else {
+        if (!("geolocation" in navigator)) {
             console.log('Geolocation not supported, using default location');
             this.initialize(this.DEFAULT_LAT, this.DEFAULT_LNG, this.DEFAULT_ZOOM);
+            return;
         }
+
+        const self = this;
+        const helpers = window.TripWeather.Utils.Helpers;
+        helpers.showLoading('location-loading-overlay');
+        let mapInitialized = false;
+
+        this.acquireUserLocation({
+            maxCacheAgeMs: this.INITIAL_LOAD_CACHE_MS,
+            onPosition: function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+
+                if (!mapInitialized) {
+                    mapInitialized = true;
+                    self.initialize(lat, lng, self.USER_ZOOM);
+                    self.fetchLocationInfo().finally(function() {
+                        helpers.hideLoading('location-loading-overlay');
+                    });
+                } else {
+                    // Phase 2 refining update — recenter and move the existing marker silently.
+                    const currentZoom = self.map.getZoom();
+                    self.userLocation.lat = helpers.formatCoordinate(lat);
+                    self.userLocation.lng = helpers.formatCoordinate(lng);
+                    self.map.setView([lat, lng], currentZoom);
+                    if (self.userLocationMarker) {
+                        self.userLocationMarker.setLatLng([lat, lng]);
+                    }
+                    self.fetchLocationInfo();
+                }
+            },
+            onError: function(error) {
+                console.warn('Geolocation error:', error.message);
+                console.log('Using default location (center of USA)');
+                helpers.hideLoading('location-loading-overlay');
+                self.initialize(self.DEFAULT_LAT, self.DEFAULT_LNG, self.DEFAULT_ZOOM);
+            }
+        });
     },
 
     /**

@@ -91,8 +91,9 @@ public class RouteService {
               .body(LocationData.Feature.class);
         
         return Double.valueOf(feature.getGeometry().getCoordinates().get(2));
-        
+
       } catch (Exception e) {
+         log.error("Failed to get elevation for ({}, {})", latitude, longitude, e);
          return null;
       }
    }

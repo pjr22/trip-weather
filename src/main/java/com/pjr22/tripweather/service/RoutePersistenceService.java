@@ -69,12 +69,6 @@ public class RoutePersistenceService {
             Optional<Route> existingRouteOpt = routeRepository.findById(routeDto.getId());
             if (existingRouteOpt.isPresent()) {
                 route = existingRouteOpt.get();
-                
-                // Eagerly fetch waypoints to avoid lazy loading issues
-                if (route.getWaypoints() != null) {
-                    route.getWaypoints().size(); // Force initialization
-                }
-                
                 route.setName(routeDto.getName());
                 // Verify the route belongs to the user (security check)
                 if (!route.getUser().getId().equals(user.getId())) {

@@ -7,44 +7,50 @@ window.TripWeather = window.TripWeather || {};
 window.TripWeather.Managers = window.TripWeather.Managers || {};
 
 window.TripWeather.Managers.Search = {
-    
+
     // Search state
     searchDebounceTimer: null,
     routeSearchDebounceTimer: null,
-    
+    initialized: false,
+
     /**
      * Initialize search functionality
      */
     initialize: function() {
+        if (this.initialized) {
+            return;
+        }
+        this.initialized = true;
+
         const modal = document.getElementById('search-modal');
         const btn = document.getElementById('search-location-btn');
         const closeBtn = document.querySelector('.close');
         const searchInput = document.getElementById('search-input');
-        
+
         if (btn) {
-            btn.onclick = function() {
+            btn.addEventListener('click', function() {
                 this.showModal();
-            }.bind(this);
+            }.bind(this));
         }
-        
+
         if (closeBtn) {
-            closeBtn.onclick = function() {
+            closeBtn.addEventListener('click', function() {
                 this.hideModal();
-            }.bind(this);
+            }.bind(this));
         }
-        
+
         if (modal) {
-            modal.onclick = function(event) {
+            modal.addEventListener('click', function(event) {
                 if (event.target == modal) {
                     this.hideModal();
                 }
-            }.bind(this);
+            }.bind(this));
         }
-        
+
         if (searchInput) {
             searchInput.addEventListener('input', this.handleSearchInput.bind(this));
         }
-        
+
         // Initialize route search modal
         this.initializeRouteSearch();
     },
@@ -333,17 +339,17 @@ window.TripWeather.Managers.Search = {
         const routeSearchInput = document.getElementById('route-search-input');
         
         if (closeBtn) {
-            closeBtn.onclick = function() {
+            closeBtn.addEventListener('click', function() {
                 this.hideRouteSearchModal();
-            }.bind(this);
+            }.bind(this));
         }
-        
+
         if (modal) {
-            modal.onclick = function(event) {
+            modal.addEventListener('click', function(event) {
                 if (event.target == modal) {
                     this.hideRouteSearchModal();
                 }
-            }.bind(this);
+            }.bind(this));
         }
         
         if (routeSearchInput) {

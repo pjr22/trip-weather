@@ -2,6 +2,10 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.5.7'
 	id 'io.spring.dependency-management' version '1.1.7'
+	// On-demand CVE scan of dependencies. Run with: ./gradlew dependencyCheckAnalyze
+	// Reports written to build/reports/dependency-check-report.html. Set NVD_API_KEY to
+	// avoid NVD rate-limiting on the first run (request one at https://nvd.nist.gov/developers/request-an-api-key).
+	id 'org.owasp.dependencycheck' version '12.1.0'
 }
 
 group = 'com.pjr22'
