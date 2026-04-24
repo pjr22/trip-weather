@@ -189,7 +189,6 @@ window.TripWeather.Managers.WaypointRenderer = {
             }
 
             const safeDateValue = helpers.escapeHtml(waypoint.date || '');
-            const safeTimezoneDisplay = helpers.escapeHtml(timezoneDisplay);
             const safeDurationValue = helpers.escapeHtml(window.TripWeather.Utils.Duration.formatDuration(waypoint.duration));
             const safeLocationValue = helpers.escapeHtml(waypoint.locationName || '');
             const safeDistanceValue = helpers.escapeHtml(waypoint.distance ? `${waypoint.distance.toFixed(1)} mi` : '-');
@@ -198,8 +197,7 @@ window.TripWeather.Managers.WaypointRenderer = {
                 <td class="drag-handle-cell"><span class="drag-handle" title="Drag to reorder">☰</span></td>
                 <td>${index + 1}</td>
                 <td><input type="date" value="${safeDateValue}" data-waypoint-sequence="${waypoint.sequence}" data-field="date"></td>
-                <td>${this.buildTimePickerHtml(waypoint)}</td>
-                <td>${safeTimezoneDisplay}</td>
+                <td>${this.buildTimePickerHtml(waypoint, timezoneDisplay)}</td>
                 <td>
                     <div class="duration-input-container">
                         <input type="text"
@@ -252,7 +250,7 @@ window.TripWeather.Managers.WaypointRenderer = {
             const dropZoneRow = tbody.insertRow();
             dropZoneRow.className = 'drop-zone-row';
             dropZoneRow.innerHTML = `
-                <td colspan="13" class="drop-zone-cell"></td>
+                <td colspan="12" class="drop-zone-cell"></td>
             `;
             this.setupDropZone(dropZoneRow);
         }
@@ -273,7 +271,7 @@ window.TripWeather.Managers.WaypointRenderer = {
         const h24 = parseInt(h24Str, 10);
         const ampm = h24 >= 12 ? 'PM' : 'AM';
         const hour12 = h24 % 12 || 12;
-        return { hour: String(hour12), minute: minute, ampm: ampm };
+        return { hour: String(hour12).padStart(2, '0'), minute: minute, ampm: ampm };
     },
 
     /**
@@ -297,20 +295,24 @@ window.TripWeather.Managers.WaypointRenderer = {
     },
 
     /**
-     * Render the hour / minute / AM|PM select trio for a waypoint's time.
-     * Minute options are 5-minute increments; if the stored value isn't on
-     * the grid (legacy data), it's inserted so nothing is silently rounded.
+     * Render the hour / minute / AM|PM select trio plus an inline timezone
+     * abbreviation for a waypoint. Minute options are 5-minute increments;
+     * if the stored value isn't on the grid (legacy data), it's inserted so
+     * nothing is silently rounded.
      * @param {object} waypoint
+     * @param {string} timezoneDisplay - Pre-computed timezone abbreviation (e.g. "MDT")
      * @returns {string} HTML
      */
-    buildTimePickerHtml: function(waypoint) {
+    buildTimePickerHtml: function(waypoint, timezoneDisplay) {
         const parsed = this.parseTime(waypoint.time);
         const sequence = waypoint.sequence;
+        const safeTz = window.TripWeather.Utils.Helpers.escapeHtml(timezoneDisplay || '');
 
         const hourOptions = ['<option value="">--</option>'];
         for (let h = 1; h <= 12; h++) {
-            const selected = parsed.hour === String(h) ? ' selected' : '';
-            hourOptions.push(`<option value="${h}"${selected}>${h}</option>`);
+            const hh = String(h).padStart(2, '0');
+            const selected = parsed.hour === hh ? ' selected' : '';
+            hourOptions.push(`<option value="${hh}"${selected}>${hh}</option>`);
         }
 
         const minuteValues = [];
@@ -336,6 +338,7 @@ window.TripWeather.Managers.WaypointRenderer = {
                 <span class="time-picker-colon">:</span>
                 <select data-waypoint-sequence="${sequence}" data-time-part="minute" aria-label="Minute">${minuteOptions.join('')}</select>
                 <select data-waypoint-sequence="${sequence}" data-time-part="ampm" aria-label="AM or PM"><option value="AM"${amSelected}>AM</option><option value="PM"${pmSelected}>PM</option></select>
+                <span class="time-picker-tz">${safeTz}</span>
             </div>
         `;
     },
