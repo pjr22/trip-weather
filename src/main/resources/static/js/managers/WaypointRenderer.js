@@ -189,7 +189,6 @@ window.TripWeather.Managers.WaypointRenderer = {
             }
 
             const safeDateValue = helpers.escapeHtml(waypoint.date || '');
-            const safeTimeValue = helpers.escapeHtml(waypoint.time || '');
             const safeTimezoneDisplay = helpers.escapeHtml(timezoneDisplay);
             const safeDurationValue = helpers.escapeHtml(window.TripWeather.Utils.Duration.formatDuration(waypoint.duration));
             const safeLocationValue = helpers.escapeHtml(waypoint.locationName || '');
@@ -199,7 +198,7 @@ window.TripWeather.Managers.WaypointRenderer = {
                 <td class="drag-handle-cell"><span class="drag-handle" title="Drag to reorder">☰</span></td>
                 <td>${index + 1}</td>
                 <td><input type="date" value="${safeDateValue}" data-waypoint-sequence="${waypoint.sequence}" data-field="date"></td>
-                <td><input type="time" value="${safeTimeValue}" data-waypoint-sequence="${waypoint.sequence}" data-field="time"></td>
+                <td>${this.buildTimePickerHtml(waypoint)}</td>
                 <td>${safeTimezoneDisplay}</td>
                 <td>
                     <div class="duration-input-container">
@@ -260,6 +259,88 @@ window.TripWeather.Managers.WaypointRenderer = {
     },
 
     /**
+     * Split a stored 24-hour "HH:MM" string into 12-hour display parts.
+     * Returns empty fields when the value is absent or malformed so the
+     * dropdowns render as "--:-- AM".
+     * @param {string} timeStr
+     * @returns {{hour: string, minute: string, ampm: string}}
+     */
+    parseTime: function(timeStr) {
+        if (!timeStr || !/^\d{1,2}:\d{2}$/.test(timeStr)) {
+            return { hour: '', minute: '', ampm: 'AM' };
+        }
+        const [h24Str, minute] = timeStr.split(':');
+        const h24 = parseInt(h24Str, 10);
+        const ampm = h24 >= 12 ? 'PM' : 'AM';
+        const hour12 = h24 % 12 || 12;
+        return { hour: String(hour12), minute: minute, ampm: ampm };
+    },
+
+    /**
+     * Compose a stored 24-hour "HH:MM" string from the three picker selects.
+     * Returns '' if hour or minute is blank so downstream code sees "no time".
+     * @param {string} hour - "1".."12"
+     * @param {string} minute - "00".."59"
+     * @param {string} ampm - "AM" | "PM"
+     * @returns {string}
+     */
+    composeTime: function(hour, minute, ampm) {
+        if (!hour || !minute) {
+            return '';
+        }
+        const h12 = parseInt(hour, 10);
+        let h24 = h12 % 12;
+        if (ampm === 'PM') {
+            h24 += 12;
+        }
+        return `${String(h24).padStart(2, '0')}:${minute}`;
+    },
+
+    /**
+     * Render the hour / minute / AM|PM select trio for a waypoint's time.
+     * Minute options are 5-minute increments; if the stored value isn't on
+     * the grid (legacy data), it's inserted so nothing is silently rounded.
+     * @param {object} waypoint
+     * @returns {string} HTML
+     */
+    buildTimePickerHtml: function(waypoint) {
+        const parsed = this.parseTime(waypoint.time);
+        const sequence = waypoint.sequence;
+
+        const hourOptions = ['<option value="">--</option>'];
+        for (let h = 1; h <= 12; h++) {
+            const selected = parsed.hour === String(h) ? ' selected' : '';
+            hourOptions.push(`<option value="${h}"${selected}>${h}</option>`);
+        }
+
+        const minuteValues = [];
+        for (let m = 0; m < 60; m += 5) {
+            minuteValues.push(String(m).padStart(2, '0'));
+        }
+        if (parsed.minute && !minuteValues.includes(parsed.minute)) {
+            minuteValues.push(parsed.minute);
+            minuteValues.sort();
+        }
+        const minuteOptions = ['<option value="">--</option>'];
+        minuteValues.forEach(mm => {
+            const selected = parsed.minute === mm ? ' selected' : '';
+            minuteOptions.push(`<option value="${mm}"${selected}>${mm}</option>`);
+        });
+
+        const amSelected = parsed.ampm === 'AM' ? ' selected' : '';
+        const pmSelected = parsed.ampm === 'PM' ? ' selected' : '';
+
+        return `
+            <div class="time-picker">
+                <select data-waypoint-sequence="${sequence}" data-time-part="hour" aria-label="Hour">${hourOptions.join('')}</select>
+                <span class="time-picker-colon">:</span>
+                <select data-waypoint-sequence="${sequence}" data-time-part="minute" aria-label="Minute">${minuteOptions.join('')}</select>
+                <select data-waypoint-sequence="${sequence}" data-time-part="ampm" aria-label="AM or PM"><option value="AM"${amSelected}>AM</option><option value="PM"${pmSelected}>PM</option></select>
+            </div>
+        `;
+    },
+
+    /**
      * Setup event handlers for a table row using data attributes
      * @param {HTMLTableRowElement} row - Table row element
      * @param {object} waypoint - Waypoint object
@@ -285,7 +366,33 @@ window.TripWeather.Managers.WaypointRenderer = {
                 });
             }
         });
-        
+
+        // Time picker: three selects (hour / minute / AM|PM) compose a single HH:MM value.
+        // Only commit when the composed value actually differs from what's stored —
+        // otherwise a partial selection (just hour, or just minute) would store '',
+        // trigger updateTable(), and the rebuild would wipe the user's in-progress picks.
+        row.querySelectorAll('select[data-time-part]').forEach(select => {
+            select.addEventListener('change', () => {
+                const picker = select.closest('.time-picker');
+                const hourSelect = picker.querySelector('[data-time-part="hour"]');
+                const minuteSelect = picker.querySelector('[data-time-part="minute"]');
+                const ampmSelect = picker.querySelector('[data-time-part="ampm"]');
+
+                // If the user picks an hour while minute is still blank, default minute to "00"
+                // so a single choice yields a complete time.
+                if (select.dataset.timePart === 'hour' && hourSelect.value && !minuteSelect.value) {
+                    minuteSelect.value = '00';
+                }
+
+                const sequence = parseInt(select.dataset.waypointSequence);
+                const composed = this.composeTime(hourSelect.value, minuteSelect.value, ampmSelect.value);
+                const current = (waypoint && waypoint.time) || '';
+                if (composed !== current) {
+                    window.TripWeather.Managers.Waypoint.updateWaypointField(sequence, 'time', composed);
+                }
+            });
+        });
+
         // Setup button click handlers
         row.querySelectorAll('button[data-waypoint-sequence]').forEach(button => {
             const sequence = parseInt(button.dataset.waypointSequence);
@@ -317,7 +424,7 @@ window.TripWeather.Managers.WaypointRenderer = {
         
         // Setup row click handler
         row.addEventListener('click', function(e) {
-            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT') {
                 this.highlightTableRow(waypoint.sequence);
                 const marker = window.TripWeather.Managers.Waypoint.waypointMarkers.find(m => m.waypointSequence === waypoint.sequence);
                 if (marker) {

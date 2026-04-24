@@ -421,8 +421,8 @@ main {
 
 #waypoints-table th:nth-child(4), /* Time column */
 #waypoints-table td:nth-child(4) {
-    width: 120px;
-    min-width: 120px;
+    width: 155px;
+    min-width: 155px;
 }
 
 #waypoints-table th:nth-child(5), /* Zone column */
@@ -502,12 +502,30 @@ main {
     font-size: 14px;
 }
 
-#waypoints-table input[type="time"] {
+.time-picker {
+    display: flex;
+    align-items: center;
+    gap: 2px;
     width: 100%;
-    padding: 6px;
+}
+
+.time-picker select {
+    padding: 6px 2px;
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 14px;
+    background-color: white;
+    cursor: pointer;
+}
+
+.time-picker select:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.time-picker-colon {
+    font-weight: 600;
+    color: #555;
 }
 
 .actions-cell {
