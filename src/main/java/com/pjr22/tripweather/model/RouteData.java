@@ -71,37 +71,107 @@ public class RouteData {
     public static class RouteSegment {
         @JsonProperty("distance")
         private Double distance;
-        
+
         @JsonProperty("duration")
         private Double duration;
-        
+
         @JsonProperty("steps")
-        private List<Object> steps;
-        
+        private List<RouteStep> steps;
+
         public RouteSegment() {}
-        
+
         public Double getDistance() {
             return distance;
         }
-        
+
         public void setDistance(Double distance) {
             this.distance = distance;
         }
-        
+
         public Double getDuration() {
             return duration;
         }
-        
+
         public void setDuration(Double duration) {
             this.duration = duration;
         }
-        
-        public List<Object> getSteps() {
+
+        public List<RouteStep> getSteps() {
             return steps;
         }
-        
-        public void setSteps(List<Object> steps) {
+
+        public void setSteps(List<RouteStep> steps) {
             this.steps = steps;
+        }
+    }
+
+    public static class RouteStep {
+        @JsonProperty("distance")
+        private Double distance;
+
+        @JsonProperty("duration")
+        private Double duration;
+
+        @JsonProperty("type")
+        private Integer type;
+
+        @JsonProperty("instruction")
+        private String instruction;
+
+        @JsonProperty("name")
+        private String name;
+
+        @JsonProperty("wayPoints")
+        private List<Integer> wayPoints;
+
+        public RouteStep() {}
+
+        public Double getDistance() {
+            return distance;
+        }
+
+        public void setDistance(Double distance) {
+            this.distance = distance;
+        }
+
+        public Double getDuration() {
+            return duration;
+        }
+
+        public void setDuration(Double duration) {
+            this.duration = duration;
+        }
+
+        public Integer getType() {
+            return type;
+        }
+
+        public void setType(Integer type) {
+            this.type = type;
+        }
+
+        public String getInstruction() {
+            return instruction;
+        }
+
+        public void setInstruction(String instruction) {
+            this.instruction = instruction;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public List<Integer> getWayPoints() {
+            return wayPoints;
+        }
+
+        public void setWayPoints(List<Integer> wayPoints) {
+            this.wayPoints = wayPoints;
         }
     }
     

@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pjr22.tripweather.Utils;
@@ -117,6 +118,9 @@ public class RouteService {
          request.setCoordinates(convertWaypointsToCoordinates(waypoints));
          request.setRadiuses(List.of(-1));
          request.setElevation(true);
+         request.setInstructions(true);
+         request.setInstructionsFormat("text");
+         request.setLanguage("en");
 
          String requestBody = objectMapper.writeValueAsString(request);
 
@@ -229,6 +233,9 @@ public class RouteService {
                   }
                   if (segmentNode.has("duration")) {
                      segment.setDuration(segmentNode.get("duration").asDouble());
+                  }
+                  if (segmentNode.has("steps")) {
+                     segment.setSteps(parseSteps(segmentNode.get("steps")));
                   }
                   segments.add(segment);
                }
@@ -345,6 +352,41 @@ public class RouteService {
       }
    }
 
+   private List<RouteData.RouteStep> parseSteps(JsonNode stepsNode) {
+      List<RouteData.RouteStep> steps = new ArrayList<>();
+      if (stepsNode == null || !stepsNode.isArray()) {
+         return steps;
+      }
+      for (JsonNode stepNode : stepsNode) {
+         RouteData.RouteStep step = new RouteData.RouteStep();
+         if (stepNode.has("distance")) {
+            step.setDistance(stepNode.get("distance").asDouble());
+         }
+         if (stepNode.has("duration")) {
+            step.setDuration(stepNode.get("duration").asDouble());
+         }
+         if (stepNode.has("type")) {
+            step.setType(stepNode.get("type").asInt());
+         }
+         if (stepNode.has("instruction")) {
+            step.setInstruction(stepNode.get("instruction").asText());
+         }
+         if (stepNode.has("name")) {
+            step.setName(stepNode.get("name").asText());
+         }
+         JsonNode wayPointsNode = stepNode.get("way_points");
+         if (wayPointsNode != null && wayPointsNode.isArray()) {
+            List<Integer> wayPoints = new ArrayList<>();
+            for (JsonNode idx : wayPointsNode) {
+               wayPoints.add(idx.asInt());
+            }
+            step.setWayPoints(wayPoints);
+         }
+         steps.add(step);
+      }
+      return steps;
+   }
+
    private RouteData createErrorRoute(String errorMessage) {
       RouteData errorRoute = new RouteData();
       errorRoute.setGeometry(new ArrayList<>());
@@ -367,6 +409,12 @@ public class RouteService {
       private List<List<Double>> coordinates;
       private List<Integer> radiuses;
       private Boolean elevation;
+      private Boolean instructions;
+
+      @JsonProperty("instructions_format")
+      private String instructionsFormat;
+
+      private String language;
 
       @Setter
       @Getter

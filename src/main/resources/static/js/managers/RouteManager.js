@@ -105,6 +105,8 @@ window.TripWeather.Managers.Route = {
             return;
         }
 
+        this.currentRoute = routeData;
+
         // Convert geometry coordinates for Leaflet (Leaflet expects [lat, lng])
         const routeCoordinates = routeData.geometry.map(function(coord) {
             return [coord[1], coord[0]];
@@ -160,6 +162,10 @@ window.TripWeather.Managers.Route = {
         // Notify EV Charging Station Manager
         if (window.TripWeather.Managers.EVChargingStation) {
             window.TripWeather.Managers.EVChargingStation.onRouteCalculated(routeData);
+        }
+
+        if (window.TripWeather.Managers.Navigation) {
+            window.TripWeather.Managers.Navigation.updateButtonState();
         }
     },
 
@@ -626,6 +632,10 @@ window.TripWeather.Managers.Route = {
         // Notify EV Charging Station Manager
         if (window.TripWeather.Managers.EVChargingStation) {
             window.TripWeather.Managers.EVChargingStation.onRouteCleared();
+        }
+
+        if (window.TripWeather.Managers.Navigation) {
+            window.TripWeather.Managers.Navigation.updateButtonState();
         }
     },
 

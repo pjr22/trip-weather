@@ -126,13 +126,13 @@ window.TripWeather.App = {
         // They attach to window.TripWeather.Managers namespace automatically
         
         // Verify managers are available
-        const requiredManagers = ['Map', 'Waypoint', 'WaypointRenderer', 'Search', 'UI', 'Route', 'Layer', 'EVChargingStation'];
+        const requiredManagers = ['Map', 'Waypoint', 'WaypointRenderer', 'Search', 'UI', 'Route', 'Layer', 'EVChargingStation', 'Navigation'];
         requiredManagers.forEach(function(managerName) {
             if (!window.TripWeather.Managers[managerName]) {
                 throw new Error(`Required manager ${managerName} not found`);
             }
         });
-        
+
         // Initialize each manager
         window.TripWeather.Managers.Waypoint.initialize();
         window.TripWeather.Managers.UI.initialize();
@@ -140,6 +140,7 @@ window.TripWeather.App = {
         window.TripWeather.Managers.Route.initialize();
         window.TripWeather.Managers.Layer.initialize();
         window.TripWeather.Managers.EVChargingStation.initialize();
+        window.TripWeather.Managers.Navigation.initialize();
         
         console.log('Managers initialized');
     },
