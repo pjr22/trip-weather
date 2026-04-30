@@ -7,7 +7,15 @@ window.TripWeather = window.TripWeather || {};
 window.TripWeather.Managers = window.TripWeather.Managers || {};
 
 window.TripWeather.Managers.WaypointRenderer = {
-    
+
+    /**
+     * Sequences of waypoints whose card is currently expanded on mobile.
+     * Cards default to collapsed; this set is mutated by the chevron
+     * click handler. updateTable() consults it on each rebuild so user
+     * expand/collapse choices survive field-edit re-renders.
+     */
+    expandedWaypoints: new Set(),
+
     /**
      * Format date and time for waypoint popup
      * @param {object} waypoint - Waypoint object
@@ -173,8 +181,13 @@ window.TripWeather.Managers.WaypointRenderer = {
             row.dataset.waypointSequence = waypoint.sequence;
             // Cards default to collapsed on mobile — tap chevron to expand.
             // The class has no visual effect on desktop (where the table
-            // layout always shows all columns).
-            row.classList.add('collapsed');
+            // layout always shows all columns). Honor any prior expand
+            // choice for this sequence so editing fields doesn't collapse
+            // the card the user is actively working in.
+            const isExpanded = this.expandedWaypoints.has(waypoint.sequence);
+            if (!isExpanded) {
+                row.classList.add('collapsed');
+            }
             
             const weatherHtml = window.TripWeather.Services.Weather.generateWeatherHtml(waypoint.weather, waypoint.weatherLoading);
             
@@ -212,7 +225,7 @@ window.TripWeather.Managers.WaypointRenderer = {
             
             row.innerHTML = `
                 <td class="drag-handle-cell">
-                    <button class="card-toggle" data-action="toggle-card" aria-label="Toggle waypoint details" aria-expanded="false"><span class="chevron">▾</span></button>
+                    <button class="card-toggle" data-action="toggle-card" aria-label="Toggle waypoint details" aria-expanded="${isExpanded ? 'true' : 'false'}"><span class="chevron">▾</span></button>
                     <span class="drag-handle" title="Drag to reorder">☰</span>
                 </td>
                 <td>${index + 1}</td>
@@ -447,13 +460,21 @@ window.TripWeather.Managers.WaypointRenderer = {
         
         // Card collapse/expand toggle (mobile only, hidden on desktop via CSS).
         // stopPropagation keeps the tap from also triggering the row's
-        // marker-popup handler below.
+        // marker-popup handler below. The expandedWaypoints set persists
+        // the choice across updateTable() rebuilds (e.g. when the user
+        // edits a date/time/duration field, which triggers a re-render).
         const cardToggle = row.querySelector('button[data-action="toggle-card"]');
         if (cardToggle) {
+            const renderer = this;
             cardToggle.addEventListener('click', function(e) {
                 e.stopPropagation();
                 const collapsed = row.classList.toggle('collapsed');
                 cardToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                if (collapsed) {
+                    renderer.expandedWaypoints.delete(waypoint.sequence);
+                } else {
+                    renderer.expandedWaypoints.add(waypoint.sequence);
+                }
             });
         }
 

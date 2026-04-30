@@ -221,7 +221,11 @@ main {
 .header-buttons {
     display: flex;
     gap: 10px;
-    align-items: center;
+    /* stretch (not center) so a single-word button like Navigate matches
+       the height of taller buttons whose label wraps to two lines. Each
+       button's own align-items: center keeps icon+text centered inside
+       the stretched box. */
+    align-items: stretch;
 }
 
 .route-btn {
@@ -234,6 +238,10 @@ main {
     font-size: 14px;
     font-weight: 600;
     transition: background-color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
 }
 
 .route-btn:hover {
@@ -245,7 +253,13 @@ main {
     cursor: not-allowed;
 }
 
-/* Common action button styles for consistency */
+/* Common action button styles for consistency.
+   Inline-flex with align-items: center keeps the icon (.btn-icon span)
+   in its own column on the left and the text (.btn-text span) on the
+   right; when the text wraps, the icon stays put and wrapped lines
+   align with the first line of text — not below the icon. text-align:
+   left ensures wrapped text within .btn-text is left-aligned rather
+   than inheriting the button-default center alignment. */
 .action-btn-primary {
     background-color: #3498db;
     color: white;
@@ -258,8 +272,24 @@ main {
     transition: background-color 0.2s;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
     gap: 8px;
+    text-align: left;
+}
+
+/* Icon column: never shrinks or grows; sized by the emoji's natural
+   character width. */
+.btn-icon {
+    flex: 0 0 auto;
+    line-height: 1;
+}
+
+/* Text column: takes remaining space and wraps at whitespace within
+   itself when the button is narrow. min-width: 0 lets it shrink below
+   its content's natural max-content size when needed. */
+.btn-text {
+    flex: 0 1 auto;
+    min-width: 0;
+    line-height: 1.15;
 }
 
 .action-btn-primary:hover {
@@ -1083,9 +1113,8 @@ main {
 
     .header-menu-toggle {
         display: inline-flex;
-        min-width: 44px;
         min-height: 44px;
-        font-size: 18px;
+        font-size: 20px;
     }
 
     /* Collapse non-essential items: hidden by default, surfaced as a
