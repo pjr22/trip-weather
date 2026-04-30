@@ -336,6 +336,13 @@ main {
     transition: transform 0.2s ease;
 }
 
+/* Mobile-only short-year overlay — hidden on desktop where the native
+   date input renders the full year directly. The ≤640 media block
+   below makes this visible and absolute-positions it over the input. */
+.date-display {
+    display: none;
+}
+
 .waypoints-section h2 {
     color: #2c3e50;
     margin-bottom: 5px;
@@ -1241,6 +1248,38 @@ main {
         display: none;
     }
 
+    /* === Reorder feedback (mobile) ===
+       The dragged card lifts visibly: heavily faded, slightly scaled
+       down, with a soft shadow so the user can tell which card is
+       in motion. The drop target gets a bold blue bar with a glow,
+       absolute-positioned above the card via ::after — no layout
+       shift, and visible from across the screen. The desktop's
+       subtle 3 px border-top is overridden so the new indicator is
+       the only thing the user sees. */
+    #waypoints-table tbody tr.dragging {
+        opacity: 0.35;
+        transform: scale(0.97);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+    }
+
+    #waypoints-table tbody tr.drag-over {
+        border-top: 1px solid #e0e0e0;
+    }
+    #waypoints-table tbody tr.drag-over::after {
+        content: '';
+        position: absolute;
+        top: -8px;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: #3498db;
+        border-radius: 3px;
+        box-shadow: 0 0 12px rgba(52, 152, 219, 0.8),
+                    0 2px 6px rgba(52, 152, 219, 0.4);
+        pointer-events: none;
+        z-index: 100;
+    }
+
     /* Reset fixed column widths inherited from the desktop table. */
     #waypoints-table tbody td {
         display: block;
@@ -1561,6 +1600,7 @@ main {
         color: transparent;
     }
     .date-display {
+        display: block;
         position: absolute;
         left: 4px;
         top: 50%;
