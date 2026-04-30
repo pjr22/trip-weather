@@ -299,22 +299,25 @@ src/main/resources/static/
 
 A suggested cut so we can ship something usable early and iterate.
 
-### Phase 1 — Backend + data shape
+### Phase 1 — Backend + data shape ✅ done
 - Request `instructions: true`, parse `steps` into typed DTOs.
 - Verify in a manual test that a planned route returns sensible turn-by-turn steps.
 - No frontend changes yet; just confirm the data is there.
 
-### Phase 2 — Navigation engine (desktop development, mobile-form-factor testing)
+### Phase 2 — Navigation engine (desktop development, mobile-form-factor testing) ✅ done
 - Build the **`PositionSource` abstraction first** (`LivePositionSource` over `geolocation.watchPosition`, `PlaybackPositionSource` reading a GPX file or interpolating along the saved route at 1×/5×/25× speed, behind a `?simgps=1` debug flag). Everything downstream depends only on the abstraction so the engine is testable from day one without driving.
 - Implement `RouteSnapper`, `ManeuverScheduler`, `VoiceGuide`, `WakeLock`, `NavigationManager`, and the `NavMapAdapter` interface with a `LeafletNavMapAdapter` implementation (see §6.6).
 - Add a **Navigate** button.
 - Render the maneuver banner and exit button. Voice prompts working.
 
-### Phase 3 — Connector route + off-route handling
-- Snap-to-nearest-point + connector route on Navigate.
-- Off-route detection + re-planning with cooldown.
+### Phase 3 — Connector route, off-route handling, waypoint stops ✅ done
+- **3a** Filter ORS depart/goal markers; build `waypointStops[]`.
+- **3b** Connector route on Navigate. Smart destination selection: planned-stop (duration > 0 waypoints) → maneuver-lookahead (encode the next maneuver's instruction in our actual approach direction) → perpendicular foot. Visual trim split from data trim so duration-stop destinations are visible while non-stop trims avoid orange-on-blue overlap.
+- **3c** Off-route detection (50 m / 10 s sustained) with guide-back via the connector machinery. Forward-only snap so the join can't go backward through visited stops. 20 s re-route cooldown.
+- **3d** Approach prompts ("In 1 mile, arriving at [name]") for duration > 0 waypoints. Arrival within `ARRIVAL_RADIUS_M` pauses navigation; voice + off-route + scheduler are gated. Continue button resumes.
+- **3e** Skip button visible when within `SKIP_AVAILABLE_DISTANCE_M` of an approachable duration waypoint, sticky until tapped or arrived. Drive-past detection (user advances past the waypoint geometrically) re-routes back with the missed waypoint as the explicit target. `arrivedWaypoints` / `skippedWaypoints` sets carry across re-routes within a session.
 
-### Phase 4 — Mobile-first planning view + PWA shell
+### Phase 4 — Mobile-first planning view + PWA shell ⏳ next
 - Responsive waypoint table (stacked cards), responsive modals, responsive header buttons.
 - Touch-target audit.
 - `manifest.webmanifest` with icons (existing favicon set covers most sizes), theme colour, `display: standalone`.

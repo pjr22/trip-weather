@@ -145,14 +145,19 @@ public class RouteService {
    }
 
    /**
-    * Add minutes to a datetime string in the specified timezone
+    * Add minutes to a datetime string in the specified timezone. Falls back to
+    * the application's default timezone when the supplied one is null or blank
+    * (e.g. on the synthetic two-waypoint connector requests the navigation
+    * client sends, where arrival-time fields are unused).
     */
    private String addMinutesToDateTime(String dateTimeStr, String timezone, Integer minutes) {
       try {
          DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
          LocalDateTime localDateTime = LocalDateTime.parse(dateTimeStr, formatter);
 
-         ZoneId zoneId = ZoneId.of(timezone);
+         String resolvedTimezone = (timezone == null || timezone.isBlank())
+               ? Utils.default_timezone_name : timezone;
+         ZoneId zoneId = ZoneId.of(resolvedTimezone);
          ZonedDateTime zonedDateTime = localDateTime.atZone(zoneId);
          ZonedDateTime resultZonedDateTime = zonedDateTime.plusMinutes(minutes);
 

@@ -74,6 +74,64 @@ body.nav-mode #map {
     background: #a93226;
 }
 
+/* Continue button — shown when paused at a duration waypoint. Anchored above
+   the Exit Navigation button so both are visible without overlap. */
+.nav-continue-btn {
+    display: none;
+    position: fixed;
+    bottom: 88px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2000;
+    background: #27ae60;
+    color: #fff;
+    border: none;
+    padding: 14px 28px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    min-width: 180px;
+    min-height: 48px;
+}
+
+.nav-continue-btn:hover {
+    background: #1e8449;
+}
+
+/* Skip button — appears when within ~2 mi of an upcoming duration waypoint.
+   Anchored top-right so it doesn't compete with the maneuver banner or the
+   bottom Exit/Continue buttons. */
+.nav-skip-btn {
+    display: none;
+    position: fixed;
+    top: 110px;
+    right: 16px;
+    z-index: 2000;
+    background: #e67e22;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    min-height: 44px;
+    max-width: 70vw;
+}
+
+.nav-skip-btn:hover {
+    background: #cf6f12;
+}
+
+/* Paused-at-waypoint banner styling — slightly different background hue so the
+   user can tell at a glance the route is paused, not just showing instructions. */
+.nav-banner.nav-banner-paused {
+    background: rgba(39, 174, 96, 0.95);
+}
+
 /* User-position marker — a triangle pointing in the direction of travel.
    The wrapping div carries the rotation transform; the triangle itself is
    built from CSS borders so we don't need an SVG asset. */

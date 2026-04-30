@@ -20,6 +20,7 @@ window.TripWeather.Nav.MapAdapter.Leaflet = {
 
     map: null,
     navUserMarker: null,
+    connectorPolyline: null,
     savedView: null,
 
     initialize: function(map) {
@@ -39,9 +40,34 @@ window.TripWeather.Nav.MapAdapter.Leaflet = {
             this.navUserMarker.remove();
             this.navUserMarker = null;
         }
+        this.clearConnectorPolyline();
         if (this.savedView && this.map) {
             this.map.setView(this.savedView.center, this.savedView.zoom);
             this.savedView = null;
+        }
+    },
+
+    /**
+     * Draw the dashed-orange "join the route" connector. coords is a list of
+     * [lat, lng] pairs in Leaflet ordering. Drawn over the saved-route polyline.
+     */
+    drawConnectorPolyline: function(coords) {
+        if (!this.map || !coords || coords.length < 2) return;
+        this.clearConnectorPolyline();
+        const C = window.TripWeather.Nav.Constants;
+        this.connectorPolyline = L.polyline(coords, {
+            color: C.CONNECTOR_POLYLINE_COLOR,
+            weight: C.CONNECTOR_POLYLINE_WEIGHT,
+            dashArray: C.CONNECTOR_POLYLINE_DASH,
+            opacity: C.CONNECTOR_POLYLINE_OPACITY,
+            interactive: false
+        }).addTo(this.map);
+    },
+
+    clearConnectorPolyline: function() {
+        if (this.connectorPolyline) {
+            this.connectorPolyline.remove();
+            this.connectorPolyline = null;
         }
     },
 

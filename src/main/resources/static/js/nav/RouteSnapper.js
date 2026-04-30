@@ -95,12 +95,37 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
         return best;
     }
 
-    function snap(compiled, position, hintIdx) {
+    /**
+     * Snap a position to the polyline.
+     *
+     * options.forwardOnly = true restricts the search to indices >= hintIdx —
+     * never matching a closer earlier segment. Used by off-route guide-back so
+     * the join point is always ahead of where the user has already been; a
+     * backward match could send them back through stops they've already done.
+     */
+    function snap(compiled, position, hintIdx, options) {
         const C = window.TripWeather.Nav.Constants;
         const points = compiled.points;
         if (points.length < 2) return null;
+        options = options || {};
 
         const hint = (hintIdx == null) ? 0 : hintIdx;
+
+        if (options.forwardOnly) {
+            const start = Math.max(0, hint);
+            const windowEnd = Math.min(points.length - 1, hint + C.SNAP_FORWARD_WINDOW_SEGMENTS);
+            let best = snapWithinRange(compiled, position, start, windowEnd);
+            // Extended forward search if the windowed match is bad — but never
+            // search before the hint.
+            if (!best || best.crossTrackM > 200) {
+                const full = snapWithinRange(compiled, position, start, points.length - 1);
+                if (full && (!best || full.crossTrackM < best.crossTrackM)) {
+                    best = full;
+                }
+            }
+            return best;
+        }
+
         const start = Math.max(0, hint - 5);
         const end = Math.min(points.length - 1, hint + C.SNAP_FORWARD_WINDOW_SEGMENTS);
 

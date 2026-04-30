@@ -19,15 +19,21 @@ public class Utils {
    }
 
    /**
-    * Convert datetime string from one timezone to another using LocationService
-    * timezone data
+    * Convert datetime string from one timezone to another. Either timezone may
+    * be null or blank — falls back to default_timezone_name in that case so
+    * synthetic requests without timezone metadata (e.g. navigation connector
+    * routing) don't spam the log with ZoneOffset parse errors.
     */
    public static String convertDateTime(String dateTimeStr, String fromTimezone, String toTimezone) {
       try {
          LocalDateTime localDateTime = LocalDateTime.parse(dateTimeStr, date_time_formatter);
 
-         ZoneId fromZoneId = ZoneId.of(fromTimezone);
-         ZoneId toZoneId = ZoneId.of(toTimezone);
+         String resolvedFrom = (fromTimezone == null || fromTimezone.isBlank())
+               ? default_timezone_name : fromTimezone;
+         String resolvedTo = (toTimezone == null || toTimezone.isBlank())
+               ? default_timezone_name : toTimezone;
+         ZoneId fromZoneId = ZoneId.of(resolvedFrom);
+         ZoneId toZoneId = ZoneId.of(resolvedTo);
 
          ZonedDateTime fromZonedDateTime = localDateTime.atZone(fromZoneId);
          ZonedDateTime toZonedDateTime = fromZonedDateTime.withZoneSameInstant(toZoneId);

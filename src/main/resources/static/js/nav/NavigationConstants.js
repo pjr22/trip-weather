@@ -45,6 +45,16 @@ window.TripWeather.Nav.Constants = {
     ARRIVAL_RADIUS_M: 50,
     SKIP_AVAILABLE_DISTANCE_M: 1609.344 * 2,   // 2 miles
 
+    // Connector destination lookahead. Saved-route maneuver instructions are
+    // tied to the original approach direction, so a connector landing the user
+    // heading the opposite way leaves the next saved instruction wrong (or
+    // unspoken). To work around this, we extend the connector's destination
+    // past the next saved-route maneuver — ORS then re-computes that maneuver's
+    // instruction in our actual approach direction. Capped so a distant
+    // maneuver doesn't pull the connector miles off course.
+    CONNECTOR_LOOKAHEAD_MAX_M: 1609.344 * 2,   // 2 miles
+    CONNECTOR_MANEUVER_BUFFER_VERTICES: 2,
+
     // Camera / display
     NAV_FOLLOW_ZOOM: 17,
 
@@ -52,6 +62,11 @@ window.TripWeather.Nav.Constants = {
     SIM_DEFAULT_SPEED_MPS: 25,            // ~90 km/h ground speed
     SIM_DEFAULT_SPEED_MULTIPLIER: 5,
     SIM_EMIT_INTERVAL_MS: 500,
+
+    // Cap how far the simulator will start from the route's first waypoint when
+    // beginAtStart=0. Tests the connector path without forcing a 100-mile drive
+    // back to the route just because the dev machine is far from it.
+    SIM_BEGIN_AT_START_MAX_DISTANCE_M: 5 * 1609.344,    // 5 miles
 
     // When the next maneuver is closer than these thresholds, the simulator
     // overrides the URL simspeed to the corresponding multiplier so the user
@@ -63,5 +78,11 @@ window.TripWeather.Nav.Constants = {
 
     // Voice
     VOICE_LANG: 'en-US',
-    VOICE_RATE: 1.0
+    VOICE_RATE: 1.0,
+
+    // Connector polyline visual (Phase 3b/3c — "join the route" overlay)
+    CONNECTOR_POLYLINE_COLOR: '#ff8800',
+    CONNECTOR_POLYLINE_WEIGHT: 4,
+    CONNECTOR_POLYLINE_DASH: '8,8',
+    CONNECTOR_POLYLINE_OPACITY: 0.9
 };

@@ -4,11 +4,15 @@ Picking up the navigation feature from another machine. Pair this with [NAVIGATI
 
 ## Status at handoff
 
-**Phase 1** (backend instructions) and **Phase 2** (navigation engine, voice, simulated GPS) are complete and tested. **Phase 3a** (filter ORS waypoint marker steps + build `waypointStops[]` side-data) is complete; **3b–3e** are pending.
+**Phases 1, 2, and 3 (3a–3e) are complete.** The navigation feature ships with:
 
-The user can plan/load a route, click Navigate, and either drive it (live GPS) or simulate it (`?simgps=1`). Voice prompts fire at the FAR/MID/NEAR/NOW buckets for real maneuvers; passthrough waypoints (duration == 0) are silent; the polyline-end check announces final arrival. The simulator slows down within 1 mi of each maneuver (real-time) and within 0.25 mi (½ real-time) so prompts are audible during desk testing.
+- Backend turn-by-turn instructions parsed from ORS into typed `RouteStep` DTOs.
+- A nav-mode UI (full-screen map, maneuver banner, Exit / Continue / Skip buttons), wake-lock, voice prompts via Web Speech, simulated GPS playback (`?simgps=1`).
+- A connector route on Navigate that joins from off-route, with smart destination selection — duration waypoints are routed to (not skipped), and the connector swallows the next saved-route maneuver to encode it in the user's actual approach direction.
+- Off-route detection (50 m / 10 s sustained, 20 s cooldown) with guide-back via the same connector machinery.
+- Per-waypoint pause/Continue at duration > 0 stops, Skip button visibility within 2 mi of upcoming stops, drive-past detection that re-routes back to the missed waypoint.
 
-**Next concrete step:** Phase 3b — connector route on Navigate (snap user → compute connector via `/api/route/calculate` → splice in front of saved-route maneuvers → drop on join). See §6.5 of NAVIGATION_PLAN.md.
+**Next concrete step:** Phase 4 — mobile-first refresh of the planning view + PWA shell (manifest + cache-first service worker). See §6.8 and §8 of NAVIGATION_PLAN.md.
 
 ## What works today (verification checklist)
 
@@ -16,11 +20,16 @@ After resuming, smoke-test these to confirm nothing regressed:
 
 1. `./gradlew bootRun` starts on `localhost:8090`.
 2. Plan a multi-waypoint route, click **🚗 Calculate Route** — polyline appears, the **🧭 Navigate** button enables.
-3. Click Navigate — banner appears, map goes full-screen, voice says "Starting navigation."
-4. With `?simgps=1` on the URL, the dot walks along the route and voice prompts fire at the FAR/MID/NEAR/NOW thresholds for each turn. Passthrough waypoints (duration 0) are silent.
-5. On reaching the final waypoint, voice says "You have arrived at your destination" and the nav UI exits.
-6. **Exit Navigation** button works mid-route.
-7. Try `?simgps=1&simspeed=20` — fast cruise between turns, slows to real-time within 1 mi of each turn, ½ real-time within 0.25 mi.
+3. Click Navigate — "Updating your location…" overlay → nav-mode banner → voice says "Starting navigation."
+4. With `?simgps=1`, the dot walks the route and voice prompts fire at FAR/MID/NEAR/NOW for each turn. Passthrough waypoints (duration 0) are silent.
+5. With `?simgps=1&beginAtStart=0`, sim starts from your real GPS (capped at 5 mi from waypoint 1) and the dashed-orange connector polyline draws the connector path.
+6. Approach a duration waypoint: voice fires "In 1 mile, arriving at [name]" → "In a quarter mile..." → "Arriving at [name]." On arrival within 50 m, voice says "You have arrived at [name]" and a green **Continue** button appears. Tapping Continue resumes navigation.
+7. Skip button appears within ~2 mi of an upcoming duration waypoint and stays visible until tapped or arrival. Tapping Skip says "Skipping. Re-routing." and routes past the waypoint.
+8. Driving past a duration waypoint without arriving (geometric pass) triggers "Re-routing to [name]" and a fresh connector back to the waypoint.
+9. Live GPS off-route ≥10 s triggers "Re-routing." and a dashed-orange connector polyline back to the saved route. 20 s cooldown between re-routes.
+10. On reaching the final waypoint, voice says "You have arrived at your destination" and the nav UI exits.
+11. **Exit Navigation** button works at any time (mid-route, paused, mid-reroute).
+12. Try `?simgps=1&simspeed=20` — fast cruise between turns, slows to real-time within 1 mi of each turn, ½ real-time within 0.25 mi.
 
 ## Resume instructions
 
@@ -41,82 +50,22 @@ Frontend has no build step. JS/CSS edits are picked up on browser refresh.
 |     1 | Backend: request `instructions: true` from ORS, parse `steps[]`        | ✅ done |
 |     2 | Engine, voice, simulated GPS, nav-mode UI, wake-lock                   | ✅ done |
 |    3a | Filter ORS type-10/11 marker steps; build `waypointStops[]`            | ✅ done |
-|    3b | Connector route on Navigate (snap → compute → splice → join)           | ⏳ next |
-|    3c | Off-route detection + guide-back; 20s cooldown                         | ⏳      |
-|    3d | `duration > 0` pause/Continue + arrival announcements                  | ⏳      |
-|    3e | Skip button + drive-past handling (re-route targets the waypoint)      | ⏳      |
-|     4 | Mobile-first planning view + PWA shell                                 | ⏳      |
+|    3b | Connector route on Navigate (snap → compute → splice → join)           | ✅ done |
+|    3c | Off-route detection + guide-back; 20s cooldown                         | ✅ done |
+|    3d | `duration > 0` pause/Continue + arrival announcements                  | ✅ done |
+|    3e | Skip button + drive-past handling (re-route targets the waypoint)      | ✅ done |
+|     4 | Mobile-first planning view + PWA shell                                 | ⏳ next |
 |     5 | v2 candidates: MapLibre alt, hybrid off-route, Settings                | future |
 
-## Phase 3 — what each remaining sub-phase needs to build
+## Phase 3 — recap of what each sub-phase shipped
 
-Order matters: 3b/3c build the connector machinery that 3d/3e depend on.
+Where to look in the code is more useful now than re-stating the spec; the spec lives in [NAVIGATION_PLAN.md](NAVIGATION_PLAN.md).
 
-### 3b — Connector route on Navigate (§6.5)
-
-On clicking **Navigate**:
-
-1. Get a single high-accuracy fix via `getCurrentPosition` (not `watchPosition` yet).
-2. Snap to nearest point on saved polyline using the existing `RouteSnapper`.
-3. If `snap.crossTrackM <= ON_ROUTE_THRESHOLD_M` (30 m): start nav from the snapped position, no connector.
-4. Otherwise call `POST /api/route/calculate` with `[currentLocation, nearestPoint]` to get a real driving connector (with its own `steps[]`).
-5. Render the connector polyline in **dashed orange** (style hook needed in `NavMapAdapter` or `RouteManager`).
-6. Splice: the active maneuver list = `connector.steps[] + savedRoute.steps[fromForwardIdx..]`.
-7. When the user reaches the join point (within `ON_ROUTE_THRESHOLD_M`), drop the connector polyline; saved-route polyline returns to normal blue. The maneuver list is already past the connector entries by then — no special action needed.
-
-For `?simgps=1` mode: skip the connector (the simulator IS the route), start at distance 0 as today.
-
-If `getCurrentPosition` is denied or times out → toast + abort. No fallback.
-
-### 3c — Off-route detection + guide-back (§6.3)
-
-In `_onPosition`, track cross-track distance. Off-route fires when `crossTrackM > OFF_ROUTE_THRESHOLD_M` (50 m) sustained for `OFF_ROUTE_SUSTAINED_MS` (10 s).
-
-On off-route:
-1. Cancel current voice prompt; say "Re-routing."
-2. Find nearest **forward** point on the polyline (search from `lastSegmentIdx`, not from start — otherwise you can match a closer earlier point and send the user backwards through stops they've done).
-3. Call `/api/route/calculate` with `[currentLocation, forwardPoint]`.
-4. Splice connector steps in front of `savedRoute.steps[fromForwardIdx..]`, render dashed-orange connector polyline.
-5. When user reaches join point, drop connector polyline.
-6. Apply `REROUTE_COOLDOWN_MS` (20 s) before another re-route can fire. If the API call fails, keep the original route and notify; don't retry.
-
-Constants are already in [NavigationConstants.js](src/main/resources/static/js/nav/NavigationConstants.js).
-
-### 3d — Pause/Continue at duration > 0 waypoints (§6.7)
-
-Now that `waypointStops[]` exists (3a), add an arrival-watcher in `_onPosition` that walks the not-yet-arrived `waypointStops[]` and checks whether the user's snapped position is within `ARRIVAL_RADIUS_M` (50 m) of each.
-
-On approach to a `duration > 0` waypoint, fire FAR/MID/NEAR/NOW announcements with phrasing "Arriving at [name] in half a mile" → "You have arrived at [name]." (May want a separate `ManeuverScheduler` instance for waypoint approach prompts, or extend the existing one.)
-
-On arrival within `ARRIVAL_RADIUS_M`:
-- Set state to **paused at waypoint i**.
-- Suppress voice (`VoiceGuide.setEnabled(false)`).
-- Suppress off-route detection.
-- Show **Continue** button in the banner ("Stopped at [name] — tap Continue when ready").
-
-On Continue:
-- Re-enable voice + off-route.
-- Resume from the next maneuver after this waypoint (find by polyline index).
-- If user position is no longer within `ON_ROUTE_THRESHOLD_M`, the standard guide-back from 3c kicks in immediately.
-
-`duration == 0` waypoints: no behaviour at all (passthroughs).
-
-**Final waypoint** always ends the session — already handled by the polyline-end check; don't apply pause logic to it (use `stop.isFinal`).
-
-### 3e — Skip button + drive-past handling (§6.7)
-
-Driving past a `duration > 0` waypoint geometrically (without arriving) does **not** count as done. Re-route the user back to the waypoint using 3c's machinery, but with the **target = the waypoint itself**, not the polyline forward point.
-
-Skip button visibility:
-- Appears when distance to the waypoint first drops below `SKIP_AVAILABLE_DISTANCE_M` (~2 mi).
-- Once shown, **stays visible** until tapped or arrival within `ARRIVAL_RADIUS_M`. Includes the entire approach + drive-past + re-route phase. Otherwise the user has no escape from the loop.
-
-On Skip:
-- Mark waypoint as skipped.
-- Trigger guide-back to the **nearest forward point on the saved polyline past the skipped waypoint** (start search at `stop.polylineIdx + 1`).
-- Resume original instructions from there.
-
-Off-route detection (3c) stays active throughout (including while routing back to a missed waypoint). The 20 s cooldown limits API churn even if the user keeps driving away.
+- **3a** — ORS type-10/11 marker filtering and the `waypointStops[]` parallel structure: [NavigationManager._flattenManeuvers / _buildWaypointStops](src/main/resources/static/js/managers/NavigationManager.js).
+- **3b** — Connector route on Navigate: `acquireUserLocation` reuse for the GPS fix, `_findConnectorDestination` priorities (planned-stop > maneuver-lookahead > perpendicular foot), `_assembleMergedRoute` for the merged geometry, visual trim split from data trim. Initial-Navigate landing on a duration waypoint preserves the synthetic stop entry.
+- **3c** — Off-route detection in `_onPosition` (50 m / 10 s sustained), forward-only `RouteSnapper.snap` for the join hint, `_triggerReroute` + `_applyReroute` for guide-back. 20 s cooldown gates retries; on fetch failure the original merged route is kept and a toast surfaces.
+- **3d** — Approach scheduler ([ManeuverScheduler.createForWaypointStops](src/main/resources/static/js/nav/ManeuverScheduler.js)) fires FAR/MID/NEAR prompts; `_handleWaypointStops` checks arrival within `ARRIVAL_RADIUS_M` and calls `_pauseAtWaypoint`. Paused state gates voice + off-route + scheduler in `_onPosition`. Continue button resumes via `_continueFromWaypoint`. Paused banner hue is green for visual distinction from active nav.
+- **3e** — Skip button visibility tracked in `_handleWaypointStops` (2 mi → arrival/tap). `_handleSkip` marks the waypoint, advances `lastSavedSegmentIdx` past it, calls `_triggerReroute` with no explicit dest so the standard heuristic finds a forward point past the skip. Drive-past detection (user's polyline distance > stop + `ARRIVAL_RADIUS_M`) calls `_triggerReroute` with an explicit dest = the missed waypoint's location. `arrivedWaypoints` and `skippedWaypoints` sets carry across re-routes within a session, queried by `_firstSkippedDurationWaypoint` so the connector-destination logic doesn't re-target them.
 
 ## Files created in this work
 
@@ -168,13 +117,12 @@ All ten open questions from the plan are resolved. Cliff notes:
 
 ## Things known to be missing or rough
 
-- No connector route at Navigate time yet — if the user starts far from the route polyline, the snap will pick a point with the user instantly "far ahead" of where they actually are (Phase 3b fixes this).
-- No off-route handling — driving away from the route just means voice prompts go silent; nothing recovers (Phase 3c fixes this).
-- No `duration > 0` arrival announcements or pause yet (Phase 3d).
-- No Skip button yet (Phase 3e).
 - Maneuver banner is plain text; no maneuver-type icons. Acceptable for v1 — polish later.
 - Heading-up rotation deferred to Phase 5 (MapLibre swap).
 - No mobile-first refresh of the planning view yet (Phase 4) — usable on phones but not optimised.
+- Re-route while waypoint approach prompts have already fired: prompts won't re-fire after the new merged geometry is applied (the waypoint scheduler is rebuilt fresh). Acceptable in practice — the user has just heard "Re-routing." and the next driving maneuver fires shortly after; arrival at the waypoint still triggers normally.
+- Drive-past `_triggerReroute` uses the user's snapped position as the connector start (the raw GPS lat/lng isn't threaded down to that handler). For the small distances involved this is fine; only matters if the perpendicular offset between snap and real GPS is substantial.
+- Phase 3d/3e were not yet road-tested when this section was written; behaviour under real GPS jitter near `ARRIVAL_RADIUS_M` may want tuning.
 
 ## References
 

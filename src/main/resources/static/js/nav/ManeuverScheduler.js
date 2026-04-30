@@ -35,7 +35,7 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
 
     // Bucket order matters: highest-distance first. update() walks the list and
     // fires the highest-priority unfired bucket whose threshold has been crossed.
-    function makeBuckets() {
+    function makeManeuverBuckets() {
         const C = window.TripWeather.Nav.Constants;
         return [
             {
@@ -61,9 +61,39 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
         ];
     }
 
-    function Scheduler(maneuvers) {
-        this.maneuvers = maneuvers || [];
-        this.buckets = makeBuckets();
+    // Buckets for waypoint-approach prompts (Phase 3d). Phrasing names the stop
+    // ("Arriving at Mom's House in 1 mile"). NEAR is the last spoken bucket here
+    // — actual arrival ("You have arrived at...") is fired separately by
+    // NavigationManager when the user enters ARRIVAL_RADIUS_M of the waypoint,
+    // because arrival also flips the manager into paused state.
+    function makeWaypointBuckets() {
+        const C = window.TripWeather.Nav.Constants;
+        return [
+            {
+                name: 'FAR',
+                threshold: C.BUCKET_FAR_M,
+                phrase: function(w) { return 'In 1 mile, arriving at ' + (w.name || 'your stop') + '.'; }
+            },
+            {
+                name: 'MID',
+                threshold: C.BUCKET_MID_M,
+                phrase: function(w) { return 'In a quarter mile, arriving at ' + (w.name || 'your stop') + '.'; }
+            },
+            {
+                name: 'NEAR',
+                threshold: C.BUCKET_NEAR_M,
+                phrase: function(w) { return 'Arriving at ' + (w.name || 'your stop') + '.'; }
+            }
+        ];
+    }
+
+    function Scheduler(items, options) {
+        options = options || {};
+        this.maneuvers = items || [];
+        this.buckets = options.buckets || makeManeuverBuckets();
+        // BUCKET_BUNCHING_M suppresses FAR when the previous item ends close to
+        // the next; not relevant for waypoint-approach prompts.
+        this.suppressBunching = !!options.suppressBunching;
         this.bucketsFired = this.maneuvers.map(function() { return {}; });
         this.currentIdx = 0;
     }
@@ -104,7 +134,7 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
             if (distToNext > bucket.threshold) continue;
             if (this.bucketsFired[this.currentIdx][bucket.name]) continue;
 
-            if (bucket.name === 'FAR' && this.currentIdx > 0) {
+            if (bucket.name === 'FAR' && !this.suppressBunching && this.currentIdx > 0) {
                 const prev = this.maneuvers[this.currentIdx - 1];
                 const gap = next.distanceFromStart - (prev.distanceFromStart + (prev.distance || 0));
                 if (gap < C.BUCKET_BUNCHING_M) {
@@ -127,6 +157,14 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
 
     window.TripWeather.Nav.ManeuverScheduler = {
         create: function(maneuvers) { return new Scheduler(maneuvers); },
+        // Companion factory for waypoint-stop approach prompts. Same scheduling
+        // logic but with stop-naming phrases and no FAR bunching suppression.
+        createForWaypointStops: function(stops) {
+            return new Scheduler(stops, {
+                buckets: makeWaypointBuckets(),
+                suppressBunching: true
+            });
+        },
         formatDistance: formatDistance
     };
 
