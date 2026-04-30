@@ -271,6 +271,39 @@ main {
     cursor: not-allowed;
 }
 
+/* The ☰ overflow toggle is hidden on desktop; the four collapsible
+   buttons (.header-menu-item) stay inline. The mobile breakpoint
+   below flips this. */
+.header-menu-toggle {
+    display: none;
+}
+
+/* "Route" / "Location" suffix in primary button labels. Visible on
+   desktop ("📁 Load Route"); hidden at narrow widths ("📁 Load") so
+   the always-visible buttons fit alongside the ☰ toggle on one line. */
+.btn-label-extra {
+    display: inline;
+}
+
+/* Card expand/collapse toggle. Hidden on desktop (rows are always
+   "expanded" in the table layout); the ≤640 block surfaces it inside
+   each card next to the drag handle. */
+.card-toggle {
+    display: none;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: #7f8c8d;
+    line-height: 1;
+}
+
+.card-toggle .chevron {
+    display: inline-block;
+    font-size: 32px;
+    transition: transform 0.2s ease;
+}
+
 .waypoints-section h2 {
     color: #2c3e50;
     margin-bottom: 5px;
@@ -950,42 +983,588 @@ main {
     box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 
-/* Responsive design for smaller screens */
+/* Responsive design for smaller screens. The mobile header puts the
+   brand (logo + title) on the top row, with the route name + stats
+   below — minimising the vertical space the masthead steals from the
+   map. The desktop two-column layout (route info on left, brand on
+   right) is preserved above 768px. */
 @media (max-width: 768px) {
     .header-content {
         flex-direction: column;
-        text-align: center;
-        gap: 15px;
+        gap: 6px;
     }
-    
+
+    /* Brand goes first; logo and title sit inline on a single line. */
+    .header-brand {
+        order: 1;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 10px;
+        text-align: left;
+    }
+
+    /* Logo before text on mobile (desktop has it on the right). */
+    .header-brand .header-logo { order: 1; }
+    .header-brand .header-text { order: 2; }
+
     .logo-image {
-        height: 50px;
+        height: 32px;
     }
-    
-    .container {
-        padding: 10px;
+
+    .header-brand .header-text h1 {
+        font-size: 20px;
+        margin: 0;
+        line-height: 1.1;
     }
-    
-    header {
-        padding: 15px;
+
+    /* Tagline is dead weight on a phone — drop it. */
+    .header-brand .header-text p {
+        display: none;
     }
 
     .header-route-info {
-        align-items: center;
+        order: 2;
+        align-items: flex-start;
     }
 
     .route-name-display {
-        justify-content: center;
+        justify-content: flex-start;
         max-width: 100%;
     }
 
     .route-name-value {
-        max-width: 260px;
+        max-width: none;
     }
 
-    .header-brand {
-        text-align: center;
+    .container {
+        padding: 10px;
+    }
+
+    header {
+        padding: 10px 14px;
+    }
+
+    /* Tablet/phone: shorter map so waypoints aren't pushed off-screen.
+       50vh is the sweet spot — large enough to feel like a map, small
+       enough that the waypoint list is visible with a small scroll. */
+    #map {
+        height: 50vh;
+        min-height: 320px;
+    }
+
+    main {
+        padding: 12px;
+    }
+
+    /* Buttons can wrap; waypoint header stacks. */
+    .waypoints-header {
         flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .header-buttons {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
+/* Phone-class viewports — collapse header buttons into an overflow menu,
+   convert the waypoint table into stacked cards, and make modals
+   near-full-screen. */
+@media (max-width: 640px) {
+    /* === Header overflow menu === */
+    .header-buttons {
+        position: relative;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .header-menu-toggle {
+        display: inline-flex;
+        min-width: 44px;
+        min-height: 44px;
+        font-size: 18px;
+    }
+
+    /* Collapse non-essential items: hidden by default, surfaced as a
+       vertical stack of floating pill buttons below the toggle when
+       the .menu-open class is set by UIManager. The four items are
+       at non-contiguous DOM positions (1, 2, 4, 7) interleaved with
+       always-visible buttons, so each gets its own absolute top offset
+       rather than being grouped in a single panel. */
+    .header-menu-item {
+        display: none;
+    }
+
+    .header-buttons.menu-open .header-menu-item {
+        display: inline-flex;
+        position: absolute;
+        right: 0;
+        z-index: 100;
+        min-width: 180px;
+        min-height: 44px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        justify-content: flex-start;
+    }
+
+    /* Each item drops below the toggle row, 48px (height + gap) apart. */
+    .header-buttons.menu-open .header-menu-item:nth-child(1) { top: calc(100% + 6px); }
+    .header-buttons.menu-open .header-menu-item:nth-child(2) { top: calc(100% + 54px); }
+    .header-buttons.menu-open .header-menu-item:nth-child(4) { top: calc(100% + 102px); }
+    .header-buttons.menu-open .header-menu-item:nth-child(7) { top: calc(100% + 150px); }
+
+    /* The three primary buttons stay inline at full touch-target size. */
+    .header-buttons > button {
+        min-height: 44px;
+    }
+
+    /* === Hide the "Route" / "Location" suffix in primary-button labels
+       so the always-visible Load / Calculate / Navigate trio fits on
+       one row alongside the ☰ toggle. === */
+    .btn-label-extra {
+        display: none;
+    }
+
+    /* === Waypoint table → cards ===
+       Each <tr> becomes a flex-wrap card. Cells are placed by `order`
+       rather than DOM order so the card reads:
+         1. Stop # badge (and drag handle, absolute, top-right)
+         2. Location (full width)
+         3. Date | Time | Duration on one flex row
+         4. Distance
+         5. Weather chips
+         6. Actions strip */
+    .table-container {
+        margin-top: 16px;
+    }
+
+    #waypoints-table {
+        table-layout: auto;
+        margin-top: 0;
+    }
+
+    #waypoints-table thead {
+        display: none;
+    }
+
+    #waypoints-table,
+    #waypoints-table tbody {
+        display: block;
+        width: 100%;
+    }
+
+    #waypoints-table tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        column-gap: 8px;
+        row-gap: 4px;
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        margin-bottom: 12px;
+        padding: 10px 12px 8px 12px;
+        position: relative;
+    }
+
+    /* Invisible 100%-wide flex item placed between Duration (order 6)
+       and Weather (order 8) — forces the Weather row to wrap onto a
+       new flex line so it can't pack alongside Time/Duration. CSS has
+       no direct "force line break" property for flex; this is the
+       standard idiom. Suppressed in collapsed mode where Weather is
+       hidden anyway, otherwise the row-gap below it adds dead space. */
+    #waypoints-table tbody tr::before {
+        content: '';
+        flex: 1 0 100%;
+        height: 0;
+        margin: 0;
+        padding: 0;
+        order: 7;
+    }
+    #waypoints-table tbody tr.collapsed::before {
+        display: none;
+    }
+
+    /* Reset fixed column widths inherited from the desktop table. */
+    #waypoints-table tbody td {
+        display: block;
+        width: auto !important;
+        min-width: 0 !important;
+        border-bottom: none;
+        padding: 4px 0;
+        text-align: left !important;
+        font-size: 14px;
+    }
+
+    /* Top-right corner of the card holds the chevron toggle (left)
+       and the drag handle (right). HTML5 drag-and-drop is mouse-only,
+       so the drag handle is for tablet-with-mouse use; the chevron
+       is the touch-friendly card-control. */
+    #waypoints-table tbody td.drag-handle-cell {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        padding: 4px 6px;
+        z-index: 2;
+        order: 0;
+        flex-basis: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .card-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        min-height: 32px;
+    }
+
+    /* Collapsed: chevron rotates to point right (closed indicator). */
+    #waypoints-table tbody tr.collapsed .card-toggle .chevron {
+        transform: rotate(-90deg);
+    }
+
+    /* Collapsed cards show only the top header strip (# circle +
+       distance) and the location name — date / time / duration /
+       weather / actions are hidden. Distance (cell 7) is intentionally
+       NOT in this list: it sits inline with the # circle and stays
+       visible while collapsed for at-a-glance reading. */
+    #waypoints-table tbody tr.collapsed td:nth-child(3),
+    #waypoints-table tbody tr.collapsed td:nth-child(4),
+    #waypoints-table tbody tr.collapsed td:nth-child(5),
+    #waypoints-table tbody tr.collapsed td:nth-child(8),
+    #waypoints-table tbody tr.collapsed td:nth-child(9),
+    #waypoints-table tbody tr.collapsed td:nth-child(10),
+    #waypoints-table tbody tr.collapsed td:nth-child(11),
+    #waypoints-table tbody tr.collapsed td.actions-cell {
+        display: none !important;
+    }
+
+    /* Collapsed mode keeps the card to a single inline row:
+       # circle + distance/START + Location, all centered vertically.
+       Distance already lays out inline (flex 0 0 auto) in expanded
+       mode — no override needed. Location flips from flex 1 1 100%
+       (its own row) to flex 1 1 0 with min-width: 0 so it shrinks
+       and stays inline; the right padding reserves the chevron+drag
+       area at top-right. */
+    #waypoints-table tbody tr.collapsed td:nth-child(6) {
+        flex: 1 1 0;
+        padding: 0 80px 0 12px;
+        min-width: 0;
+        overflow: hidden;
+        align-self: center;
+    }
+    #waypoints-table tbody tr.collapsed td:nth-child(6) input {
+        width: 100%;
+        text-overflow: ellipsis;
+    }
+    #waypoints-table tbody tr.collapsed td:nth-child(6)::before {
+        display: none;
+    }
+    #waypoints-table tbody tr.collapsed td:nth-child(6) input {
+        background: transparent;
+        border: none;
+        padding: 0;
+        min-height: 0;
+        font-weight: 600;
+        font-size: 15px;
+        color: #2c3e50;
+        pointer-events: none;
+    }
+
+    /* Tighter card padding when collapsed — single-row look. */
+    #waypoints-table tbody tr.collapsed {
+        padding: 8px 12px;
+    }
+
+    /* Stop number badge — small solid blue circle, top-left of the card.
+       Mirrors the on-map marker style (.waypoint-marker) at a slightly
+       smaller size for the card list. */
+    #waypoints-table tbody td:nth-child(2) {
+        order: 1;
+        flex: 0 0 auto;
+        width: 28px !important;
+        height: 28px;
+        box-sizing: border-box;
+        background-color: #3498db;
+        color: #fff;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 13px;
+        line-height: 1;
+        padding: 0;
+        margin: 0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Location: full-width row, sits below the # circle and the
+       distance/START line. */
+    #waypoints-table tbody td:nth-child(6) {
+        order: 3;
+        flex: 1 1 100%;
+        padding: 2px 0 6px 0;
+    }
+
+    /* Date | Time | Duration share one flex row. Date needs the most
+       basis to fit "MM/DD/YYYY" + the calendar icon without truncation;
+       Time is the shortest ("01:38 PM" with tz hidden); Duration sits
+       in the middle. Sum 260 + 16 px column-gap = 276 px, fits a
+       320-px viewport (~280 px card width). */
+    #waypoints-table tbody td:nth-child(3) {  /* Date */
+        order: 4;
+        flex: 1.3 1 100px;
+    }
+    #waypoints-table tbody td:nth-child(4) {  /* Time */
+        order: 5;
+        flex: 1 1 70px;
+    }
+    #waypoints-table tbody td:nth-child(5) {  /* Duration */
+        order: 6;
+        flex: 1.1 1 90px;
+    }
+
+    /* Small uppercase label above each editable field. Distance (cell 7)
+       is excluded — it sits inline next to the # circle with a ruler
+       emoji prefix, not as a labeled row. */
+    #waypoints-table tbody td:nth-child(3)::before { content: 'Date'; }
+    #waypoints-table tbody td:nth-child(4)::before { content: 'Time'; }
+    #waypoints-table tbody td:nth-child(5)::before { content: 'Duration'; }
+    #waypoints-table tbody td:nth-child(6)::before { content: 'Location'; }
+
+    #waypoints-table tbody td:nth-child(3)::before,
+    #waypoints-table tbody td:nth-child(4)::before,
+    #waypoints-table tbody td:nth-child(5)::before,
+    #waypoints-table tbody td:nth-child(6)::before {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #7f8c8d;
+        margin-bottom: 4px;
+        font-weight: 600;
+    }
+
+    /* Distance sits inline next to the # circle on row 1 of the card.
+       For waypoint 1 the renderer emits "START" with the .waypoint-start
+       class for green color; for later waypoints it's "X.X mi". No
+       ruler emoji, no "DISTANCE" label. */
+    #waypoints-table tbody td:nth-child(7) {
+        order: 2;
+        flex: 0 0 auto;
+        align-self: center;
+        padding: 0 0 0 10px;
+        font-size: 12px;
+        line-height: 1.1;
+        color: #7f8c8d;
+        font-weight: 600;
+    }
+    #waypoints-table tbody td:nth-child(7)::before {
+        content: none;
+    }
+    #waypoints-table tbody td.distance-cell {
+        text-align: left !important;
+    }
+    #waypoints-table tbody td.distance-cell.waypoint-start {
+        color: #27ae60;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+
+    /* Duration field sits left-aligned within its cell, and the input
+       flexes to fill instead of using the desktop fixed 90 px. */
+    #waypoints-table tbody td .duration-input-container {
+        justify-content: flex-start;
+    }
+    #waypoints-table tbody td .duration-input {
+        flex: 1;
+        min-width: 0;
+        width: auto;
+    }
+
+    /* Weather chips — the 4 separate <td>s (or a single colspan=4 cell
+       for loading/error) flow inline on a row of their own at order 8.
+       The tr::before pseudo at order 7 forces a line break above this
+       row, so weather can never pack alongside Time/Duration.
+       align-self: center vertically aligns the icon (32 px) with the
+       text-only cells (~20 px) so condition / temp / wind share a
+       baseline. The 4th cell (precip %) is hidden — the icon overlay
+       already shows the chance-of-precipitation. */
+    #waypoints-table tbody td:nth-child(8),
+    #waypoints-table tbody td:nth-child(9),
+    #waypoints-table tbody td:nth-child(10) {
+        order: 8;
+        align-self: center;
+        padding: 6px 10px 6px 0;
+        font-size: 14px;
+        color: #2c3e50;
+    }
+
+    /* Cell 8 hosts the icon AND the condition text — turn it into its
+       own flex row so the icon (fixed 32 px) and the condition span
+       (.weather-condition, flex 1, wrappable) sit as siblings, not
+       inline-flow where text wrapping leaves the icon awkwardly above
+       a wrapped second line. min-width: 0 allows the cell itself to
+       shrink so cells 9/10 (temp/wind) stay on the same row. */
+    #waypoints-table tbody td:nth-child(8) {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1 1 0;
+        min-width: 0;
+        margin-top: 6px;
+        padding-top: 6px;
+    }
+    #waypoints-table tbody td:nth-child(8) .weather-icon {
+        flex: 0 0 32px;
+        margin-right: 0;
+    }
+    #waypoints-table tbody td:nth-child(8) .weather-condition {
+        flex: 1 1 0;
+        min-width: 0;
+        white-space: normal;
+        line-height: 1.15;
+        font-weight: 500;
+    }
+
+    /* Temp and wind take exactly their content width and never shrink. */
+    #waypoints-table tbody td:nth-child(9),
+    #waypoints-table tbody td:nth-child(10) {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
+    #waypoints-table tbody td:nth-child(11) {
+        display: none;
+    }
+
+    /* Loading / error use a single colspan=4 td at position 8. */
+    #waypoints-table tbody td.weather-loading,
+    #waypoints-table tbody td.weather-error {
+        flex: 1 1 100%;
+        text-align: left !important;
+        padding: 8px 0;
+    }
+
+    /* Actions row: a horizontal strip across the bottom of the card. */
+    #waypoints-table tbody td.actions-cell {
+        order: 9;
+        display: flex !important;
+        flex: 1 1 100%;
+        gap: 6px;
+        padding: 10px 0 4px 0;
+        border-top: 1px solid #f0f0f0;
+        margin-top: 6px;
+        justify-content: flex-start;
+    }
+
+    #waypoints-table tbody td.actions-cell .action-btn {
+        flex: 1;
+        min-width: 44px;
+        height: 44px;
+        margin: 0;
+    }
+
+    /* Drop zone is hidden — touch users can't drag-and-drop anyway. */
+    .drop-zone-row {
+        display: none !important;
+    }
+
+    /* Inputs at touch-friendly sizes; 16 px font keeps iOS from
+       auto-zooming on focus. */
+    #waypoints-table tbody td input[type="date"],
+    #waypoints-table tbody td input[type="text"] {
+        font-size: 16px;
+        padding: 8px 10px;
+        min-height: 40px;
+    }
+
+    .duration-input {
+        font-size: 16px;
+        min-height: 40px;
+        padding: 8px;
+    }
+
+    /* Time picker: keep it compact enough to share a row with Date and
+       Duration. The timezone abbreviation costs ~30 px we can't spare
+       on a phone, so it's hidden — the picker still drives waypoint
+       arrival times correctly; the abbreviation is informational only. */
+    .time-picker {
+        padding: 6px 8px;
+        font-size: 16px;
+        min-height: 40px;
+        gap: 0;
+    }
+    .time-picker select {
+        font-size: 16px;
+        padding: 2px 0;
+    }
+    .time-picker-tz {
+        display: none;
+    }
+
+    /* Bigger duration arrows for touch. */
+    .duration-arrow-up,
+    .duration-arrow-down {
+        min-width: 24px;
+        height: 18px;
+        font-size: 11px;
+    }
+
+    /* === Modals: near-full-screen on phones === */
+    .modal-content {
+        margin: 0;
+        width: 100%;
+        max-width: 100%;
+        height: 100vh;
+        max-height: 100vh;
+        border: none;
+        border-radius: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .modal-header {
+        border-radius: 0;
+        padding: 16px 18px;
+    }
+
+    .modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px 18px 24px 18px;
+    }
+
+    .close {
+        font-size: 32px;
+        padding: 4px 8px;
+        min-width: 44px;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-btn {
+        min-height: 44px;
+        font-size: 15px;
+    }
+
+    .layer-options {
+        grid-template-columns: 1fr;
+    }
+
+    .layer-select-btn {
+        padding: 14px;
+        min-height: 44px;
     }
 }
 

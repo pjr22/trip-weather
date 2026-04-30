@@ -154,7 +154,7 @@ window.TripWeather.Managers.Route = {
         });
 
         // Update button text to show route is active
-        window.TripWeather.Managers.UI.updateRouteButtonText('🔄 Recalculate Route');
+        window.TripWeather.Managers.UI.updateRouteButtonText('🔄 Recalculate <span class="btn-label-extra">Route</span>');
 
         // Update route statistics
         this.updateRouteStats(routeData);
@@ -624,7 +624,7 @@ window.TripWeather.Managers.Route = {
         this.currentRoute = null;
 
         // Reset button text
-        window.TripWeather.Managers.UI.updateRouteButtonText('🛣️ Calculate Route');
+        window.TripWeather.Managers.UI.updateRouteButtonText('🛣️ Calculate <span class="btn-label-extra">Route</span>');
 
         // Clear route statistics
         this.updateRouteStats(null);

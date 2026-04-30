@@ -130,7 +130,7 @@ window.TripWeather.Services.Weather = {
             }
             
             return `
-                <td>${weatherIcon}${safeCondition}</td>
+                <td>${weatherIcon}<span class="weather-condition">${safeCondition}</span></td>
                 <td>${safeTemperature}</td>
                 <td>${safeWind}</td>
                 <td>${safePrecipitation}</td>

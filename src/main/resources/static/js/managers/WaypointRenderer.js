@@ -171,6 +171,10 @@ window.TripWeather.Managers.WaypointRenderer = {
         waypoints.forEach((waypoint, index) => {
             const row = tbody.insertRow();
             row.dataset.waypointSequence = waypoint.sequence;
+            // Cards default to collapsed on mobile — tap chevron to expand.
+            // The class has no visual effect on desktop (where the table
+            // layout always shows all columns).
+            row.classList.add('collapsed');
             
             const weatherHtml = window.TripWeather.Services.Weather.generateWeatherHtml(waypoint.weather, waypoint.weatherLoading);
             
@@ -191,10 +195,26 @@ window.TripWeather.Managers.WaypointRenderer = {
             const safeDateValue = helpers.escapeHtml(waypoint.date || '');
             const safeDurationValue = helpers.escapeHtml(window.TripWeather.Utils.Duration.formatDuration(waypoint.duration));
             const safeLocationValue = helpers.escapeHtml(waypoint.locationName || '');
-            const safeDistanceValue = helpers.escapeHtml(waypoint.distance ? `${waypoint.distance.toFixed(1)} mi` : '-');
+            // Distance value: "START" for waypoint 1 (no previous), the
+            // rendered miles for later waypoints, empty for any waypoint
+            // missing a computed distance. The mobile card layout positions
+            // this cell directly below the # circle as a badge stack.
+            let distanceText;
+            if (index === 0) {
+                distanceText = 'START';
+            } else if (waypoint.distance) {
+                distanceText = `${waypoint.distance.toFixed(1)} mi`;
+            } else {
+                distanceText = '';
+            }
+            const safeDistanceValue = helpers.escapeHtml(distanceText);
+            const distanceCellClass = (index === 0) ? 'distance-cell waypoint-start' : 'distance-cell';
             
             row.innerHTML = `
-                <td class="drag-handle-cell"><span class="drag-handle" title="Drag to reorder">☰</span></td>
+                <td class="drag-handle-cell">
+                    <button class="card-toggle" data-action="toggle-card" aria-label="Toggle waypoint details" aria-expanded="false"><span class="chevron">▾</span></button>
+                    <span class="drag-handle" title="Drag to reorder">☰</span>
+                </td>
                 <td>${index + 1}</td>
                 <td><input type="date" value="${safeDateValue}" data-waypoint-sequence="${waypoint.sequence}" data-field="date"></td>
                 <td>${this.buildTimePickerHtml(waypoint, timezoneDisplay)}</td>
@@ -214,7 +234,7 @@ window.TripWeather.Managers.WaypointRenderer = {
                     </div>
                 </td>
                 <td><input type="text" value="${safeLocationValue}" placeholder="Enter location name" data-waypoint-sequence="${waypoint.sequence}" data-field="locationName"></td>
-                <td class="distance-cell">${safeDistanceValue}</td>
+                <td class="${distanceCellClass}">${safeDistanceValue}</td>
                 ${weatherHtml}
                 <td class="actions-cell">
                     <button class="action-btn" data-waypoint-sequence="${waypoint.sequence}" data-action="center" title="Center on waypoint">
@@ -425,6 +445,18 @@ window.TripWeather.Managers.WaypointRenderer = {
             }
         });
         
+        // Card collapse/expand toggle (mobile only, hidden on desktop via CSS).
+        // stopPropagation keeps the tap from also triggering the row's
+        // marker-popup handler below.
+        const cardToggle = row.querySelector('button[data-action="toggle-card"]');
+        if (cardToggle) {
+            cardToggle.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const collapsed = row.classList.toggle('collapsed');
+                cardToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            });
+        }
+
         // Setup row click handler
         row.addEventListener('click', function(e) {
             if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT') {

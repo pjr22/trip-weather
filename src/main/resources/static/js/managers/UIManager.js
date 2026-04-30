@@ -15,6 +15,49 @@ window.TripWeather.Managers.UI = {
         // Initialize any UI components that need setup
         this.initializeTooltips();
         this.initializeKeyboardShortcuts();
+        this.initializeMobileMenu();
+    },
+
+    /**
+     * Wire the header overflow toggle (☰) — only visible at narrow viewports.
+     * Toggles the .menu-open class on .header-buttons; closes when an item
+     * inside the menu is tapped, when the user taps outside, or on Escape.
+     */
+    initializeMobileMenu: function() {
+        const toggle = document.getElementById('header-menu-toggle');
+        const container = document.getElementById('header-buttons');
+        if (!toggle || !container) return;
+
+        const close = function() {
+            container.classList.remove('menu-open');
+            toggle.setAttribute('aria-expanded', 'false');
+        };
+
+        toggle.addEventListener('click', function(event) {
+            event.stopPropagation();
+            const isOpen = container.classList.toggle('menu-open');
+            toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+
+        // Close after tapping any menu item — items inside the dropdown
+        // are .header-menu-item; the toggle itself is excluded above.
+        container.querySelectorAll('.header-menu-item').forEach(function(item) {
+            item.addEventListener('click', close);
+        });
+
+        // Tap outside dismisses the menu.
+        document.addEventListener('click', function(event) {
+            if (!container.contains(event.target)) {
+                close();
+            }
+        });
+
+        // Escape dismisses; existing handleEscapeKey doesn't know about this.
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && container.classList.contains('menu-open')) {
+                close();
+            }
+        });
     },
 
     /**
@@ -124,7 +167,10 @@ window.TripWeather.Managers.UI = {
     updateRouteButtonText: function(text) {
         const calculateRouteBtn = document.getElementById('calculate-route-btn');
         if (calculateRouteBtn) {
-            calculateRouteBtn.textContent = text;
+            // innerHTML so the .btn-label-extra span around "Route" is preserved
+            // and can be hidden on narrow viewports. Callers pass internal,
+            // hardcoded strings — never user input — so this is safe.
+            calculateRouteBtn.innerHTML = text;
         }
     },
 
