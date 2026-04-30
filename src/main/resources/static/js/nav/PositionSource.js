@@ -42,11 +42,17 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
         return (brng + 360) % 360;
     }
 
+    /**
+     * Controller contract returned by source.start():
+     *   { stop(), pause(), resume() }
+     * pause/resume are real on the playback source (clears/restarts the emit
+     * timer) and no-ops on Live (the GPS keeps streaming regardless).
+     */
     const Live = {
         start: function(onPosition, onError) {
             if (!('geolocation' in navigator)) {
                 onError && onError({ code: 0, message: 'Geolocation not supported' });
-                return function() {};
+                return { stop: function() {}, pause: function() {}, resume: function() {} };
             }
             const C = window.TripWeather.Nav.Constants;
             const watchId = navigator.geolocation.watchPosition(
@@ -69,8 +75,10 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
                     timeout: C.POSITION_TIMEOUT_MS
                 }
             );
-            return function stop() {
-                navigator.geolocation.clearWatch(watchId);
+            return {
+                stop: function() { navigator.geolocation.clearWatch(watchId); },
+                pause: function() {},   // user is physically there, no virtual pause
+                resume: function() {}
             };
         }
     };
@@ -91,17 +99,23 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
         const C = window.TripWeather.Nav.Constants;
         const baseSpeedMps = options.speedMps || C.SIM_DEFAULT_SPEED_MPS;
         const baseMultiplier = options.speedMultiplier || C.SIM_DEFAULT_SPEED_MULTIPLIER;
+        // Combined "slow down before" points: turn maneuvers AND duration
+        // waypoint stops. Without the stops, the simulator can step past the
+        // ARRIVAL_RADIUS_M window in one tick at high simspeed values.
         const maneuverDistances = options.maneuverDistances || [];
+        const stopDistances = options.stopDistances || [];
+        const slowdownDistances = maneuverDistances.concat(stopDistances)
+            .sort(function(a, b) { return a - b; });
         const emitInterval = options.emitInterval || C.SIM_EMIT_INTERVAL_MS;
 
         function multiplierFor(distanceAlong) {
-            if (maneuverDistances.length === 0) return baseMultiplier;
-            // Find the next maneuver still ahead of us (with a small fudge so we
-            // don't latch onto the maneuver we're sitting exactly on top of).
+            if (slowdownDistances.length === 0) return baseMultiplier;
+            // Find the next slowdown point still ahead of us (with a small fudge
+            // so we don't latch onto the point we're sitting exactly on top of).
             let nextDist = null;
-            for (let i = 0; i < maneuverDistances.length; i++) {
-                if (maneuverDistances[i] > distanceAlong + 5) {
-                    nextDist = maneuverDistances[i];
+            for (let i = 0; i < slowdownDistances.length; i++) {
+                if (slowdownDistances[i] > distanceAlong + 5) {
+                    nextDist = slowdownDistances[i];
                     break;
                 }
             }
@@ -129,18 +143,21 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
             start: function(onPosition, onError) {
                 if (points.length < 2) {
                     onError && onError({ code: 0, message: 'Not enough geometry for playback' });
-                    return function() {};
+                    return { stop: function() {}, pause: function() {}, resume: function() {} };
                 }
 
                 let distanceAlong = 0;
                 let segmentIdx = 0;
+                let intervalId = null;
+                let stopped = false;
 
-                const intervalId = setInterval(function() {
+                function tick() {
                     const mult = multiplierFor(distanceAlong);
                     const speedMps = baseSpeedMps * mult;
                     distanceAlong += speedMps * (emitInterval / 1000);
                     if (distanceAlong >= totalDistance) {
                         clearInterval(intervalId);
+                        intervalId = null;
                         // Final emit at the end of the route.
                         const last = points[points.length - 1];
                         const prev = points[points.length - 2];
@@ -170,10 +187,31 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
                         speed: speedMps,
                         timestamp: Date.now()
                     });
-                }, emitInterval);
+                }
 
-                return function stop() {
-                    clearInterval(intervalId);
+                intervalId = setInterval(tick, emitInterval);
+
+                return {
+                    stop: function() {
+                        stopped = true;
+                        if (intervalId !== null) {
+                            clearInterval(intervalId);
+                            intervalId = null;
+                        }
+                    },
+                    pause: function() {
+                        if (stopped) return;
+                        if (intervalId !== null) {
+                            clearInterval(intervalId);
+                            intervalId = null;
+                        }
+                    },
+                    resume: function() {
+                        if (stopped) return;
+                        if (intervalId === null) {
+                            intervalId = setInterval(tick, emitInterval);
+                        }
+                    }
                 };
             }
         };
@@ -182,10 +220,11 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
     /**
      * Choose a position source based on URL query params.
      *   ?simgps=1                  → playback along the supplied route geometry
-     *   ?simgps=1&simspeed=10      → 10× ground speed (overridden near maneuvers)
+     *   ?simgps=1&simspeed=10      → 10× ground speed (overridden near maneuvers
+     *                                 and waypoint stops)
      *
-     * options.maneuverDistances (optional) is forwarded to the playback source so
-     * it can slow down to a realistic pace as it approaches each maneuver.
+     * options.maneuverDistances and options.stopDistances are both forwarded to
+     * the playback source so it slows down approaching either kind of point.
      */
     function fromUrl(routeGeometry, options) {
         options = options || {};
@@ -196,7 +235,8 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
             console.log('Navigation: using simulated GPS playback at ' + speedMultiplier + '× speed');
             return makePlaybackFromGeometry(routeGeometry, {
                 speedMultiplier: speedMultiplier,
-                maneuverDistances: options.maneuverDistances
+                maneuverDistances: options.maneuverDistances,
+                stopDistances: options.stopDistances
             });
         }
         return Live;

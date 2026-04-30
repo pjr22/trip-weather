@@ -24,7 +24,7 @@ window.TripWeather.Managers.Navigation = {
     scheduler: null,
     waypointScheduler: null,
     positionSource: null,
-    stopPositionSource: null,
+    positionController: null,
     mapAdapter: null,
     lastSegmentIdx: 0,
     lastSavedSegmentIdx: 0,
@@ -49,6 +49,14 @@ window.TripWeather.Managers.Navigation = {
     skippedWaypoints: null,
     pausedAtWaypoint: -1,
     skipVisibleForWaypoint: -1,
+    // Final-destination state. arrivedAtFinal latches once the user enters the
+    // arrival window of the polyline end; banner stays "You have arrived at
+    // [name]" and the user closes via Exit Navigation. finalSidePhrase is "left",
+    // "right", or "" when undeterminable; computed from the polyline's last
+    // bearing and the offset to the planned waypoint location.
+    arrivedAtFinal: false,
+    finalSidePhrase: '',
+    finalApproachScheduler: null,
     bannerEl: null,
     exitBtnEl: null,
     continueBtnEl: null,
@@ -115,6 +123,7 @@ window.TripWeather.Managers.Navigation = {
         this.skippedWaypoints = {};
         this.pausedAtWaypoint = -1;
         this.skipVisibleForWaypoint = -1;
+        this.arrivedAtFinal = false;
 
         const params = new URLSearchParams(window.location.search);
         const isSimGps = params.get('simgps') === '1';
@@ -309,7 +318,8 @@ window.TripWeather.Managers.Navigation = {
                 lat: stop.lat,
                 lng: stop.lng,
                 isPlannedStop: true,
-                waypointIdx: stop.waypointIdx
+                waypointIdx: stop.waypointIdx,
+                savedPolylineIdx: stop.savedPolylineIdx
             };
         }
 
@@ -395,7 +405,8 @@ window.TripWeather.Managers.Navigation = {
                 return {
                     lat: routeData.geometry[polylineIdx][1],
                     lng: routeData.geometry[polylineIdx][0],
-                    waypointIdx: i
+                    waypointIdx: i,
+                    savedPolylineIdx: polylineIdx
                 };
             }
         }
@@ -422,6 +433,11 @@ window.TripWeather.Managers.Navigation = {
      * conflict with the connector's instructions for the same junction.
      */
     _beginNavSession: function(routeData, connectorInfo) {
+        // Side phrase for final-arrival prompts is fixed for the saved route;
+        // compute once before assembly. Re-routes don't change the side because
+        // the saved polyline's last segment is preserved across them.
+        this.finalSidePhrase = this._computeFinalArrivalSide(routeData);
+
         const assembled = this._assembleMergedRoute(routeData, connectorInfo);
         this._applyAssembled(assembled);
 
@@ -437,12 +453,15 @@ window.TripWeather.Managers.Navigation = {
         window.TripWeather.Nav.WakeLock.request();
 
         const maneuverDistances = this.maneuvers.map(function(m) { return m.distanceFromStart; });
+        const stopDistances = this.waypointStops
+            .filter(function(s) { return !s.isFinal && s.duration > 0; })
+            .map(function(s) { return s.distanceFromStart; });
         this.positionSource = window.TripWeather.Nav.PositionSource.fromUrl(
             assembled.activeGeometry,
-            { maneuverDistances: maneuverDistances }
+            { maneuverDistances: maneuverDistances, stopDistances: stopDistances }
         );
         const self = this;
-        this.stopPositionSource = this.positionSource.start(
+        this.positionController = this.positionSource.start(
             function(pos) { self._onPosition(pos); },
             function(err) { self._onPositionError(err); }
         );
@@ -549,12 +568,22 @@ window.TripWeather.Managers.Navigation = {
                 return s.waypointIdx === targetIdx;
             });
             if (!alreadyListed && (wpData.duration || 0) > 0 && !isFinal) {
+                // Pull waypointLat/Lng from the waypoint's planned location so
+                // the geographic arrival backstop has the right reference point
+                // (the merged polyline doesn't pass through this location — it
+                // ends at Q ≈ this location and continues on saved.slice(K+1)).
+                const wpLng = wpData.location && wpData.location[0] != null
+                    ? wpData.location[0] : null;
+                const wpLat = wpData.location && wpData.location[1] != null
+                    ? wpData.location[1] : null;
                 waypointStops = [{
                     waypointIdx: targetIdx,
                     polylineIdx: M - 1,
                     distanceFromStart: compiled.cumDist[M - 1] || 0,
                     duration: wpData.duration,
                     name: wpData.name || ('Waypoint ' + (targetIdx + 1)),
+                    waypointLat: wpLat,
+                    waypointLng: wpLng,
                     isFinal: false
                 }].concat(waypointStops);
             }
@@ -590,10 +619,73 @@ window.TripWeather.Managers.Navigation = {
         this._savedSegIdxAtJoin = assembled.savedSegIdxAtJoin;
         this.scheduler = window.TripWeather.Nav.ManeuverScheduler.create(this.maneuvers);
         this._rebuildWaypointScheduler();
+        this._rebuildFinalApproachScheduler();
         this.lastSegmentIdx = 0;
         this.lastSavedSegmentIdx = assembled.savedSegIdxAtJoin >= 0
             ? assembled.savedSegIdxAtJoin : 0;
         this.offRouteSince = 0;
+    },
+
+    /**
+     * Build (or rebuild) the one-element final-destination approach scheduler.
+     * The destination's distanceFromStart is the merged polyline's total length;
+     * sidePhrase ('left' / 'right' / '') was computed in _beginNavSession.
+     */
+    _rebuildFinalApproachScheduler: function() {
+        if (!this.compiled || !this.compiled.totalDistance) {
+            this.finalApproachScheduler = null;
+            return;
+        }
+        const stop = {
+            distanceFromStart: this.compiled.totalDistance,
+            sidePhrase: this.finalSidePhrase || ''
+        };
+        this.finalApproachScheduler = window.TripWeather.Nav.ManeuverScheduler
+            .createForFinalDestination(stop);
+    },
+
+    /**
+     * Side ('left' / 'right' / '') of the final destination relative to the
+     * polyline's last segment direction. Determined by the cross product of
+     * (last-segment bearing) × (offset from polyline endpoint to waypoint
+     * location). Returns '' when the offset is below ~5 m — the destination is
+     * essentially on the road and "side" isn't meaningful.
+     */
+    _computeFinalArrivalSide: function(routeData) {
+        if (!routeData || !routeData.waypoints || !routeData.geometry) return '';
+        const geo = routeData.geometry;
+        if (geo.length < 2) return '';
+        const finalIdx = routeData.waypoints.length - 1;
+        const finalWp = routeData.waypoints[finalIdx];
+        if (!finalWp) return '';
+
+        // Waypoint location: prefer the routeData.waypoints entry's coordinates
+        // (which carry the raw lat/lng of the planned stop) over the polyline
+        // endpoint, since the polyline ends on the road and the waypoint may sit
+        // off it.
+        const wpLng = (finalWp.location && finalWp.location[0] != null)
+            ? finalWp.location[0] : geo[geo.length - 1][0];
+        const wpLat = (finalWp.location && finalWp.location[1] != null)
+            ? finalWp.location[1] : geo[geo.length - 1][1];
+
+        const last = geo[geo.length - 1];
+        const prev = geo[geo.length - 2];
+        const lastLng = last[0], lastLat = last[1];
+        const prevLng = prev[0], prevLat = prev[1];
+
+        // Offset distance from polyline endpoint to waypoint location.
+        const offsetDist = window.TripWeather.Nav.RouteSnapper.haversine(
+            { lat: lastLat, lng: lastLng }, { lat: wpLat, lng: wpLng });
+        if (offsetDist < 5) return '';
+
+        // 2D cross product: (bearing) × (offset). Positive = waypoint is left
+        // of the bearing direction; negative = right. lng is x (east), lat is
+        // y (north).
+        const bx = lastLng - prevLng, by = lastLat - prevLat;
+        const ox = wpLng - lastLng, oy = wpLat - lastLat;
+        const cross = bx * oy - by * ox;
+        if (Math.abs(cross) < 1e-12) return '';
+        return cross > 0 ? 'left' : 'right';
     },
 
     /**
@@ -728,19 +820,22 @@ window.TripWeather.Managers.Navigation = {
         const Live = window.TripWeather.Nav.PositionSource.Live;
         const isPlayback = this.positionSource && this.positionSource !== Live;
         if (isPlayback) {
-            if (this.stopPositionSource) {
-                this.stopPositionSource();
-                this.stopPositionSource = null;
+            if (this.positionController) {
+                this.positionController.stop();
+                this.positionController = null;
             }
             const maneuverDistances = this.maneuvers.map(function(m) {
                 return m.distanceFromStart;
             });
+            const stopDistances = this.waypointStops
+                .filter(function(s) { return !s.isFinal && s.duration > 0; })
+                .map(function(s) { return s.distanceFromStart; });
             this.positionSource = window.TripWeather.Nav.PositionSource.fromUrl(
                 assembled.activeGeometry,
-                { maneuverDistances: maneuverDistances }
+                { maneuverDistances: maneuverDistances, stopDistances: stopDistances }
             );
             const self = this;
-            this.stopPositionSource = this.positionSource.start(
+            this.positionController = this.positionSource.start(
                 function(pos) { self._onPosition(pos); },
                 function(err) { self._onPositionError(err); }
             );
@@ -755,10 +850,12 @@ window.TripWeather.Managers.Navigation = {
         this.connectorActive = false;
         this.rerouting = false;
         this.offRouteSince = 0;
+        this.arrivedAtFinal = false;
+        this.pausedAtWaypoint = -1;
 
-        if (this.stopPositionSource) {
-            this.stopPositionSource();
-            this.stopPositionSource = null;
+        if (this.positionController) {
+            this.positionController.stop();
+            this.positionController = null;
         }
 
         window.TripWeather.Nav.VoiceGuide.cancel();
@@ -794,10 +891,11 @@ window.TripWeather.Managers.Navigation = {
         this.mapAdapter.updateUserPosition(snap.snappedLat, snap.snappedLng, heading);
         this.mapAdapter.followCamera(snap.snappedLat, snap.snappedLng);
 
-        // While paused at a waypoint (Phase 3d), suppress voice prompts, off-
-        // route detection, scheduler advances, and final-arrival checks. Map
-        // marker still updates so the user can see their position.
-        if (this.pausedAtWaypoint !== -1) return;
+        // While paused at a waypoint (Phase 3d), or after the user has reached
+        // the final destination, suppress voice prompts, off-route detection,
+        // scheduler advances, and arrival checks. Map marker still updates so
+        // the user can see their position.
+        if (this.pausedAtWaypoint !== -1 || this.arrivedAtFinal) return;
 
         // Drop the dashed-orange connector once the user has reached the join
         // point (past the connector's distance AND on the saved polyline).
@@ -831,6 +929,16 @@ window.TripWeather.Managers.Navigation = {
         // reroute, etc.).
         if (this._handleWaypointStops(snap)) return;
 
+        // Final-destination approach prompts ("In 1 mile, your destination will
+        // be on the right.") fire from a separate one-element scheduler so
+        // they don't interfere with regular maneuver bucketing.
+        if (this.finalApproachScheduler) {
+            const fr = this.finalApproachScheduler.update(snap.distanceAlongPolyline);
+            if (fr && fr.phrase) {
+                window.TripWeather.Nav.VoiceGuide.say(fr.phrase);
+            }
+        }
+
         const result = this.scheduler.update(snap.distanceAlongPolyline);
         if (result.phrase) {
             window.TripWeather.Nav.VoiceGuide.say(result.phrase);
@@ -841,10 +949,35 @@ window.TripWeather.Managers.Navigation = {
         // Arrival at final destination — within ARRIVAL_RADIUS_M of the polyline end.
         const remaining = this.compiled.totalDistance - snap.distanceAlongPolyline;
         if (remaining <= C.ARRIVAL_RADIUS_M) {
-            window.TripWeather.Nav.VoiceGuide.say('You have arrived at your destination.');
-            const self = this;
-            // Defer the actual stop slightly so the utterance has time to start.
-            setTimeout(function() { self.stop(); }, 1500);
+            this._handleFinalArrival();
+        }
+    },
+
+    /**
+     * Final-destination arrival: latch the arrived state, announce, switch the
+     * banner, and pause the simulator so the dot stops at the destination.
+     * Voice + off-route + scheduler are gated off in _onPosition by
+     * arrivedAtFinal. Session ends only when the user taps Exit Navigation.
+     */
+    _handleFinalArrival: function() {
+        if (this.arrivedAtFinal) return;
+        this.arrivedAtFinal = true;
+
+        const VoiceGuide = window.TripWeather.Nav.VoiceGuide;
+        VoiceGuide.cancel();
+        VoiceGuide.say('You have arrived.');
+
+        const routeData = window.TripWeather.Managers.Route.currentRoute;
+        const finalWp = routeData && routeData.waypoints
+            ? routeData.waypoints[routeData.waypoints.length - 1] : null;
+        const name = (finalWp && finalWp.name) || 'your destination';
+        this._showArrivedBanner(name);
+
+        this._hideSkipButton();
+        this.skipVisibleForWaypoint = -1;
+
+        if (this.positionController && this.positionController.pause) {
+            this.positionController.pause();
         }
     },
 
@@ -888,6 +1021,23 @@ window.TripWeather.Managers.Navigation = {
             if (Math.abs(distToStop) <= C.ARRIVAL_RADIUS_M) {
                 this._pauseAtWaypoint(i);
                 return true;
+            }
+
+            // Geographic backstop. The merged polyline doesn't always pass
+            // through the waypoint's planned location — most notably when the
+            // connector to a duration waypoint ends at a road point Q offset
+            // from the planned location, and the merged polyline jumps from Q
+            // to the next saved-tail vertex without visiting the waypoint
+            // exactly. The polyline-distance check can miss while the user dot
+            // is nonetheless geographically very close. This catches that case.
+            if (stop.waypointLat != null && stop.waypointLng != null) {
+                const geoDist = window.TripWeather.Nav.RouteSnapper.haversine(
+                    { lat: snap.snappedLat, lng: snap.snappedLng },
+                    { lat: stop.waypointLat, lng: stop.waypointLng });
+                if (geoDist <= C.ARRIVAL_RADIUS_M) {
+                    this._pauseAtWaypoint(i);
+                    return true;
+                }
             }
 
             // Drive-past: user is past the waypoint without arriving.
@@ -976,6 +1126,11 @@ window.TripWeather.Managers.Navigation = {
         this._hideSkipButton();
         this.skipVisibleForWaypoint = -1;
         this._showPausedBanner(stop);
+        // Stop the simulator while paused so the dot doesn't run off (no-op for
+        // live GPS, where the user is physically there and not moving).
+        if (this.positionController && this.positionController.pause) {
+            this.positionController.pause();
+        }
         const VoiceGuide = window.TripWeather.Nav.VoiceGuide;
         VoiceGuide.cancel();
         VoiceGuide.say('You have arrived at ' + (stop.name || 'your stop') + '.');
@@ -994,6 +1149,9 @@ window.TripWeather.Managers.Navigation = {
         // a stale paused-period crossTrack reading triggers a reroute.
         this.offRouteSince = 0;
         this._hidePausedBanner();
+        if (this.positionController && this.positionController.resume) {
+            this.positionController.resume();
+        }
     },
 
     /**
@@ -1159,12 +1317,18 @@ window.TripWeather.Managers.Navigation = {
             if (oldIdx <= originalIdxFloor) continue;
             const polylineIdx = oldIdx + indexShift;
             if (polylineIdx >= compiled.cumDist.length) continue;
+            // waypointLat/Lng carries the planned waypoint location for the
+            // geographic arrival backstop (see _handleWaypointStops). For non-
+            // synthetic stops, this is the saved-polyline vertex at oldIdx.
+            const sourceVertex = routeData.geometry[oldIdx];
             stops.push({
                 waypointIdx: i,
                 polylineIdx: polylineIdx,
                 distanceFromStart: compiled.cumDist[polylineIdx],
                 duration: waypoints[i].duration || 0,
                 name: waypoints[i].name || ('Waypoint ' + (i + 1)),
+                waypointLat: sourceVertex ? sourceVertex[1] : null,
+                waypointLng: sourceVertex ? sourceVertex[0] : null,
                 isFinal: isFinal(i)
             });
         }
@@ -1243,6 +1407,7 @@ window.TripWeather.Managers.Navigation = {
         document.body.classList.remove('nav-mode');
         if (this.bannerEl) {
             this.bannerEl.classList.remove('nav-banner-paused');
+            this.bannerEl.classList.remove('nav-banner-arrived');
             this.bannerEl.style.display = 'none';
         }
         if (this.exitBtnEl) this.exitBtnEl.style.display = 'none';
@@ -1256,9 +1421,11 @@ window.TripWeather.Managers.Navigation = {
     },
 
     _updateBanner: function(nextManeuver, distanceToNext, distanceAlongPolyline) {
-        // Don't overwrite the paused banner with maneuver text — the paused
-        // banner is shown by _showPausedBanner and stays until Continue.
+        // Don't overwrite the paused or arrived banner with maneuver text —
+        // those banners are shown by _showPausedBanner / _showArrivedBanner
+        // and stay until Continue / Exit Navigation.
         if (this.pausedAtWaypoint !== -1) return;
+        if (this.arrivedAtFinal) return;
 
         const instrEl = document.getElementById('nav-instruction');
         const distEl = document.getElementById('nav-distance');
@@ -1290,6 +1457,15 @@ window.TripWeather.Managers.Navigation = {
     _hidePausedBanner: function() {
         if (this.bannerEl) this.bannerEl.classList.remove('nav-banner-paused');
         if (this.continueBtnEl) this.continueBtnEl.style.display = 'none';
+    },
+
+    _showArrivedBanner: function(name) {
+        if (!this.bannerEl) return;
+        this.bannerEl.classList.add('nav-banner-arrived');
+        const instrEl = document.getElementById('nav-instruction');
+        const distEl = document.getElementById('nav-distance');
+        if (instrEl) instrEl.textContent = 'You have arrived at ' + name;
+        if (distEl) distEl.textContent = '';
     },
 
     _showSkipButton: function(stop) {

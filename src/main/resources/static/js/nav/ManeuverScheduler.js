@@ -87,6 +87,37 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
         ];
     }
 
+    // Buckets for the final-destination approach (Phase 3 polish). The side
+    // phrase is set on the entry — "on the left" / "on the right" / "" when
+    // unknown — and woven into the prompt only when known. The actual arrival
+    // utterance ("You have arrived.") is fired separately by NavigationManager,
+    // not from this scheduler.
+    function makeFinalDestinationBuckets() {
+        const C = window.TripWeather.Nav.Constants;
+        const phrase = function(d, distLabel) {
+            return d.sidePhrase
+                ? 'In ' + distLabel + ', your destination will be on the ' + d.sidePhrase + '.'
+                : 'In ' + distLabel + ', you will arrive at your destination.';
+        };
+        return [
+            {
+                name: 'FAR',
+                threshold: C.BUCKET_FAR_M,
+                phrase: function(d) { return phrase(d, '1 mile'); }
+            },
+            {
+                name: 'MID',
+                threshold: C.BUCKET_MID_M,
+                phrase: function(d) { return phrase(d, 'a quarter mile'); }
+            },
+            {
+                name: 'NEAR',
+                threshold: C.BUCKET_NEAR_M,
+                phrase: function(d) { return phrase(d, '500 feet'); }
+            }
+        ];
+    }
+
     function Scheduler(items, options) {
         options = options || {};
         this.maneuvers = items || [];
@@ -162,6 +193,15 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
         createForWaypointStops: function(stops) {
             return new Scheduler(stops, {
                 buckets: makeWaypointBuckets(),
+                suppressBunching: true
+            });
+        },
+        // One-element scheduler for the final-destination approach. The single
+        // entry is `{ distanceFromStart, sidePhrase }`; sidePhrase is "left",
+        // "right", or "" when undeterminable.
+        createForFinalDestination: function(stop) {
+            return new Scheduler([stop], {
+                buckets: makeFinalDestinationBuckets(),
                 suppressBunching: true
             });
         },

@@ -132,6 +132,12 @@ body.nav-mode #map {
     background: rgba(39, 174, 96, 0.95);
 }
 
+/* Final-arrival banner — distinct hue (deeper green) to mark the trip as
+   complete. Persists until the user taps Exit Navigation. */
+.nav-banner.nav-banner-arrived {
+    background: rgba(22, 130, 74, 0.95);
+}
+
 /* User-position marker — a triangle pointing in the direction of travel.
    The wrapping div carries the rotation transform; the triangle itself is
    built from CSS borders so we don't need an SVG asset. */
