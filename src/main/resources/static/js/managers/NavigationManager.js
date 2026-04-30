@@ -181,9 +181,10 @@ window.TripWeather.Managers.Navigation = {
                 if (self.startToken !== myToken) return;
                 helpers.hideLoading('location-loading-overlay');
                 self._abortStart(myToken);
-                console.warn('Navigation: location acquisition failed:', error && error.message);
+                console.warn('Navigation: location acquisition failed:',
+                    error && error.message, 'code=', error && error.code);
                 window.TripWeather.Managers.UI.showToast(
-                    'Unable to get your current location. Please check your browser permissions.',
+                    window.TripWeather.Utils.GeolocationDiagnostics.describeError(error),
                     'error');
             }
         });
@@ -1214,9 +1215,13 @@ window.TripWeather.Managers.Navigation = {
     },
 
     _onPositionError: function(err) {
-        console.warn('Navigation: position fix failed:', err && err.message);
+        console.warn('Navigation: position fix failed:',
+            err && err.message, 'code=', err && err.code);
+        // Lead with "navigation needs GPS" framing because the user is mid-trip
+        // and aborting; describeError adds the specific cause so they can fix it.
+        const diag = window.TripWeather.Utils.GeolocationDiagnostics;
         window.TripWeather.Managers.UI.showToast(
-            'Location unavailable. Navigation needs precise GPS to continue.', 'error');
+            'Navigation stopped — ' + diag.describeError(err), 'error');
         this.stop();
     },
 

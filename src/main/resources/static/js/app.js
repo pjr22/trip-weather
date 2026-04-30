@@ -86,7 +86,7 @@ window.TripWeather.App = {
         // They attach to window.TripWeather.Utils namespace automatically
         
         // Verify utilities are available
-        const requiredUtils = ['Duration', 'Timezone', 'IconLoader', 'Helpers'];
+        const requiredUtils = ['Duration', 'Timezone', 'IconLoader', 'Helpers', 'GeolocationDiagnostics'];
         requiredUtils.forEach(function(utilName) {
             if (!window.TripWeather.Utils[utilName]) {
                 throw new Error(`Required utility ${utilName} not found`);

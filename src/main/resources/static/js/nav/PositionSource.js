@@ -50,8 +50,12 @@ window.TripWeather.Nav = window.TripWeather.Nav || {};
      */
     const Live = {
         start: function(onPosition, onError) {
-            if (!('geolocation' in navigator)) {
-                onError && onError({ code: 0, message: 'Geolocation not supported' });
+            // Catch the silent failures (insecure context, no API) before kicking
+            // off a watch that the browser will reject without prompting.
+            const diag = window.TripWeather.Utils && window.TripWeather.Utils.GeolocationDiagnostics;
+            const precheck = diag ? diag.precheck() : ({ ok: 'geolocation' in navigator });
+            if (!precheck.ok) {
+                onError && onError(precheck);
                 return { stop: function() {}, pause: function() {}, resume: function() {} };
             }
             const C = window.TripWeather.Nav.Constants;

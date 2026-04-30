@@ -108,6 +108,15 @@ window.TripWeather.Managers.Map = {
         const ACCURACY_GOAL_M = this.ACCURACY_GOAL_M;
         const HIGH_ACCURACY_TIMEOUT_MS = this.HIGH_ACCURACY_TIMEOUT_MS;
 
+        // Catches "no prompt ever appears" failures (insecure context, no
+        // geolocation API) up front, before we burn time on a watch that the
+        // browser will silently reject.
+        const precheck = window.TripWeather.Utils.GeolocationDiagnostics.precheck();
+        if (!precheck.ok) {
+            if (options.onError) options.onError(precheck);
+            return;
+        }
+
         let bestAccuracy = Infinity;
         let watchId = null;
         let watchTimeoutId = null;
@@ -201,9 +210,11 @@ window.TripWeather.Managers.Map = {
                 }
             },
             onError: function(error) {
-                console.warn('Geolocation error:', error.message);
+                console.warn('Geolocation error:', error && error.message, 'code=', error && error.code);
                 helpers.hideLoading('location-loading-overlay');
-                helpers.showToast('Unable to get your current location. Please check your browser permissions.', 'error');
+                helpers.showToast(
+                    window.TripWeather.Utils.GeolocationDiagnostics.describeError(error),
+                    'error');
             }
         });
     },
@@ -303,8 +314,26 @@ window.TripWeather.Managers.Map = {
 
         const self = this;
         const helpers = window.TripWeather.Utils.Helpers;
+        const diag = window.TripWeather.Utils.GeolocationDiagnostics;
         helpers.showLoading('location-loading-overlay');
         let mapInitialized = false;
+        // Either the watch's onError or the Permissions probe can announce
+        // the permission problem. Whichever wins suppresses the other so the
+        // user only sees one toast.
+        let diagnosticToastShown = false;
+
+        // Proactive probe: if the browser already remembers a denied decision,
+        // we can tell the user before the watch eventually times out — and on
+        // some iOS Safari versions watchPosition never fires onError at all
+        // when permission is denied, so this is the only signal we'll get.
+        diag.queryPermissionState().then(function(state) {
+            if (state === 'denied' && !mapInitialized && !diagnosticToastShown) {
+                diagnosticToastShown = true;
+                helpers.showToast(
+                    diag.describeError({ code: diag.PERMISSION_DENIED }),
+                    'warning');
+            }
+        });
 
         this.acquireUserLocation({
             maxCacheAgeMs: this.INITIAL_LOAD_CACHE_MS,
@@ -331,10 +360,17 @@ window.TripWeather.Managers.Map = {
                 }
             },
             onError: function(error) {
-                console.warn('Geolocation error:', error.message);
+                console.warn('Geolocation error:', error && error.message, 'code=', error && error.code);
                 console.log('Using default location (center of USA)');
                 helpers.hideLoading('location-loading-overlay');
                 self.initialize(self.DEFAULT_LAT, self.DEFAULT_LNG, self.DEFAULT_ZOOM);
+                // Surface the underlying cause so users on iOS/Safari can self-diagnose
+                // (HTTPS missing, denied permission, OS-level Location Services off).
+                // Previously this path was silent and people just saw the default map.
+                if (!diagnosticToastShown) {
+                    diagnosticToastShown = true;
+                    helpers.showToast(diag.describeError(error), 'warning');
+                }
             }
         });
     },
