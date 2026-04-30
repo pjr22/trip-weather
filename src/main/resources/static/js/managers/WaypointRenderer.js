@@ -17,6 +17,20 @@ window.TripWeather.Managers.WaypointRenderer = {
     expandedWaypoints: new Set(),
 
     /**
+     * Format an ISO date (YYYY-MM-DD) as MM/DD/YY for the mobile date
+     * overlay. Returns '' for empty/malformed input. Used only for
+     * display — the underlying <input type="date"> still stores the
+     * full ISO value and drives the native picker.
+     * @param {string} isoDate
+     * @returns {string}
+     */
+    formatShortDate: function(isoDate) {
+        if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return '';
+        const [y, m, d] = isoDate.split('-');
+        return `${m}/${d}/${y.slice(2)}`;
+    },
+
+    /**
      * Format date and time for waypoint popup
      * @param {object} waypoint - Waypoint object
      * @param {boolean} isDeparture - Whether this is departure time (adds duration)
@@ -206,17 +220,24 @@ window.TripWeather.Managers.WaypointRenderer = {
             }
 
             const safeDateValue = helpers.escapeHtml(waypoint.date || '');
+            // Mobile-only short-year overlay text (MM/DD/YY) shown on
+            // top of the native date input via .date-display. Empty
+            // string when no date set — CSS shows a "MM/DD/YY"
+            // placeholder via :empty::before instead.
+            const safeShortDate = helpers.escapeHtml(this.formatShortDate(waypoint.date));
             const safeDurationValue = helpers.escapeHtml(window.TripWeather.Utils.Duration.formatDuration(waypoint.duration));
             const safeLocationValue = helpers.escapeHtml(waypoint.locationName || '');
             // Distance value: "START" for waypoint 1 (no previous), the
             // rendered miles for later waypoints, empty for any waypoint
-            // missing a computed distance. The mobile card layout positions
-            // this cell directly below the # circle as a badge stack.
+            // missing a computed distance. Drop the decimal once distance
+            // exceeds 99.9 mi — at trip-scale ranges the tenth-of-a-mile
+            // precision stops being useful and just costs a character.
             let distanceText;
             if (index === 0) {
                 distanceText = 'START';
             } else if (waypoint.distance) {
-                distanceText = `${waypoint.distance.toFixed(1)} mi`;
+                const miles = waypoint.distance;
+                distanceText = miles > 99.9 ? `${Math.round(miles)} mi` : `${miles.toFixed(1)} mi`;
             } else {
                 distanceText = '';
             }
@@ -229,7 +250,7 @@ window.TripWeather.Managers.WaypointRenderer = {
                     <span class="drag-handle" title="Drag to reorder">☰</span>
                 </td>
                 <td>${index + 1}</td>
-                <td><input type="date" value="${safeDateValue}" data-waypoint-sequence="${waypoint.sequence}" data-field="date"></td>
+                <td><div class="date-input-wrapper"><input type="date" value="${safeDateValue}" data-waypoint-sequence="${waypoint.sequence}" data-field="date"><span class="date-display">${safeShortDate}</span></div></td>
                 <td>${this.buildTimePickerHtml(waypoint, timezoneDisplay)}</td>
                 <td>
                     <div class="duration-input-container">
