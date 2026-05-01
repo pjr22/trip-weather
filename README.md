@@ -2,7 +2,7 @@
 
 Plan a road trip, see the weather along the way, and find EV charging stations on your route.
 
-**Try it live:** https://trip-weather.pjr22.com
+**Try it live:** https://tripweather.pjr22.com
 
 ![Trip Weather is a web app for planning driving trips that shows you the weather forecast at each stop, at the time you'll actually be there.](src/main/resources/static/favicon-192x192.png)
 
