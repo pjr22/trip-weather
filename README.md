@@ -15,8 +15,9 @@ Trip Weather is a free web app for planning a driving trip. You drop pins on a m
 - the **arrival and departure times** at each stop, accounting for drive time and any time zones you cross
 - **EV charging stations** along your route (United States, via NREL)
 - **map weather overlays** (temperature, precipitation probability, wind) for the time you'll be at each stop
+- **turn-by-turn voice navigation** when it's time to drive — see [Navigation](#navigation-turn-by-turn) for what works and what doesn't
 
-You can save routes, share them with a link, and come back later to load them.
+You can save routes, share them with a link, and come back later to load them. The app also works on phones — installable to the home screen as a Progressive Web App.
 
 ---
 
@@ -62,6 +63,43 @@ Click the **EV charging** button to search for charging stations along your rout
 - **Load** opens a saved route by name.
 
 > Note: saved routes are currently stored under a shared guest user and are reachable by anyone with the link (or who enumerates route IDs). Don't save anything you want to keep private.
+
+### Drive it
+Once a route is calculated, **🧭 Navigate** starts a voice-guided drive. See the [Navigation section](#navigation-turn-by-turn) below — there are real web-platform limitations worth knowing before you rely on it.
+
+---
+
+## Navigation (turn-by-turn)
+
+Plan a route on your computer, save it, then later open the app on your phone, load the route, mount the phone in the car, and tap **🧭 Navigate**. The app will:
+
+- guide you from your current location to the start of the saved route via a short connector,
+- speak turn-by-turn instructions ("In 1 mile, turn right onto Elm Street" → "In a quarter mile, turn right" → "Turn right now"),
+- announce arrival at intermediate stops with a non-zero duration ("Arriving at Lunch Stop in half a mile" → "You have arrived at Lunch Stop"), and **pause** until you tap **Continue**,
+- detect when you've gone off-route (sustained drift over ~10 s) and re-route you back, with a 20-second cooldown so it doesn't thrash,
+- show a **Skip** button when you're approaching a planned stop, in case you decide en route to bypass it,
+- end the session and return to the planning view when you reach the final waypoint.
+
+Stops with **duration > 0** are treated as mandatory destinations — the only ways to be done with one are to arrive at it, or to tap **Skip**. Stops with **duration = 0** are silent passthroughs that just shape the route.
+
+### Honest limitations
+
+This is a web app, not a native one. That has consequences worth knowing before you trust it on a long drive:
+
+- **Foreground only.** Voice guidance and high-accuracy GPS pause when the browser tab is backgrounded or the screen turns off. The realistic use case is a **phone mounted in the car, screen on, browser foregrounded** — which is exactly what it's designed for. A screen wake-lock keeps the screen alive while the app is open and visible.
+- **No background navigation.** If you switch to another app mid-drive (to answer a call, change music, etc.), navigation pauses; switching back resumes from the current GPS fix. Don't rely on it to keep talking while you're in another app.
+- **Network required throughout.** Map tiles, re-routing, and weather all require a connection. There is no offline navigation mode — if you lose signal, the route polyline and last-known position remain on screen but no new directions or re-routes will arrive until you're back online.
+- **Map stays north-up.** The map doesn't rotate to your direction of travel; only the position dot rotates. Heading-up rotation is on the future-features list (it would require swapping the map engine).
+- **TTS quality varies.** Voice prompts use the browser's built-in speech synthesis (Web Speech API). Voices and pronunciation differ across iOS, Android, and desktop browsers. On iOS Safari the very first prompt requires a user gesture to unlock audio — that gesture is the **Navigate** button tap, so always start a session by tapping Navigate yourself rather than relaunching from a backgrounded state.
+- **Battery drain is real.** High-accuracy GPS, screen wake-lock, frequent map redraws, and TTS together will eat phone battery quickly. Plug into a car charger.
+- **GPS jitter can trigger brief re-routes.** In city canyons, deep tunnels, or under heavy tree cover, position fixes get noisy. The 20 s re-route cooldown limits API churn, but you may briefly hear "Re-routing." prompts before the signal recovers.
+- **U.S. coverage for weather, worldwide for routing.** The forecasts at each stop come from the U.S. National Weather Service and only cover the United States and territories. The driving directions themselves work wherever OpenRouteService does — i.e., almost everywhere.
+
+If any of these limitations are deal-breakers for your use case, you want a native navigation app, not this one.
+
+### Install to the home screen
+
+Trip Weather installs as a Progressive Web App, which is much nicer than running it in a browser tab while you drive. On **iOS Safari**, tap the share button (square with an up arrow) and choose **Add to Home Screen**. On **Android Chrome**, tap the menu and choose **Install app** (or accept the install prompt if it appears). Once installed, it launches full-screen without browser chrome — the right experience for a phone in a car mount.
 
 ---
 

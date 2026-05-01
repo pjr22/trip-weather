@@ -317,12 +317,13 @@ A suggested cut so we can ship something usable early and iterate.
 - **3d** Approach prompts ("In 1 mile, arriving at [name]") for duration > 0 waypoints. Arrival within `ARRIVAL_RADIUS_M` pauses navigation; voice + off-route + scheduler are gated. Continue button resumes.
 - **3e** Skip button visible when within `SKIP_AVAILABLE_DISTANCE_M` of an approachable duration waypoint, sticky until tapped or arrived. Drive-past detection (user advances past the waypoint geometrically) re-routes back with the missed waypoint as the explicit target. `arrivedWaypoints` / `skippedWaypoints` sets carry across re-routes within a session.
 
-### Phase 4 — Mobile-first planning view + PWA shell ⏳ next
-- Responsive waypoint table (stacked cards), responsive modals, responsive header buttons.
-- Touch-target audit.
-- `manifest.webmanifest` with icons (existing favicon set covers most sizes), theme colour, `display: standalone`.
-- `sw.js` — minimal cache-first service worker for static assets (HTML / CSS / JS / icons). No offline routing; map tiles and the routing API still require network.
-- "Add to Home Screen" verified on iOS Safari and Android Chrome.
+### Phase 4 — Mobile-first planning view + PWA shell ✅ done
+- Responsive waypoint table — stacked cards under 640 px, with reorder, drag-handle/chevron, and collapse.
+- Header buttons collapse into an overflow menu (☰) under 640 px; primary actions (Load / Calculate / Navigate) stay inline.
+- Modals are near-full-screen on phones; ≥ 44 × 44 px touch targets across primary controls and the modal close affordance.
+- `manifest.webmanifest` with the existing favicon set, `theme_color` `#3498db`, `display: standalone`.
+- `sw.js` — stale-while-revalidate for the HTML shell; cache-first for same-origin static assets and the Leaflet CDN bundle; network-only for `/api/*` and other origins (map tiles, weather imagery, geocoding).
+- "Add to Home Screen" works on iOS Safari and Android Chrome via the manifest; standalone launch verified.
 
 ### Phase 5 — v2 candidates (deferred)
 - MapLibre as a second nav-map engine (heading-up rotation), with Leaflet remaining as the planning engine and as a nav option.
