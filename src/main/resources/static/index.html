@@ -28,43 +28,58 @@
     <div class="container">
         <header>
             <div class="header-content">
-                <div class="header-route-info">
-                    <div class="route-name-display">
-                        <span class="route-name-label">Current Route:</span>
-                        <span id="current-route-name" class="route-name-value">New</span>
-                        <button id="rename-route-btn" class="icon-btn" title="Rename Route">
-                            <span class="route-name-icon" data-icon="icons/pencil.svg"></span>
-                        </button>
-                    </div>
-                    <div id="route-stats" class="route-stats" style="display: none;">
-                        <span class="stat-item" title="Total driving distance">
-                            <span class="stat-icon" data-icon="icons/ruler.svg">📏</span>
-                            <span id="route-total-distance">0 mi</span>
-                        </span>
-                        <span class="stat-separator">•</span>
-                        <span class="stat-item" title="Total driving time (excluding stops)">
-                            <span class="stat-icon" data-icon="icons/clock.svg">⏱️</span>
-                            <span id="route-total-time">0h 0m</span>
-                        </span>
-                        <span class="stat-separator">•</span>
-                        <span class="stat-item" title="Elevation: Ascent / Descent (Net change)">
-                            <span class="stat-icon" data-icon="icons/mountain.svg">⛰️</span>
-                            <span id="route-elevation">
-                                <span class="elevation-up">↑ 0 ft</span>
-                                <span class="elevation-down">↓ 0 ft</span>
-                                <span class="elevation-net">(Net: 0 ft)</span>
-                            </span>
-                        </span>
-                    </div>
-                </div>
                 <div class="header-brand">
+                    <div class="header-logo">
+                        <img src="icons/car_mountain_sunny.png" alt="Trip Weather Logo" class="logo-image">
+                    </div>
                     <div class="header-text">
                         <h1>Trip Weather</h1>
                         <p>Plan your route and view weather forecasts</p>
                     </div>
-                    <div class="header-logo">
-                        <img src="icons/car_mountain_sunny.png" alt="Trip Weather Logo" class="logo-image">
+                </div>
+                <div class="header-profile">
+                    <button id="profile-menu-btn" class="profile-icon-btn" aria-label="Profile menu" aria-haspopup="true" aria-expanded="false" aria-controls="profile-menu">
+                        <svg class="profile-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="9" r="3.6" fill="currentColor"/>
+                            <path d="M5 20.5c0-3.6 3.1-6.5 7-6.5s7 2.9 7 6.5" fill="currentColor"/>
+                        </svg>
+                    </button>
+                    <span id="profile-username" class="profile-username">guest</span>
+                    <div id="profile-menu" class="profile-menu" role="menu" hidden>
+                        <button class="profile-menu-item" data-action="login" role="menuitem">Log in</button>
+                        <button class="profile-menu-item" data-action="logout" role="menuitem">Log out</button>
+                        <button class="profile-menu-item" data-action="preferences" role="menuitem">Preferences</button>
+                        <button class="profile-menu-item" data-action="about" role="menuitem">About</button>
                     </div>
+                </div>
+            </div>
+            <div class="header-route-info">
+                <div class="route-name-display">
+                    <span class="route-name-label">Route:</span>
+                    <span id="current-route-name" class="route-name-value">New</span>
+                    <button id="rename-route-btn" class="icon-btn rename-route-btn" title="Rename Route">
+                        <span class="route-name-icon" data-icon="icons/pencil.svg"></span>
+                    </button>
+                </div>
+                <div id="route-stats" class="route-stats" style="display: none;">
+                    <span class="stat-item" title="Total driving distance">
+                        <span class="stat-icon" data-icon="icons/ruler.svg">📏</span>
+                        <span id="route-total-distance">0 mi</span>
+                    </span>
+                    <span class="stat-separator">•</span>
+                    <span class="stat-item" title="Total driving time (excluding stops)">
+                        <span class="stat-icon" data-icon="icons/clock.svg">⏱️</span>
+                        <span id="route-total-time">0h 0m</span>
+                    </span>
+                    <span class="stat-separator">•</span>
+                    <span class="stat-item" title="Elevation: Ascent / Descent (Net change)">
+                        <span class="stat-icon" data-icon="icons/mountain.svg">⛰️</span>
+                        <span id="route-elevation">
+                            <span class="elevation-up">↑ 0 ft</span>
+                            <span class="elevation-down">↓ 0 ft</span>
+                            <span class="elevation-net">(Net: 0 ft)</span>
+                        </span>
+                    </span>
                 </div>
             </div>
         </header>
@@ -155,6 +170,16 @@
                     <button id="route-name-confirm-btn" class="modal-btn primary">Save Name</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div id="info-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="info-modal-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="info-modal-title">Info</h3>
+                <span class="close" data-close="info-modal" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body" id="info-modal-body"></div>
         </div>
     </div>
 

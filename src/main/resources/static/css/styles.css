@@ -25,24 +25,17 @@ header {
 
 .header-content {
     display: flex;
-    align-items: center;
+    align-items: end;
     justify-content: space-between;
-    gap: 24px;
+    gap: 16px;
 }
 
 .header-brand {
     display: flex;
     align-items: center;
-    gap: 20px;
-    text-align: right;
-}
-
-.header-brand .header-text {
-    order: 1;
-}
-
-.header-brand .header-logo {
-    order: 2;
+    gap: 14px;
+    text-align: left;
+    min-width: 0;
 }
 
 .header-logo {
@@ -50,40 +43,130 @@ header {
 }
 
 .logo-image {
-    height: 70px;
+    height: 50px;
     width: auto;
     border-radius: 4px;
 }
 
 .header-text {
-    flex-grow: 1;
+    min-width: 0;
 }
 
 header h1 {
     color: #2c3e50;
-    margin-bottom: 5px;
+    font-size: 24px;
+    margin-bottom: 2px;
 }
 
 header p {
     color: #7f8c8d;
+    font-size: 13px;
+}
+
+.header-profile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: end;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.profile-icon-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: none;
+    background: #ecf0f1;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #2c3e50;
+    transition: background-color 0.2s ease;
+}
+
+.profile-icon-btn:hover {
+    background-color: #d5dbdb;
+}
+
+.profile-icon-btn:focus {
+    outline: 2px solid #3498db;
+    outline-offset: 2px;
+}
+
+.profile-icon {
+    width: 22px;
+    height: 22px;
+}
+
+.profile-username {
+    font-size: 11px;
+    color: #7f8c8d;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1;
+    padding-right: 4px;
+    padding-bottom: 2px;
+}
+
+.profile-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 180px;
+    background: #fff;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    /* Above Leaflet panes (top out at 700) and map controls (1000). */
+    z-index: 1100;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.profile-menu[hidden] {
+    display: none;
+}
+
+.profile-menu-item {
+    background: none;
+    border: none;
+    padding: 10px 14px;
+    text-align: left;
+    cursor: pointer;
     font-size: 14px;
+    color: #2c3e50;
+    transition: background-color 0.15s ease;
+}
+
+.profile-menu-item:hover {
+    background-color: #f5f7f9;
+}
+
+.profile-menu-item:focus {
+    outline: 2px solid #3498db;
+    outline-offset: -2px;
 }
 
 .header-route-info {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: 8px;
 }
 
 .route-name-display {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     font-weight: 600;
     color: #2c3e50;
     width: 100%;
-    max-width: 900px;
 }
 
 .route-name-label {
@@ -91,15 +174,21 @@ header p {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: #7f8c8d;
+    flex-shrink: 0;
 }
 
 .route-name-value {
     font-size: 16px;
-    max-width: 630px;
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    flex: 1;
+}
+
+.rename-route-btn {
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 .route-stats {
@@ -203,7 +292,8 @@ main {
 }
 
 #map {
-    height: 600px;
+    height: 65vh;
+    min-height: 400px;
     width: 100%;
     border-radius: 4px;
     margin-bottom: 30px;
@@ -799,6 +889,14 @@ main {
     padding: 20px;
 }
 
+#info-modal-body p + p {
+    margin-top: 8px;
+}
+
+#info-modal-body a {
+    color: #2980b9;
+}
+
 .modal-actions {
     margin-top: 20px;
     display: flex;
@@ -1022,37 +1120,21 @@ main {
     box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 
-/* Responsive design for smaller screens. The mobile header puts the
-   brand (logo + title) on the top row, with the route name + stats
-   below — minimising the vertical space the masthead steals from the
-   map. The desktop two-column layout (route info on left, brand on
-   right) is preserved above 768px. */
+/* Responsive design for smaller screens. The header keeps the same
+   two-row structure as desktop (brand+profile on top, route info
+   below) but tightens spacing and shrinks the brand so the profile
+   widget on the right has room. */
 @media (max-width: 768px) {
-    .header-content {
-        flex-direction: column;
-        gap: 6px;
-    }
-
-    /* Brand goes first; logo and title sit inline on a single line. */
     .header-brand {
-        order: 1;
-        flex-direction: row;
-        align-items: center;
-        justify-content: flex-start;
         gap: 10px;
-        text-align: left;
     }
-
-    /* Logo before text on mobile (desktop has it on the right). */
-    .header-brand .header-logo { order: 1; }
-    .header-brand .header-text { order: 2; }
 
     .logo-image {
-        height: 32px;
+        height: 44px;
     }
 
     .header-brand .header-text h1 {
-        font-size: 20px;
+        font-size: 18px;
         margin: 0;
         line-height: 1.1;
     }
@@ -1062,9 +1144,14 @@ main {
         display: none;
     }
 
-    .header-route-info {
-        order: 2;
-        align-items: flex-start;
+    .profile-icon-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .profile-icon {
+        width: 20px;
+        height: 20px;
     }
 
     /* Tighter stats so all three (distance · time · elevation) fit on
@@ -1076,15 +1163,6 @@ main {
     }
     .route-stats .stat-icon {
         font-size: 12px;
-    }
-
-    .route-name-display {
-        justify-content: flex-start;
-        max-width: 100%;
-    }
-
-    .route-name-value {
-        max-width: none;
     }
 
     .container {
@@ -1099,7 +1177,7 @@ main {
        50vh is the sweet spot — large enough to feel like a map, small
        enough that the waypoint list is visible with a small scroll. */
     #map {
-        height: 50vh;
+        height: 54vh;
         min-height: 320px;
     }
 

@@ -47,3 +47,83 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// === Build version generation ===
+//
+// Two tasks cooperate to produce src/main/resources/static/version.txt
+// (served at /version.txt for the About dialog):
+//
+//   bumpVersion       — increments NN on the same day, resets to 01 on a new
+//                       day. State lives in version.properties (gitignored).
+//                       Hooked only to bootJar so dev iteration via bootRun
+//                       doesn't churn the counter.
+//   writeVersionFile  — writes version.txt from the current state. Hooked to
+//                       processResources so the file always exists for any
+//                       run that copies resources (bootRun, build, test).
+//                       Seeds version.properties with today/01 on a fresh
+//                       checkout if it's missing.
+import java.text.SimpleDateFormat
+
+tasks.register('bumpVersion') {
+	description = 'Bumps the build counter (YY.MM.DD.NN) — increments NN on the same day, resets to 01 on a new day.'
+	group = 'build'
+
+	doLast {
+		def stateFile = file("$projectDir/version.properties")
+		def props = new Properties()
+		if (stateFile.exists()) {
+			stateFile.withInputStream { props.load(it) }
+		}
+		def today = new SimpleDateFormat('yy.MM.dd').format(new Date())
+		def storedDate = props.getProperty('date')
+		def storedBuild = props.getProperty('build')
+
+		def newBuild = (storedDate == today && storedBuild)
+				? String.format('%02d', storedBuild.toInteger() + 1)
+				: '01'
+
+		props.setProperty('date', today)
+		props.setProperty('build', newBuild)
+		stateFile.withOutputStream {
+			props.store(it, 'Build version state — auto-generated, gitignored')
+		}
+		println "Build version bumped to ${today}.${newBuild}"
+	}
+}
+
+tasks.register('writeVersionFile') {
+	description = 'Writes static/version.txt from version.properties. Initialises the properties file on a fresh checkout.'
+	group = 'build'
+
+	doLast {
+		def stateFile = file("$projectDir/version.properties")
+		def outputFile = file("$projectDir/src/main/resources/static/version.txt")
+
+		def props = new Properties()
+		if (stateFile.exists()) {
+			stateFile.withInputStream { props.load(it) }
+		} else {
+			def today = new SimpleDateFormat('yy.MM.dd').format(new Date())
+			props.setProperty('date', today)
+			props.setProperty('build', '01')
+			stateFile.withOutputStream {
+				props.store(it, 'Build version state — auto-generated, gitignored')
+			}
+		}
+
+		outputFile.parentFile.mkdirs()
+		outputFile.text = "${props.getProperty('date')}.${props.getProperty('build')}"
+	}
+}
+
+tasks.named('processResources') {
+	dependsOn 'writeVersionFile'
+}
+
+tasks.named('bootJar') {
+	dependsOn 'bumpVersion'
+}
+
+tasks.named('writeVersionFile') {
+	mustRunAfter 'bumpVersion'
+}

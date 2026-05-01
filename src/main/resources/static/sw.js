@@ -60,6 +60,9 @@ function isSameOriginStatic(url, request) {
     if (request.method !== 'GET') return false;
     if (request.mode === 'navigate') return false;
     if (url.pathname.startsWith('/api/')) return false;
+    // version.txt is regenerated on every build — caching it would freeze
+    // the About dialog on whatever was current at first install.
+    if (url.pathname === '/version.txt') return false;
     return true;
 }
 

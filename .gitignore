@@ -43,6 +43,10 @@ out/
 ### API Keys ###
 *api_key.txt
 
+### Auto-generated build version (see build.gradle bumpVersion / writeVersionFile) ###
+version.properties
+src/main/resources/static/version.txt
+
 ### jar files ###
 **.jar
 
