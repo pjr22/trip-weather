@@ -64,6 +64,22 @@ Click the **EV charging** button to search for charging stations along your rout
 
 > Note: saved routes are currently stored under a shared guest user and are reachable by anyone with the link (or who enumerates route IDs). Don't save anything you want to keep private.
 
+### Export
+
+Once a route is saved, click **📤 Export** (under the ☰ menu on phones) to send the trip to other apps or download it as a file:
+
+- **Google Maps** — opens driving directions in a new tab, or in the Google Maps app on iOS/Android.
+- **GPX** — for GPS devices and fitness apps (Garmin, Komoot, Strava, RideWithGPS). Includes waypoints, the planned route, and the high-resolution track with elevation.
+- **KML** / **KMZ** — for Google Earth and Google My Maps. KMZ is the same file, compressed.
+- **GeoJSON** — for generic GIS and web tools.
+- **CSV** — waypoints as a spreadsheet, with per-waypoint weather columns.
+
+Limits worth knowing:
+
+- The route must be **saved first** and have **at least two waypoints**.
+- **Google Maps caps at 10 stops.** Longer routes are truncated to the first 10 with a warning toast — this is a Google Maps URL limit, not a Trip Weather one.
+- **Weather is U.S. only.** CSV and GeoJSON include per-waypoint forecasts from the National Weather Service; waypoints outside U.S. coverage have empty weather cells. GPX, KML, and KMZ deliberately omit weather — those formats target GPS devices that ignore unknown data.
+
 ### Drive it
 Once a route is calculated, **🧭 Navigate** starts a voice-guided drive. See the [Navigation section](#navigation-turn-by-turn) below — there are real web-platform limitations worth knowing before you rely on it.
 

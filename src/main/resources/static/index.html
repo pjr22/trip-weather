@@ -56,10 +56,10 @@
             <div class="header-route-info">
                 <div class="route-name-display">
                     <span class="route-name-label">Route:</span>
-                    <span id="current-route-name" class="route-name-value">New</span>
                     <button id="rename-route-btn" class="icon-btn rename-route-btn" title="Rename Route">
                         <span class="route-name-icon" data-icon="icons/pencil.svg"></span>
                     </button>
+                    <span id="current-route-name" class="route-name-value">New</span>
                 </div>
                 <div id="route-stats" class="route-stats" style="display: none;">
                     <span class="stat-item" title="Total driving distance">
@@ -98,6 +98,7 @@
                     <button id="save-route-btn" class="action-btn-primary header-menu-item"><span class="btn-icon">💾</span><span class="btn-text">Save <span class="btn-label-extra">Route</span></span></button>
                     <button id="load-route-btn" class="action-btn-primary"><span class="btn-icon">📁</span><span class="btn-text">Load <span class="btn-label-extra">Route</span></span></button>
                     <button id="share-route-btn" class="action-btn-primary header-menu-item"><span class="btn-icon">🔗</span><span class="btn-text">Share <span class="btn-label-extra">Route</span></span></button>
+                    <button id="export-route-btn" class="action-btn-primary header-menu-item"><span class="btn-icon">📤</span><span class="btn-text">Export <span class="btn-label-extra">Route</span></span></button>
                     <button id="calculate-route-btn" class="route-btn"><span class="btn-icon">🚗</span><span class="btn-text">Calculate <span class="btn-label-extra">Route</span></span></button>
                     <button id="navigate-btn" class="action-btn-primary" disabled><span class="btn-icon">🧭</span><span class="btn-text">Navigate</span></button>
                     <button id="search-location-btn" class="action-btn-primary header-menu-item"><span class="btn-icon">🔍</span><span class="btn-text">Search <span class="btn-label-extra">Location</span></span></button>
@@ -168,6 +169,50 @@
                 <div class="modal-actions">
                     <button id="route-name-cancel-btn" class="modal-btn secondary">Cancel</button>
                     <button id="route-name-confirm-btn" class="modal-btn primary">Save Name</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="export-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="export-modal-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="export-modal-title">Export Route</h3>
+                <span class="close" data-close="export-modal" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p class="export-route-name">Exporting: <span id="export-route-name-value"></span></p>
+                <div class="export-options">
+                    <button class="export-option-btn" data-format="gmaps">
+                        <span class="export-option-icon">🗺️</span>
+                        <span class="export-option-label">Google Maps</span>
+                        <span class="export-option-hint">Open driving directions in a new tab</span>
+                    </button>
+                    <button class="export-option-btn" data-format="gpx">
+                        <span class="export-option-icon">🛰️</span>
+                        <span class="export-option-label">GPX</span>
+                        <span class="export-option-hint">Garmin, Komoot, Strava, RideWithGPS</span>
+                    </button>
+                    <button class="export-option-btn" data-format="kml">
+                        <span class="export-option-icon">🌍</span>
+                        <span class="export-option-label">KML</span>
+                        <span class="export-option-hint">Google Earth, Google My Maps</span>
+                    </button>
+                    <button class="export-option-btn" data-format="kmz">
+                        <span class="export-option-icon">📦</span>
+                        <span class="export-option-label">KMZ</span>
+                        <span class="export-option-hint">Compressed KML</span>
+                    </button>
+                    <button class="export-option-btn" data-format="geojson">
+                        <span class="export-option-icon">{ }</span>
+                        <span class="export-option-label">GeoJSON</span>
+                        <span class="export-option-hint">Generic GIS / web tools</span>
+                    </button>
+                    <button class="export-option-btn" data-format="csv">
+                        <span class="export-option-icon">📊</span>
+                        <span class="export-option-label">CSV</span>
+                        <span class="export-option-hint">Waypoints as a spreadsheet</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -268,6 +313,7 @@
     <script src="js/managers/LayerManager.js"></script>
     <script src="js/managers/EVChargingStationManager.js"></script>
     <script src="js/managers/NavigationManager.js"></script>
+    <script src="js/managers/ExportManager.js"></script>
 
     <!-- Main Application (coordinates everything) -->
     <script src="js/app.js"></script>

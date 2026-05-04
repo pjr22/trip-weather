@@ -187,7 +187,6 @@ header p {
 }
 
 .rename-route-btn {
-    margin-left: auto;
     flex-shrink: 0;
 }
 
@@ -1228,10 +1227,12 @@ main {
 
     /* Collapse non-essential items: hidden by default, surfaced as a
        vertical stack of floating pill buttons below the toggle when
-       the .menu-open class is set by UIManager. The four items are
-       at non-contiguous DOM positions (1, 2, 4, 7) interleaved with
+       the .menu-open class is set by UIManager. The five items are
+       at non-contiguous DOM positions (1, 2, 4, 5, 8) interleaved with
        always-visible buttons, so each gets its own absolute top offset
-       rather than being grouped in a single panel. */
+       rather than being grouped in a single panel. If you reorder or
+       insert buttons in the header, update the :nth-child selectors
+       below to match — they're keyed off DOM order, not class. */
     .header-menu-item {
         display: none;
     }
@@ -1251,7 +1252,8 @@ main {
     .header-buttons.menu-open .header-menu-item:nth-child(1) { top: calc(100% + 6px); }
     .header-buttons.menu-open .header-menu-item:nth-child(2) { top: calc(100% + 54px); }
     .header-buttons.menu-open .header-menu-item:nth-child(4) { top: calc(100% + 102px); }
-    .header-buttons.menu-open .header-menu-item:nth-child(7) { top: calc(100% + 150px); }
+    .header-buttons.menu-open .header-menu-item:nth-child(5) { top: calc(100% + 150px); }
+    .header-buttons.menu-open .header-menu-item:nth-child(8) { top: calc(100% + 198px); }
 
     /* The three primary buttons stay inline at full touch-target size. */
     .header-buttons > button {
@@ -2295,4 +2297,64 @@ main {
 
 .ev-add-waypoint-btn:hover {
     background-color: #229954;
+}
+
+/* Export Modal */
+.export-route-name {
+    margin-bottom: 16px;
+    color: #555;
+    font-size: 14px;
+}
+.export-route-name #export-route-name-value {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.export-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.export-option-btn {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 12px;
+    align-items: center;
+    padding: 12px 14px;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: left;
+    color: #2c3e50;
+    transition: all 0.2s;
+}
+
+.export-option-btn:hover {
+    background-color: #e3f2fd;
+    border-color: #3498db;
+}
+
+.export-option-icon {
+    grid-row: 1 / span 2;
+    font-size: 24px;
+    line-height: 1;
+}
+
+.export-option-label {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.export-option-hint {
+    font-size: 12px;
+    color: #7f8c8d;
+}
+
+@media (max-width: 600px) {
+    .export-options {
+        grid-template-columns: 1fr;
+    }
 }
