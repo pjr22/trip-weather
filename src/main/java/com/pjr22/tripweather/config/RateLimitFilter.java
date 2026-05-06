@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final List<String> PROTECTED_PATH_PREFIXES = List.of(
+            "/api/auth/",
             "/api/location/",
             "/api/ev-charging/",
             "/api/route/",

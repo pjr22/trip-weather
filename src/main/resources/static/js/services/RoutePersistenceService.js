@@ -20,7 +20,9 @@ window.TripWeather.Services.RoutePersistence = {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-XSRF-TOKEN': window.TripWeather.Utils.Helpers.getCsrfToken()
                 },
+                credentials: 'same-origin',
                 body: JSON.stringify(routeData)
             });
             
@@ -116,29 +118,55 @@ window.TripWeather.Services.RoutePersistence = {
     },
     
     /**
-     * Search for routes by name
+     * Search for routes by name. Scope is server-driven: authenticated callers
+     * see only their own routes; anonymous callers see the shared guest bucket.
      * @param {string} searchQuery - Route name to search for
-     * @param {string} [username] - Optional username (defaults to guest)
      * @returns {Promise} Promise that resolves with search results
      */
-    searchRoutes: async function(searchQuery, username = null) {
+    searchRoutes: async function(searchQuery) {
         try {
             const url = `/api/routes/search/${encodeURIComponent(searchQuery)}`;
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
-                    'Content-Type': 'application/json',
-                }
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'same-origin'
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error searching routes:', error);
             throw error;
+        }
+    },
+
+    /**
+     * Delete a route by ID. Server enforces ownership — anonymous callers
+     * always get 404, and authenticated callers get 404 for routes that
+     * belong to other users (deliberately, to avoid leaking existence).
+     * Resolves on 204 No Content; rejects with .status set on the error
+     * for any non-2xx response.
+     * @param {string} routeId - UUID of the route to delete
+     * @returns {Promise<void>}
+     */
+    deleteRoute: async function(routeId) {
+        const response = await fetch(`/api/routes/${encodeURIComponent(routeId)}`, {
+            method: 'DELETE',
+            headers: {
+                'X-XSRF-TOKEN': window.TripWeather.Utils.Helpers.getCsrfToken()
+            },
+            credentials: 'same-origin'
+        });
+        if (!response.ok) {
+            const err = new Error(`HTTP ${response.status}`);
+            err.status = response.status;
+            throw err;
         }
     }
 };

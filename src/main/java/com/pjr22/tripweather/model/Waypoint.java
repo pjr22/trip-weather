@@ -46,7 +46,10 @@ public class Waypoint {
     private Double elevation;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "route_id", nullable = false, referencedColumnName = "id")
+    @JoinColumn(name = "route_id", nullable = false, referencedColumnName = "id",
+                foreignKey = @ForeignKey(
+                    name = "waypoints_route_id_fkey",
+                    foreignKeyDefinition = "FOREIGN KEY (route_id) REFERENCES routes(id) ON DELETE CASCADE"))
     private Route route;
     
     @PrePersist

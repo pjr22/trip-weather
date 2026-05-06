@@ -21,10 +21,11 @@ public class UserManagementService {
     
     private static final Logger logger = LoggerFactory.getLogger(UserManagementService.class);
     private static final String GUEST_USER_NAME = "guest";
-    
+    private static final String GUEST_USER_EMAIL = "guest@local";
+
     @Autowired
     private UserRepository userRepository;
-    
+
     /**
      * Create a new user with the given name
      * @param name The name of the user to create
@@ -32,40 +33,47 @@ public class UserManagementService {
      */
     public User createUser(String name) {
         logger.info("Creating new user with name: {}", name);
-        
+
         // Check if user already exists
         Optional<User> existingUser = userRepository.findByName(name);
         if (existingUser.isPresent()) {
             logger.info("User with name '{}' already exists with ID: {}", name, existingUser.get().getId());
             return existingUser.get();
         }
-        
+
         // Create new user
         User user = new User();
         user.setName(name);
         // UUID and timestamp will be set by @PrePersist
-        
+
         User savedUser = userRepository.save(user);
         logger.info("Successfully created user with ID: {} and name: {}", savedUser.getId(), savedUser.getName());
-        
+
         return savedUser;
     }
-    
+
     /**
-     * Get or create the guest user
-     * @return The guest user
+     * Get or create the guest user. Guest is the shared anonymous owner for
+     * routes saved without authentication; it has a sentinel email and is
+     * always enabled but has no password hash, so it can never be logged into.
      */
     public User getOrCreateGuestUser() {
         logger.debug("Looking for guest user");
-        
+
         Optional<User> guestUser = userRepository.findByName(GUEST_USER_NAME);
         if (guestUser.isPresent()) {
             logger.debug("Found existing guest user with ID: {}", guestUser.get().getId());
             return guestUser.get();
         }
-        
+
         logger.info("Guest user not found, creating new guest user");
-        return createUser(GUEST_USER_NAME);
+        User user = new User();
+        user.setName(GUEST_USER_NAME);
+        user.setEmail(GUEST_USER_EMAIL);
+        user.setEnabled(true);
+        User savedUser = userRepository.save(user);
+        logger.info("Successfully created guest user with ID: {}", savedUser.getId());
+        return savedUser;
     }
     
     /**

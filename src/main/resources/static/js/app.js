@@ -101,19 +101,94 @@ window.TripWeather.App = {
      */
     initializeServices: function() {
         console.log('Initializing services...');
-        
+
         // Services are self-contained in their respective files
         // They attach to window.TripWeather.Services namespace automatically
-        
+
         // Verify services are available
-        const requiredServices = ['Location', 'Weather', 'RoutePersistence', 'EVChargingStation'];
+        const requiredServices = ['Auth', 'Location', 'Weather', 'RoutePersistence', 'EVChargingStation'];
         requiredServices.forEach(function(serviceName) {
             if (!window.TripWeather.Services[serviceName]) {
                 throw new Error(`Required service ${serviceName} not found`);
             }
         });
-        
+
+        // Resolve current-user state and then handle any auth-token URLs that
+        // landed via email links. The /verify path needs to wait for the
+        // initial /me round-trip to complete so the XSRF-TOKEN cookie is in
+        // place before AuthService.verify() POSTs it back.
+        const self = this;
+        window.TripWeather.Services.Auth.init().then(function() {
+            self.handleAuthEntryUrl();
+        });
+
         console.log('Services initialized');
+    },
+
+    /**
+     * Inspect window.location for auth-driven entry URLs:
+     *  - /verify?token=...         → POST the token, auto-login on success
+     *  - /reset-password?token=... → open the reset-password modal pre-loaded
+     *                                with the token; the actual password
+     *                                update happens on form submit
+     *
+     * On every path the URL is rewritten to "/" via history.replaceState so a
+     * refresh doesn't replay the action.
+     */
+    handleAuthEntryUrl: function() {
+        const path = window.location.pathname;
+        if (path === '/verify') {
+            this._handleVerifyEntry();
+            return;
+        }
+        if (path === '/reset-password') {
+            this._handleResetPasswordEntry();
+        }
+    },
+
+    _handleVerifyEntry: function() {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        if (!token) return;
+
+        window.history.replaceState({}, '', '/');
+
+        window.TripWeather.Services.Auth.verify(token).then(function() {
+            window.TripWeather.Managers.UI.showInfoModal(
+                'Email verified',
+                '<p>Your email is verified and you\'re now logged in.</p>'
+            );
+        }).catch(function(err) {
+            const isExpired = err && err.body && err.body.code === 'INVALID_TOKEN';
+            const html = isExpired
+                ? '<p>This verification link is invalid or expired.</p>' +
+                  '<p>Open the most recent email, or sign up again to receive a fresh link.</p>'
+                : '<p>Something went wrong verifying your email. Please try again, or sign up again to receive a fresh link.</p>';
+            window.TripWeather.Managers.UI.showInfoModal('Verification failed', html);
+        });
+    },
+
+    _handleResetPasswordEntry: function() {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        if (!token) return;
+
+        // Strip the token from the URL bar so a refresh doesn't reopen the
+        // modal with stale state. AuthModals stashes the token internally.
+        window.history.replaceState({}, '', '/');
+
+        const modals = window.TripWeather.Managers.AuthModals;
+        if (modals && typeof modals.showResetPassword === 'function') {
+            modals.showResetPassword(token);
+        } else {
+            // Defensive: if AuthModals failed to initialise, fall back to an
+            // info modal explaining the situation rather than swallowing the
+            // user's reset attempt.
+            window.TripWeather.Managers.UI.showInfoModal(
+                'Reset password',
+                '<p>We couldn\'t open the reset form. Please refresh the page and try the link again.</p>'
+            );
+        }
     },
 
     /**
@@ -126,7 +201,7 @@ window.TripWeather.App = {
         // They attach to window.TripWeather.Managers namespace automatically
         
         // Verify managers are available
-        const requiredManagers = ['Map', 'Waypoint', 'WaypointRenderer', 'Search', 'UI', 'Route', 'Layer', 'EVChargingStation', 'Navigation', 'Export'];
+        const requiredManagers = ['Map', 'Waypoint', 'WaypointRenderer', 'Search', 'UI', 'AuthModals', 'Route', 'Layer', 'EVChargingStation', 'Navigation', 'Export'];
         requiredManagers.forEach(function(managerName) {
             if (!window.TripWeather.Managers[managerName]) {
                 throw new Error(`Required manager ${managerName} not found`);
@@ -136,6 +211,7 @@ window.TripWeather.App = {
         // Initialize each manager
         window.TripWeather.Managers.Waypoint.initialize();
         window.TripWeather.Managers.UI.initialize();
+        window.TripWeather.Managers.AuthModals.initialize();
         window.TripWeather.Managers.Search.initialize();
         window.TripWeather.Managers.Route.initialize();
         window.TripWeather.Managers.Layer.initialize();
@@ -246,20 +322,38 @@ window.TripWeather.App = {
     },
 
     /**
+     * Wipe in-memory route state — current route id/name, owning userId,
+     * waypoints, polyline. Does NOT show a toast (callers decide what to
+     * say); used by the "New Route" button and by the logout flow.
+     *
+     * @param {object} [options]
+     * @param {boolean} [options.preserveUserId=false] - keep the current
+     *     route's owning userId. The "New Route" button uses this so the
+     *     authenticated user's next save still ties to their account;
+     *     logout passes false so the cleared-route state matches the
+     *     now-anonymous session.
+     */
+    resetCurrentRoute: function(options) {
+        options = options || {};
+        this.routeNameModalCallback = null;
+        this.closeRouteNameModal();
+
+        this.currentRoute = {
+            id: null,
+            name: null,
+            userId: options.preserveUserId ? (this.currentRoute.userId || null) : null
+        };
+        window.TripWeather.Managers.Waypoint.clearAllWaypoints();
+        window.TripWeather.Managers.Route.clearRoute();
+        this.updateCurrentRouteDisplay();
+    },
+
+    /**
      * Reset route state for a new route
      */
     handleNewRoute: function() {
         console.log('Starting a new route');
-
-        this.routeNameModalCallback = null;
-        this.closeRouteNameModal();
-
-        const existingUserId = this.currentRoute.userId || null;
-        this.currentRoute = { id: null, name: null, userId: existingUserId };
-        window.TripWeather.Managers.Waypoint.clearAllWaypoints();
-        window.TripWeather.Managers.Route.clearRoute();
-        this.updateCurrentRouteDisplay();
-
+        this.resetCurrentRoute({ preserveUserId: true });
         window.TripWeather.Managers.UI.showToast('Started a new route.', 'info');
     },
 

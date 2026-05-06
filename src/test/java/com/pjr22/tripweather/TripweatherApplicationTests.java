@@ -5,7 +5,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest
-@TestPropertySource(properties = "spring.datasource.password=tripdb")
+@TestPropertySource(properties = {
+        "spring.datasource.password=tripdb",
+        "trip.email.enabled=false",
+        "trip.auth.remember-me.enabled=false"
+})
 class TripweatherApplicationTests {
 
 	@Test

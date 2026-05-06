@@ -17,13 +17,14 @@ window.TripWeather.Managers.UI = {
         this.initializeKeyboardShortcuts();
         this.initializeMobileMenu();
         this.initializeProfileMenu();
+        this.initializeConfirmModal();
     },
 
     /**
-     * Wire the profile-icon dropdown in the header. Login / logout /
-     * preferences are placeholders until account features ship; About
-     * shows app/version/URL info. Toggle behaviour mirrors
-     * initializeMobileMenu — outside-tap and Escape both dismiss.
+     * Wire the profile-icon dropdown in the header. Menu items are rendered
+     * dynamically based on the current AuthService state — anonymous shows
+     * Sign up / Log in / About; authenticated shows Log out / About. Toggle
+     * behaviour mirrors initializeMobileMenu — outside-tap and Escape dismiss.
      */
     initializeProfileMenu: function() {
         const toggle = document.getElementById('profile-menu-btn');
@@ -34,6 +35,7 @@ window.TripWeather.Managers.UI = {
             menu.hidden = true;
             toggle.setAttribute('aria-expanded', 'false');
         };
+        this._closeProfileMenu = close;
 
         toggle.addEventListener('click', function(event) {
             event.stopPropagation();
@@ -41,13 +43,6 @@ window.TripWeather.Managers.UI = {
             menu.hidden = isOpen;
             toggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
         });
-
-        menu.querySelectorAll('.profile-menu-item').forEach(function(item) {
-            item.addEventListener('click', function() {
-                close();
-                this.handleProfileMenuAction(item.dataset.action);
-            }.bind(this));
-        }.bind(this));
 
         document.addEventListener('click', function(event) {
             if (!menu.hidden && !menu.contains(event.target) && event.target !== toggle) {
@@ -61,7 +56,63 @@ window.TripWeather.Managers.UI = {
             }
         });
 
+        // Initial render against current auth state, then re-render whenever it changes.
+        const auth = window.TripWeather.Services.Auth;
+        this.renderProfileMenu(auth ? auth.getCurrentUser() : null);
+        if (auth && typeof auth.onChange === 'function') {
+            auth.onChange(function(user) { this.renderProfileMenu(user); }.bind(this));
+        }
+
         this.initializeInfoModal();
+    },
+
+    /**
+     * Render the profile-menu items and the username display based on auth state.
+     * @param {object|null} user - current AuthService user or null when anonymous
+     */
+    renderProfileMenu: function(user) {
+        const menu = document.getElementById('profile-menu');
+        const usernameEl = document.getElementById('profile-username');
+        if (!menu) return;
+
+        const items = user
+            ? [
+                { action: 'changePwd',  label: 'Change password' },
+                { action: 'logout',     label: 'Log out' },
+                { action: 'deleteAcct', label: 'Delete account' },
+                { action: 'about',      label: 'About' }
+            ]
+            : [
+                { action: 'signup', label: 'Sign up' },
+                { action: 'login',  label: 'Log in' },
+                { action: 'about',  label: 'About' }
+            ];
+
+        menu.innerHTML = '';
+        items.forEach(function(item) {
+            const btn = document.createElement('button');
+            btn.className = 'profile-menu-item';
+            btn.dataset.action = item.action;
+            btn.setAttribute('role', 'menuitem');
+            btn.textContent = item.label;
+            btn.addEventListener('click', function() {
+                if (this._closeProfileMenu) this._closeProfileMenu();
+                this.handleProfileMenuAction(item.action);
+            }.bind(this));
+            menu.appendChild(btn);
+        }.bind(this));
+
+        if (usernameEl) {
+            usernameEl.textContent = this._displayNameFor(user);
+        }
+    },
+
+    _displayNameFor: function(user) {
+        if (!user) return 'guest';
+        // Email is the canonical login identifier — show it in full so the
+        // user can see exactly which account they're logged into.
+        if (user.email) return user.email;
+        return user.displayName || 'user';
     },
 
     /**
@@ -92,20 +143,45 @@ window.TripWeather.Managers.UI = {
     },
 
     /**
-     * Dispatch a profile-menu selection to its handler.
+     * Dispatch a profile-menu selection to its handler. Signup / login go
+     * through AuthModals; logout goes through AuthService directly. Phase 4
+     * will add change-password and delete-account.
      * @param {string} action - data-action attribute on the clicked item
      */
     handleProfileMenuAction: function(action) {
-        const placeholder = 'Future capability coming soon.';
+        const modals = window.TripWeather.Managers.AuthModals;
+        const auth = window.TripWeather.Services.Auth;
         switch (action) {
+            case 'signup':
+                if (modals) modals.showSignup();
+                break;
             case 'login':
-                this.showInfoModal('Log in', placeholder);
+                if (modals) modals.showLogin();
                 break;
             case 'logout':
-                this.showInfoModal('Log out', placeholder);
+                if (auth) {
+                    // Capture the email before logout() clears the cached user
+                    // so the toast can still name the account that just left.
+                    const previous = auth.getCurrentUser();
+                    const who = (previous && previous.email) || 'user';
+                    auth.logout().then(function() {
+                        // Wipe the in-memory route so the next save doesn't
+                        // resolve back to the just-logged-out user's route.
+                        // Also avoids the surprising "I'm anonymous now but
+                        // their waypoints are still on screen" experience.
+                        if (window.TripWeather.App
+                                && typeof window.TripWeather.App.resetCurrentRoute === 'function') {
+                            window.TripWeather.App.resetCurrentRoute();
+                        }
+                        window.TripWeather.Managers.UI.showToast(who + ' logged out.', 'info');
+                    });
+                }
                 break;
-            case 'preferences':
-                this.showInfoModal('Preferences', placeholder);
+            case 'changePwd':
+                if (modals) modals.showChangePassword();
+                break;
+            case 'deleteAcct':
+                if (modals) modals.showDeleteAccount();
                 break;
             case 'about':
                 this.showAboutDialog();
@@ -247,17 +323,95 @@ window.TripWeather.Managers.UI = {
     },
 
     /**
-     * Show confirmation dialog
-     * @param {string} message - Confirmation message
-     * @param {Function} onConfirm - Callback when confirmed
-     * @param {Function} onCancel - Callback when cancelled (optional)
+     * Wire close affordances on the confirm modal — × button, Cancel button,
+     * backdrop click, and Escape key. The OK button gets its handler each
+     * time {@link showConfirm} runs, since the callback changes per call.
      */
-    showConfirm: function(message, onConfirm, onCancel) {
-        if (confirm(message)) {
-            if (onConfirm) onConfirm();
-        } else {
-            if (onCancel) onCancel();
+    initializeConfirmModal: function() {
+        const modal = document.getElementById('confirm-modal');
+        if (!modal) return;
+
+        const finish = function(outcome) {
+            modal.style.display = 'none';
+            const callbacks = this._confirmCallbacks;
+            this._confirmCallbacks = null;
+            if (!callbacks) return;
+            const fn = outcome === 'confirm' ? callbacks.onConfirm : callbacks.onCancel;
+            if (typeof fn === 'function') {
+                try { fn(); } catch (e) { console.warn('confirm callback threw', e); }
+            }
+        }.bind(this);
+
+        const xClose = modal.querySelector('.modal-header .close');
+        if (xClose) {
+            xClose.addEventListener('click', function() { finish('cancel'); });
         }
+        const cancelBtn = document.getElementById('confirm-modal-cancel');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function() { finish('cancel'); });
+        }
+        const okBtn = document.getElementById('confirm-modal-ok');
+        if (okBtn) {
+            okBtn.addEventListener('click', function() { finish('confirm'); });
+        }
+
+        modal.addEventListener('click', function(event) {
+            if (event.target === modal) finish('cancel');
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && modal.style.display === 'block') {
+                finish('cancel');
+            }
+        });
+    },
+
+    /**
+     * Show a styled confirmation dialog. Drop-in replacement for the old
+     * native {@code confirm()} wrapper.
+     *
+     * @param {string} message - Confirmation message (rendered via textContent — safe for user-supplied strings)
+     * @param {Function} onConfirm - Callback when the user clicks OK
+     * @param {Function} [onCancel] - Callback when the user dismisses (Cancel / × / backdrop / Escape)
+     * @param {object} [options]
+     * @param {string} [options.title='Confirm'] - Modal header text
+     * @param {string} [options.confirmLabel='OK'] - OK button text
+     * @param {string} [options.cancelLabel='Cancel'] - Cancel button text
+     * @param {boolean} [options.danger=false] - Style the OK button as destructive (red); also focuses Cancel by default so Enter doesn't trigger the destructive action.
+     */
+    showConfirm: function(message, onConfirm, onCancel, options) {
+        const modal = document.getElementById('confirm-modal');
+        const messageEl = document.getElementById('confirm-modal-message');
+        const titleEl = document.getElementById('confirm-modal-title');
+        const okBtn = document.getElementById('confirm-modal-ok');
+        const cancelBtn = document.getElementById('confirm-modal-cancel');
+
+        // Fallback so the UI still works if the markup is missing.
+        if (!modal || !messageEl || !okBtn || !cancelBtn || !titleEl) {
+            if (window.confirm(message)) {
+                if (onConfirm) onConfirm();
+            } else {
+                if (onCancel) onCancel();
+            }
+            return;
+        }
+
+        const opts = options || {};
+        titleEl.textContent = opts.title || 'Confirm';
+        messageEl.textContent = message;
+        okBtn.textContent = opts.confirmLabel || 'OK';
+        cancelBtn.textContent = opts.cancelLabel || 'Cancel';
+        okBtn.className = 'modal-btn ' + (opts.danger ? 'danger' : 'primary');
+
+        this._confirmCallbacks = { onConfirm: onConfirm, onCancel: onCancel };
+        modal.style.display = 'block';
+
+        // Focus the safe action by default for destructive prompts; otherwise
+        // focus OK so Enter confirms.
+        const toFocus = opts.danger ? cancelBtn : okBtn;
+        setTimeout(function() {
+            try { toFocus.focus(); } catch (_) { /* ignore */ }
+        }, 0);
     },
 
     /**

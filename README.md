@@ -62,7 +62,9 @@ Click the **EV charging** button to search for charging stations along your rout
 - **Share** copies a link you can send to anyone; opening that link loads the same route in their browser.
 - **Load** opens a saved route by name.
 
-> Note: saved routes are currently stored under a shared guest user and are reachable by anyone with the link (or who enumerates route IDs). Don't save anything you want to keep private.
+Routes you save while signed in are private to your account — only you see them in **Load**, only you can delete them, and they live forever (no auto-expiry). Routes saved as a guest land in a shared bucket visible to every other guest, and they're swept 30 days after creation. **Share links** continue to work for anyone, regardless of who owns the route or whether the viewer is signed in — that's a UUID-based link, unchanged.
+
+If you'd rather your routes weren't shared, [sign in or sign up](#account-optional) — it's free and the only data we ask for is an email address.
 
 ### Export
 
@@ -79,6 +81,20 @@ Limits worth knowing:
 - The route must be **saved first** and have **at least two waypoints**.
 - **Google Maps caps at 10 stops.** Longer routes are truncated to the first 10 with a warning toast — this is a Google Maps URL limit, not a Trip Weather one.
 - **Weather is U.S. only.** CSV and GeoJSON include per-waypoint forecasts from the National Weather Service; waypoints outside U.S. coverage have empty weather cells. GPX, KML, and KMZ deliberately omit weather — those formats target GPS devices that ignore unknown data.
+
+### Account (optional)
+
+You can use Trip Weather without an account — just plan, calculate, and drive. An account only matters if you want your saved routes to be private to you.
+
+Click the **profile icon** in the top right to access account actions:
+
+- **Sign up** with email + password (12 characters minimum). You'll get a verification link in email; click it to finish setting up the account. The link is short-lived (5 minutes by default), so try it as soon as the email arrives. If it expires before you click, the modal offers a "resend" option.
+- **Log in** with the same email + password. Tick **Stay logged in for 30 days** to skip the login screen on later visits — the cookie survives browser restart and is invalidated automatically if you change your password from another device.
+- **Forgot password** — request a reset link on the login modal. The email lands the same way as the verification flow; click it to choose a new password. Your existing password keeps working until you successfully complete the reset, so a forgot-password request alone doesn't lock you out if you remember the old password.
+- **Change password** (from the profile menu when logged in) — requires your current password, and invalidates "stay logged in" on every browser including the current one. You stay logged in for the rest of the current session.
+- **Delete account** (from the profile menu when logged in) — requires your current password and an explicit acknowledgement that your saved routes will be deleted. Cascades to every route, waypoint, and login token tied to the account.
+
+Email goes through [Mailtrap](https://mailtrap.io/). The only thing the app stores about you is your email address (lowercased, used as your login identifier), a BCrypt hash of your password, and the routes you save.
 
 ### Drive it
 Once a route is calculated, **🧭 Navigate** starts a voice-guided drive. See the [Navigation section](#navigation-turn-by-turn) below — there are real web-platform limitations worth knowing before you rely on it.
@@ -165,13 +181,28 @@ export TRIP_DB_PASSWORD=...   # required; app refuses to start without it
 # export TRIP_DB_URL='jdbc:postgresql://localhost:5432/yourdb'
 # export TRIP_DB_USERNAME='youruser'
 
-# 4. run
+# 4. user-accounts setup — pick one path:
+#
+#    a) Skip the email + remember-me wiring during initial setup:
+export TRIP_EMAIL_ENABLED=false
+export TRIP_REMEMBER_ME_ENABLED=false
+export TRIP_APP_BASE_URL=http://localhost:8090
+export TRIP_COOKIE_SECURE=false
+#
+#    b) Or wire it up properly (Mailtrap free tier is fine for dev):
+# export TRIP_EMAIL_URL='https://sandbox.api.mailtrap.io/api/send/<inbox-id>'
+# export TRIP_EMAIL_APIKEY=<mailtrap-api-token>
+# export TRIP_REMEMBER_ME_KEY="$(openssl rand -base64 48)"
+
+# 5. run
 ./gradlew bootRun
 ```
 
 Then open http://localhost:8090.
 
-Developer documentation — architecture, module layout, API endpoints, WMS layer handling — lives in [HOWTO_LOCAL_MAP.md](HOWTO_LOCAL_MAP.md) and inline in the source. A full code review with known issues and priorities is in [CODE_REVIEW.md](CODE_REVIEW.md).
+When `TRIP_EMAIL_ENABLED=false`, the app logs would-be email bodies (verification and password-reset links included) at INFO level instead of sending them — useful for the verify / reset flow without provisioning Mailtrap. Set `TRIP_AUTH_EMAIL_TOKEN_LIFETIME_MINUTES` to a larger value if 5 minutes feels too tight while you're testing.
+
+Developer documentation — architecture, module layout, API endpoints, WMS layer handling — lives in [HOWTO_LOCAL_MAP.md](HOWTO_LOCAL_MAP.md) and inline in the source. The user-accounts feature has its own design document in [USER_ACCOUNTS_PLAN.md](USER_ACCOUNTS_PLAN.md). A full code review with known issues and priorities is in [CODE_REVIEW.md](CODE_REVIEW.md).
 
 ---
 

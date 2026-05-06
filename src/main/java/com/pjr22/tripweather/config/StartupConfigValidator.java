@@ -26,5 +26,39 @@ public class StartupConfigValidator implements EnvironmentPostProcessor {
                   + "See CODE_REVIEW.md issue #1 for full setup instructions."
             );
         }
+
+        boolean emailEnabled = Boolean.parseBoolean(
+                environment.getProperty("trip.email.enabled", "true"));
+        if (emailEnabled) {
+            String emailUrl = environment.getProperty("trip.email.url");
+            String emailKey = environment.getProperty("trip.email.api-key");
+            if (emailUrl == null || emailUrl.isBlank()
+                    || emailKey == null || emailKey.isBlank()) {
+                throw new IllegalStateException(
+                        "Email is enabled (trip.email.enabled=true) but TRIP_EMAIL_URL "
+                      + "and/or TRIP_EMAIL_APIKEY is missing.\n"
+                      + "Set them in the environment, for example:\n"
+                      + "  export TRIP_EMAIL_URL='https://send.api.mailtrap.io/api/send'\n"
+                      + "  export TRIP_EMAIL_APIKEY='<your-mailtrap-api-token>'\n"
+                      + "or disable email locally with TRIP_EMAIL_ENABLED=false."
+                );
+            }
+        }
+
+        boolean rememberMeEnabled = Boolean.parseBoolean(
+                environment.getProperty("trip.auth.remember-me.enabled", "true"));
+        if (rememberMeEnabled) {
+            String rememberMeKey = environment.getProperty("trip.auth.remember-me.key");
+            if (rememberMeKey == null || rememberMeKey.isBlank()) {
+                throw new IllegalStateException(
+                        "Remember-me is enabled (trip.auth.remember-me.enabled=true) but "
+                      + "TRIP_REMEMBER_ME_KEY is missing.\n"
+                      + "This server-side secret signs the persistent-login cookie. "
+                      + "Generate a random string and set it in the environment, for example:\n"
+                      + "  export TRIP_REMEMBER_ME_KEY=\"$(openssl rand -base64 48)\"\n"
+                      + "or disable the feature locally with TRIP_REMEMBER_ME_ENABLED=false."
+                );
+            }
+        }
     }
 }

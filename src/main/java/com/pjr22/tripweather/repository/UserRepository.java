@@ -19,7 +19,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      * @return Optional containing the user if found
      */
     Optional<User> findByName(String name);
-    
+
+    /**
+     * Find a user by email (case-insensitive). Email is the login identifier;
+     * stored lowercased but matched defensively.
+     */
+    Optional<User> findByEmailIgnoreCase(String email);
+
     /**
      * Find a user by ID
      * @param id The UUID to search for

@@ -1,0 +1,71 @@
+/* Styles specific to the signup / login modals. Designed to slot in alongside
+   styles.css without overriding existing modal rules. */
+
+.auth-label {
+    display: block;
+    margin-top: 12px;
+    margin-bottom: 4px;
+    font-size: 0.9em;
+    color: #444;
+    font-weight: 500;
+}
+
+.auth-message {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.auth-message.error {
+    background: #fdecea;
+    border: 1px solid #f5c2c0;
+    color: #842029;
+}
+
+.auth-message.info {
+    background: #e8f4fd;
+    border: 1px solid #b6d8f5;
+    color: #084298;
+}
+
+.auth-message.success {
+    background: #e7f6ec;
+    border: 1px solid #a3d9b1;
+    color: #0f5132;
+}
+
+.auth-message a,
+.auth-switch a {
+    color: #0d6efd;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.auth-switch {
+    margin-top: 16px;
+    text-align: center;
+    color: #555;
+    font-size: 0.9em;
+}
+
+/* Inline checkbox label, used for "Stay logged in" on Login modal and the
+   acknowledge box on the destructive delete-account modal. */
+.auth-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 0.9em;
+    color: #444;
+    cursor: pointer;
+    user-select: none;
+}
+
+.auth-checkbox input[type="checkbox"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}

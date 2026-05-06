@@ -15,20 +15,29 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class User {
-    
+
     @Id
     @Column(name = "id", columnDefinition = "UUID")
     private UUID id;
-    
+
     @Column(name = "name", nullable = false, length = 255)
     private String name;
-    
+
+    @Column(name = "email", nullable = false, length = 255, unique = true)
+    private String email;
+
+    @Column(name = "password_hash", length = 255)
+    private String passwordHash;
+
+    @Column(name = "enabled", nullable = false)
+    private boolean enabled;
+
     @Column(name = "created", nullable = false)
     private LocalDateTime created;
-    
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Route> routes;
-    
+
     @PrePersist
     public void prePersist() {
         if (id == null) {

@@ -23,6 +23,7 @@
     
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/nav.css">
+    <link rel="stylesheet" href="css/auth.css">
 </head>
 <body>
     <div class="container">
@@ -46,10 +47,8 @@
                     </button>
                     <span id="profile-username" class="profile-username">guest</span>
                     <div id="profile-menu" class="profile-menu" role="menu" hidden>
-                        <button class="profile-menu-item" data-action="login" role="menuitem">Log in</button>
-                        <button class="profile-menu-item" data-action="logout" role="menuitem">Log out</button>
-                        <button class="profile-menu-item" data-action="preferences" role="menuitem">Preferences</button>
-                        <button class="profile-menu-item" data-action="about" role="menuitem">About</button>
+                        <!-- Items are rendered dynamically by UIManager.renderProfileMenu()
+                             based on the current AuthService state (anonymous vs. authenticated). -->
                     </div>
                 </div>
             </div>
@@ -228,6 +227,188 @@
         </div>
     </div>
 
+    <div id="confirm-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="confirm-modal-title">Confirm</h3>
+                <span class="close" data-close="confirm-modal" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-modal-message"></p>
+                <div class="modal-actions">
+                    <button id="confirm-modal-cancel" class="modal-btn secondary" type="button">Cancel</button>
+                    <button id="confirm-modal-ok" class="modal-btn primary" type="button">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="signup-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="signup-modal-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="signup-modal-title">Sign up</h3>
+                <span class="close" data-close="signup-modal" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="signup-form" autocomplete="on" novalidate>
+                    <label class="auth-label" for="signup-email">Email</label>
+                    <input type="email" id="signup-email" class="search-input" autocomplete="email" required>
+
+                    <label class="auth-label" for="signup-password">Password (min 12 characters)</label>
+                    <input type="password" id="signup-password" class="search-input" autocomplete="new-password" minlength="12" required>
+
+                    <label class="auth-label" for="signup-password-confirm">Confirm password</label>
+                    <input type="password" id="signup-password-confirm" class="search-input" autocomplete="new-password" minlength="12" required>
+
+                    <div id="signup-message" class="auth-message" role="alert" hidden></div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="modal-btn secondary" data-close="signup-modal">Cancel</button>
+                        <button type="submit" class="modal-btn primary">Create account</button>
+                    </div>
+                </form>
+                <p class="auth-switch">Already have an account? <a href="#" id="signup-switch-to-login">Log in</a></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="login-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="login-modal-title">Log in</h3>
+                <span class="close" data-close="login-modal" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="login-form" autocomplete="on" novalidate>
+                    <label class="auth-label" for="login-email">Email</label>
+                    <input type="email" id="login-email" class="search-input" autocomplete="email" required>
+
+                    <label class="auth-label" for="login-password">Password</label>
+                    <input type="password" id="login-password" class="search-input" autocomplete="current-password" required>
+
+                    <label class="auth-checkbox" for="login-remember-me">
+                        <input type="checkbox" id="login-remember-me">
+                        Stay logged in for 30 days
+                    </label>
+
+                    <div id="login-message" class="auth-message" role="alert" hidden></div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="modal-btn secondary" data-close="login-modal">Cancel</button>
+                        <button type="submit" class="modal-btn primary">Log in</button>
+                    </div>
+                </form>
+                <p class="auth-switch">No account yet? <a href="#" id="login-switch-to-signup">Sign up</a></p>
+                <p class="auth-switch"><a href="#" id="login-forgot-link">Forgot your password?</a></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="forgot-password-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="forgot-password-modal-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="forgot-password-modal-title">Reset your password</h3>
+                <span class="close" data-close="forgot-password-modal" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Enter your email address and we'll send you a link to choose a new password.</p>
+                <form id="forgot-password-form" autocomplete="on" novalidate>
+                    <label class="auth-label" for="forgot-password-email">Email</label>
+                    <input type="email" id="forgot-password-email" class="search-input" autocomplete="email" required>
+
+                    <div id="forgot-password-message" class="auth-message" role="alert" hidden></div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="modal-btn secondary" data-close="forgot-password-modal">Cancel</button>
+                        <button type="submit" class="modal-btn primary">Send reset link</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="reset-password-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="reset-password-modal-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="reset-password-modal-title">Choose a new password</h3>
+                <span class="close" data-close="reset-password-modal" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="reset-password-form" autocomplete="on" novalidate>
+                    <label class="auth-label" for="reset-password-new">New password (min 12 characters)</label>
+                    <input type="password" id="reset-password-new" class="search-input" autocomplete="new-password" minlength="12" required>
+
+                    <label class="auth-label" for="reset-password-confirm">Confirm new password</label>
+                    <input type="password" id="reset-password-confirm" class="search-input" autocomplete="new-password" minlength="12" required>
+
+                    <div id="reset-password-message" class="auth-message" role="alert" hidden></div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="modal-btn secondary" data-close="reset-password-modal">Cancel</button>
+                        <button type="submit" class="modal-btn primary">Set new password</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="change-password-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="change-password-modal-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="change-password-modal-title">Change password</h3>
+                <span class="close" data-close="change-password-modal" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Changing your password will log you out of any other browsers where you stayed logged in.</p>
+                <form id="change-password-form" autocomplete="on" novalidate>
+                    <label class="auth-label" for="change-password-current">Current password</label>
+                    <input type="password" id="change-password-current" class="search-input" autocomplete="current-password" required>
+
+                    <label class="auth-label" for="change-password-new">New password (min 12 characters)</label>
+                    <input type="password" id="change-password-new" class="search-input" autocomplete="new-password" minlength="12" required>
+
+                    <label class="auth-label" for="change-password-confirm">Confirm new password</label>
+                    <input type="password" id="change-password-confirm" class="search-input" autocomplete="new-password" minlength="12" required>
+
+                    <div id="change-password-message" class="auth-message" role="alert" hidden></div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="modal-btn secondary" data-close="change-password-modal">Cancel</button>
+                        <button type="submit" class="modal-btn primary">Change password</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="delete-account-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-account-modal-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="delete-account-modal-title">Delete account</h3>
+                <span class="close" data-close="delete-account-modal" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p><strong>This permanently deletes your account, all your saved routes, and any waypoints attached to them.</strong> It can't be undone.</p>
+                <form id="delete-account-form" autocomplete="off" novalidate>
+                    <label class="auth-label" for="delete-account-password">Confirm with your password</label>
+                    <input type="password" id="delete-account-password" class="search-input" autocomplete="current-password" required>
+
+                    <label class="auth-checkbox" for="delete-account-acknowledge">
+                        <input type="checkbox" id="delete-account-acknowledge" required>
+                        I understand my saved routes will be deleted.
+                    </label>
+
+                    <div id="delete-account-message" class="auth-message" role="alert" hidden></div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="modal-btn secondary" data-close="delete-account-modal">Cancel</button>
+                        <button type="submit" class="modal-btn danger">Delete my account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <div id="layers-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="layers-modal-title">
         <div class="modal-content">
             <div class="modal-header">
@@ -289,6 +470,7 @@
     <script src="js/utils/GeolocationDiagnostics.js"></script>
     
     <!-- Services (depend on utils) -->
+    <script src="js/services/AuthService.js"></script>
     <script src="js/services/LocationService.js"></script>
     <script src="js/services/WeatherService.js"></script>
     <script src="js/services/RoutePersistenceService.js"></script>
@@ -309,6 +491,7 @@
     <script src="js/managers/WaypointRenderer.js"></script>
     <script src="js/managers/SearchManager.js"></script>
     <script src="js/managers/UIManager.js"></script>
+    <script src="js/managers/AuthModals.js"></script>
     <script src="js/managers/RouteManager.js"></script>
     <script src="js/managers/LayerManager.js"></script>
     <script src="js/managers/EVChargingStationManager.js"></script>

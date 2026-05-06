@@ -376,6 +376,25 @@ window.TripWeather.Utils.Helpers = {
     },
 
     /**
+     * Read the Spring Security CSRF token from the XSRF-TOKEN cookie.
+     * Spring writes this cookie via CookieCsrfTokenRepository#withHttpOnlyFalse;
+     * the SPA must echo it back in the X-XSRF-TOKEN header on every state-changing
+     * request or the request is rejected with 403.
+     * @returns {string} The token, or '' if the cookie isn't set yet.
+     */
+    getCsrfToken: function() {
+        var name = 'XSRF-TOKEN=';
+        var parts = document.cookie ? document.cookie.split(';') : [];
+        for (var i = 0; i < parts.length; i++) {
+            var c = parts[i].trim();
+            if (c.indexOf(name) === 0) {
+                return decodeURIComponent(c.substring(name.length));
+            }
+        }
+        return '';
+    },
+
+    /**
      * Shared fetch wrapper. Contract:
      *   - 2xx with a JSON body        -> resolves to parsed object/array
      *   - 2xx with an empty body      -> resolves to null (so callers can fall through
@@ -444,7 +463,11 @@ window.TripWeather.Utils.Helpers = {
     httpPost: function(url, data) {
         return this.request(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-XSRF-TOKEN': this.getCsrfToken()
+            },
+            credentials: 'same-origin',
             body: JSON.stringify(data)
         });
     }

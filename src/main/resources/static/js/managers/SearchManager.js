@@ -434,17 +434,25 @@ window.TripWeather.Managers.Search = {
     },
     
     /**
-     * Display route search results in modal
+     * Display route search results in modal. When the current viewer owns a
+     * result row, render an inline 🗑 button that deletes it after confirm.
+     * Anonymous viewers and authenticated viewers looking at someone else's
+     * route (which only happens via a stale cache — server scopes results)
+     * see no delete affordance.
      * @param {object} data - Search response data
      */
     displayRouteSearchResults: function(data) {
         const resultsContainer = document.getElementById('route-search-results');
-        
+
         if (!data || data.length === 0) {
             resultsContainer.innerHTML = '<div class="search-no-results">No routes found</div>';
             return;
         }
-        
+
+        const auth = window.TripWeather.Services.Auth;
+        const currentUser = auth ? auth.getCurrentUser() : null;
+        const currentUserId = currentUser ? currentUser.id : null;
+
         resultsContainer.innerHTML = '';
 
         data.forEach(route => {
@@ -471,8 +479,71 @@ window.TripWeather.Managers.Search = {
                 window.TripWeather.Managers.Search.selectRouteSearchResult(route.id);
             });
 
+            if (currentUserId && route.userId === currentUserId) {
+                // Match the waypoint-row delete button: red background +
+                // white SVG icon loaded by IconLoader.
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'action-btn delete-action route-delete-btn';
+                deleteBtn.title = 'Delete this route';
+                deleteBtn.setAttribute('aria-label', 'Delete route ' + route.name);
+
+                const iconContainer = document.createElement('span');
+                iconContainer.className = 'action-icon-container';
+                deleteBtn.appendChild(iconContainer);
+                window.TripWeather.Utils.IconLoader.loadSvgIcon(
+                    'icons/delete.svg', iconContainer, 'action-icon');
+
+                deleteBtn.addEventListener('click', function(event) {
+                    // Click on the trash button must NOT also trigger the
+                    // row's "load route" handler.
+                    event.stopPropagation();
+                    window.TripWeather.Managers.Search.confirmDeleteRoute(route, resultItem);
+                });
+                resultItem.appendChild(deleteBtn);
+            }
+
             resultsContainer.appendChild(resultItem);
         });
+    },
+
+    /**
+     * Confirm + delete a route from the search results list. Removes the row
+     * on success and toasts the result. Re-runs the live search query when
+     * the user is mid-typing so the results stay consistent with the server.
+     */
+    confirmDeleteRoute: function(route, rowElement) {
+        const ui = window.TripWeather.Managers.UI;
+        ui.showConfirm(
+            'Delete the route "' + route.name + '"? This cannot be undone.',
+            function() {
+                window.TripWeather.Services.RoutePersistence.deleteRoute(route.id)
+                    .then(function() {
+                        if (rowElement && rowElement.parentNode) {
+                            rowElement.parentNode.removeChild(rowElement);
+                        }
+                        const remaining = document.querySelectorAll('#route-search-results .search-result-item');
+                        if (remaining.length === 0) {
+                            const container = document.getElementById('route-search-results');
+                            if (container) {
+                                container.innerHTML = '<div class="search-no-results">No routes found</div>';
+                            }
+                        }
+                        ui.showToast('Route deleted.', 'success');
+                    })
+                    .catch(function(err) {
+                        if (err && err.status === 404) {
+                            ui.showToast('That route is no longer available.', 'warning');
+                        } else if (err && err.status === 401) {
+                            ui.showToast('Please log in to delete routes.', 'warning');
+                        } else {
+                            ui.showToast('Could not delete the route. Please try again.', 'error');
+                        }
+                    });
+            },
+            null,
+            { title: 'Delete route', confirmLabel: 'Delete', danger: true }
+        );
     },
     
     /**

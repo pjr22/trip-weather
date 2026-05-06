@@ -71,8 +71,10 @@ public class RouteService {
 
           return locationData;
        } catch (Exception e) {
-          log.info("Failed to get snap location info from: {}", SNAP_ENDPOINT);
-          log.error("Snap request failed.", e);
+          // Upstream ORS failures (5xx, timeouts) are transient and handled
+          // by callers via null-checks — log at WARN without the stack trace
+          // so a partial ORS outage doesn't fill the log with ERRORs.
+          log.warn("Snap request failed for {}: {}", SNAP_ENDPOINT, e.getMessage());
           return null;
       }
    }
@@ -94,7 +96,9 @@ public class RouteService {
         return Double.valueOf(feature.getGeometry().getCoordinates().get(2));
 
       } catch (Exception e) {
-         log.error("Failed to get elevation for ({}, {})", latitude, longitude, e);
+         // See snapToLocation for the WARN-not-ERROR rationale.
+         log.warn("Failed to get elevation for ({}, {}): {}",
+                 latitude, longitude, e.getMessage());
          return null;
       }
    }

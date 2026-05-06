@@ -931,6 +931,15 @@ main {
     background-color: #dfe6e9;
 }
 
+.modal-btn.danger {
+    background-color: #e74c3c;
+    color: #fff;
+}
+
+.modal-btn.danger:hover {
+    background-color: #c0392b;
+}
+
 .modal-btn:focus {
     outline: 2px solid #3498db;
     outline-offset: 2px;
@@ -958,11 +967,25 @@ main {
 
 .search-result-item {
     padding: 12px;
+    /* Reserve room on the right so a long route name can't overlap the
+       optional delete button (rendered absolute-top-right when the user
+       owns the row). */
+    padding-right: 52px;
     border: 1px solid #e0e0e0;
     border-radius: 4px;
     margin-bottom: 8px;
     cursor: pointer;
     transition: background-color 0.2s;
+    position: relative;
+}
+
+/* Position-only overrides — visual styling (red bg, white icon, sizing)
+   comes from .action-btn.delete-action, matching the waypoint-table
+   delete button. */
+.route-delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
 }
 
 .search-result-item:hover {
