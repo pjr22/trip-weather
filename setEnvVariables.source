@@ -1,6 +1,8 @@
 export TRIP_EMAIL_ENABLED=false
 export TRIP_EMAIL_URL=https://send.api.mailtrap.io/api/send
 export TRIP_EMAIL_APIKEY=`cat mailtrap_api_key.txt`
+export TRIP_EMAIL_FROM=tripweather@pjr22.com
+export TRIP_APP_BASE_URL=https://tripweather.pjr22.com
 export TRIP_COOKIE_SECURE=false
 export OPENROUTESERVICE_API_KEY=`cat openRouteService_api_key.txt`
 export GEOAPIFY_API_KEY=`cat geoApify_api_key.txt`
@@ -10,6 +12,8 @@ export TRIP_REMEMBER_ME_KEY="$(openssl rand -base64 48)"
 echo "TRIP_EMAIL_ENABLED=$TRIP_EMAIL_ENABLED"
 echo "TRIP_EMAIL_URL=$TRIP_EMAIL_URL"
 echo "TRIP_EMAIL_APIKEY=$TRIP_EMAIL_APIKEY"
+echo "TRIP_EMAIL_FROM=$TRIP_EMAIL_FROM"
+echo "TRIP_APP_BASE_URL=$TRIP_APP_BASE_URL"
 echo "TRIP_COOKIE_SECURE=$TRIP_COOKIE_SECURE"
 echo "Using OpenRouteService API key: $OPENROUTESERVICE_API_KEY"
 echo "Using GeoApify API key: $GEOAPIFY_API_KEY"
