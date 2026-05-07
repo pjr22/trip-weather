@@ -1,13 +1,19 @@
 package com.pjr22.tripweather.service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -16,9 +22,12 @@ import org.springframework.web.client.RestClient;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.pjr22.tripweather.Utils;
 import com.pjr22.tripweather.model.LocationData;
+import com.pjr22.tripweather.model.OrsResponseCache;
 import com.pjr22.tripweather.model.RouteData;
+import com.pjr22.tripweather.repository.OrsResponseCacheRepository;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -26,79 +35,113 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Wraps OpenRouteService with a Postgres-backed durable response cache. Each
+ * of directions / snap / elevation hashes a canonical request payload (with
+ * coordinates rounded to ~10 cm precision) and looks the result up in
+ * {@code ors_response_cache}. On a hit within TTL, no upstream call. On a
+ * miss or stale entry, calls upstream; on upstream failure with a stale
+ * entry within the per-endpoint stale-max window, serves stale.
+ *
+ * Per-endpoint TTLs differ because routes can subtly change with road network
+ * updates while snap+elevation are essentially geological.
+ */
 @Slf4j
 @Service
 public class RouteService {
 
    private final RestClient restClient;
    private final String apiKey;
-   private final String baseUrl;
    private final ObjectMapper objectMapper;
+   private final OrsResponseCacheRepository cacheRepository;
+   private final Clock clock;
+   private final long directionsTtlHours;
+   private final long directionsStaleMaxHours;
+   private final long snapTtlHours;
+   private final long snapStaleMaxHours;
+   private final long elevationTtlHours;
+   private final long elevationStaleMaxHours;
 
    private static final String DIRECTIONS_ENDPOINT = "/v2/directions/driving-car/geojson";
    private static final String ELEVATION_ENDPOINT = "/elevation/point";
    private static final String SNAP_ENDPOINT = "/v2/snap/driving-car/geojson";
 
+   private static final String CACHE_KIND_DIRECTIONS = "directions";
+   private static final String CACHE_KIND_SNAP = "snap";
+   private static final String CACHE_KIND_ELEVATION = "elevation";
+
+   /** Bump if the canonical request shape (or upstream response shape) changes
+    *  in a way that invalidates previously-cached entries. */
+   private static final int CACHE_KEY_VERSION = 1;
+
+   private static final int SNAP_RADIUS_METERS = 10_000;
+   private static final int COORDINATE_DECIMALS = 6;
+
    public RouteService(
          @Value("${openrouteservice.api.key}") String apiKey,
-         @Value("${openrouteservice.base.url:https://api.openrouteservice.org}") String baseUrl
+         RestClient orsRestClient,
+         ObjectMapper objectMapper,
+         OrsResponseCacheRepository cacheRepository,
+         Clock clock,
+         @Value("${trip.routing.directions-ttl-hours:24}") long directionsTtlHours,
+         @Value("${trip.routing.directions-stale-max-hours:168}") long directionsStaleMaxHours,
+         @Value("${trip.routing.snap-ttl-hours:720}") long snapTtlHours,
+         @Value("${trip.routing.snap-stale-max-hours:2160}") long snapStaleMaxHours,
+         @Value("${trip.routing.elevation-ttl-hours:720}") long elevationTtlHours,
+         @Value("${trip.routing.elevation-stale-max-hours:2160}") long elevationStaleMaxHours
    ) {
       this.apiKey = apiKey;
-      this.baseUrl = baseUrl;
-      this.restClient = RestClient.builder().baseUrl(this.baseUrl).build();
-      this.objectMapper = new ObjectMapper();
+      this.restClient = orsRestClient;
+      this.objectMapper = objectMapper;
+      this.cacheRepository = cacheRepository;
+      this.clock = clock;
+      this.directionsTtlHours = directionsTtlHours;
+      this.directionsStaleMaxHours = directionsStaleMaxHours;
+      this.snapTtlHours = snapTtlHours;
+      this.snapStaleMaxHours = snapStaleMaxHours;
+      this.elevationTtlHours = elevationTtlHours;
+      this.elevationStaleMaxHours = elevationStaleMaxHours;
    }
 
    public LocationData snapToLocation(double latitude, double longitude) {
+      if (apiKey == null || apiKey.isEmpty()) {
+         return null;
+      }
       try {
-          if (apiKey == null || apiKey.isEmpty()) {
-              return null;
-          }
-          
-          // {"locations":[[8.669629,49.413025],[8.675841,49.418532],[8.665144,49.415594]],"radius":350}'
-          Map<String, Object> body = new HashMap<>();
-          body.put("locations", List.of(List.of(longitude, latitude)));
-          body.put("radius", Integer.valueOf(10000));
-
-          LocationData locationData = restClient.post()
-                  .uri(SNAP_ENDPOINT)
-                  .body(body)
-                  .header("Authorization", apiKey)
-                  .header("Content-Type", "application/json")
-                  .retrieve()
-                  .toEntity(LocationData.class)
-                  .getBody();
-
-          return locationData;
-       } catch (Exception e) {
-          // Upstream ORS failures (5xx, timeouts) are transient and handled
-          // by callers via null-checks — log at WARN without the stack trace
-          // so a partial ORS outage doesn't fill the log with ERRORs.
-          log.warn("Snap request failed for {}: {}", SNAP_ENDPOINT, e.getMessage());
-          return null;
+         String hash = snapCacheKey(latitude, longitude);
+         JsonNode response = getOrFetchCached(hash, CACHE_KIND_SNAP,
+               snapTtlHours, snapStaleMaxHours,
+               () -> callSnapApi(latitude, longitude));
+         if (response == null) {
+            return null;
+         }
+         return objectMapper.treeToValue(response, LocationData.class);
+      } catch (Exception e) {
+         log.warn("Snap request failed for ({}, {}): {}", latitude, longitude, e.getMessage());
+         return null;
       }
    }
 
-   // https://localhost:5000/elevation/point?geometry=13.349762,38.11295
    public Double getElevation(double latitude, double longitude) {
+      if (apiKey == null || apiKey.isEmpty()) {
+         return null;
+      }
       try {
-         if (apiKey == null || apiKey.isEmpty()) {
+         String hash = elevationCacheKey(latitude, longitude);
+         JsonNode response = getOrFetchCached(hash, CACHE_KIND_ELEVATION,
+               elevationTtlHours, elevationStaleMaxHours,
+               () -> callElevationApi(latitude, longitude));
+         if (response == null) {
             return null;
-        }
-
-        String url = String.format(ELEVATION_ENDPOINT + "?geometry=%s,%s", longitude, latitude);
-        LocationData.Feature feature = restClient.get()
-              .uri(url)
-              .header("Authorization", apiKey)
-              .retrieve()
-              .body(LocationData.Feature.class);
-        
-        return Double.valueOf(feature.getGeometry().getCoordinates().get(2));
-
+         }
+         JsonNode coords = response.path("geometry").path("coordinates");
+         if (coords.isArray() && coords.size() >= 3 && !coords.get(2).isNull()) {
+            return coords.get(2).asDouble();
+         }
+         return null;
       } catch (Exception e) {
-         // See snapToLocation for the WARN-not-ERROR rationale.
          log.warn("Failed to get elevation for ({}, {}): {}",
-                 latitude, longitude, e.getMessage());
+               latitude, longitude, e.getMessage());
          return null;
       }
    }
@@ -108,45 +151,203 @@ public class RouteService {
          ZonedDateTime departureDateTime,
          List<Integer> durations
    ) {
+      if (apiKey == null || apiKey.isEmpty()) {
+         return createErrorRoute("OpenRouteService API key not configured");
+      }
+      if (waypoints == null || waypoints.size() < 2) {
+         return createErrorRoute("At least 2 waypoints are required for routing");
+      }
+
+      JsonNode response;
       try {
-         if (apiKey == null || apiKey.isEmpty()) {
-            return createErrorRoute("OpenRouteService API key not configured");
-         }
-
-         if (waypoints == null || waypoints.size() < 2) {
-            return createErrorRoute("At least 2 waypoints are required for routing");
-         }
-
-         // Prepare request body for OpenRouteService
-         RouteRequest request = new RouteRequest();
-         request.setCoordinates(convertWaypointsToCoordinates(waypoints));
-         request.setRadiuses(List.of(-1));
-         request.setElevation(true);
-         request.setInstructions(true);
-         request.setInstructionsFormat("text");
-         request.setLanguage("en");
-
-         String requestBody = objectMapper.writeValueAsString(request);
-
-         JsonNode response = restClient.post()
-               .uri(DIRECTIONS_ENDPOINT)
-               .header("Authorization", apiKey)
-               .header("Content-Type", "application/json")
-               .body(requestBody)
-               .retrieve()
-               .body(JsonNode.class);
-         
-         ZonedDateTime now = ZonedDateTime.now(departureDateTime.getZone());
-         if (departureDateTime.isBefore(now)) {
-            departureDateTime = now;
-         }
-
-         return parseRouteResponseWithArrivalTimesAndDurations(response, waypoints, departureDateTime, durations);
-
+         String hash = directionsCacheKey(waypoints);
+         response = getOrFetchCached(hash, CACHE_KIND_DIRECTIONS,
+               directionsTtlHours, directionsStaleMaxHours,
+               () -> callDirectionsApi(waypoints));
       } catch (Exception e) {
          return createErrorRoute("Failed to calculate route: " + e.getMessage());
       }
+      if (response == null) {
+         return createErrorRoute("No directions response");
+      }
+
+      ZonedDateTime now = ZonedDateTime.now(departureDateTime.getZone());
+      if (departureDateTime.isBefore(now)) {
+         departureDateTime = now;
+      }
+      return parseRouteResponseWithArrivalTimesAndDurations(response, waypoints, departureDateTime, durations);
    }
+
+   // ---------------------------------------------------------------- caching
+
+   /** SAM type so endpoint methods can supply their upstream call as a lambda. */
+   @FunctionalInterface
+   private interface ApiCall {
+      JsonNode execute() throws Exception;
+   }
+
+   private JsonNode getOrFetchCached(String requestHash, String endpoint,
+                                     long ttlHours, long staleMaxHours,
+                                     ApiCall apiCall) throws Exception {
+      Optional<OrsResponseCache> cached = cacheRepository.findById(requestHash);
+      LocalDateTime now = LocalDateTime.now(clock);
+
+      if (cached.isPresent()) {
+         OrsResponseCache entry = cached.get();
+         if (now.isBefore(entry.getFetchedAt().plusHours(ttlHours))) {
+            return parseJsonOrNull(entry.getResponseJson());
+         }
+         try {
+            JsonNode fresh = apiCall.execute();
+            if (fresh != null) {
+               persist(requestHash, endpoint, fresh, now);
+               return fresh;
+            }
+         } catch (Exception e) {
+            if (now.isBefore(entry.getFetchedAt().plusHours(staleMaxHours))) {
+               log.warn("ORS {} refresh failed; serving stale cached entry from {}",
+                     endpoint, entry.getFetchedAt(), e);
+               return parseJsonOrNull(entry.getResponseJson());
+            }
+            throw e;
+         }
+         // apiCall returned null without throwing — fall back to stale within window
+         if (now.isBefore(entry.getFetchedAt().plusHours(staleMaxHours))) {
+            log.warn("ORS {} returned null; serving stale cached entry from {}",
+                  endpoint, entry.getFetchedAt());
+            return parseJsonOrNull(entry.getResponseJson());
+         }
+         return null;
+      }
+
+      JsonNode fresh = apiCall.execute();
+      if (fresh != null) {
+         persist(requestHash, endpoint, fresh, now);
+      }
+      return fresh;
+   }
+
+   private void persist(String hash, String endpoint, JsonNode response, LocalDateTime fetchedAt) {
+      try {
+         OrsResponseCache entry = new OrsResponseCache(hash, endpoint,
+               objectMapper.writeValueAsString(response), fetchedAt);
+         cacheRepository.save(entry);
+      } catch (Exception e) {
+         log.warn("Failed to persist ORS {} cache entry", endpoint, e);
+      }
+   }
+
+   private JsonNode parseJsonOrNull(String json) {
+      try {
+         return objectMapper.readTree(json);
+      } catch (Exception e) {
+         log.warn("Could not parse cached ORS response", e);
+         return null;
+      }
+   }
+
+   private String directionsCacheKey(List<RouteRequest.Waypoint> waypoints) {
+      List<List<Double>> rounded = new ArrayList<>(waypoints.size());
+      for (RouteRequest.Waypoint wp : waypoints) {
+         rounded.add(List.of(round(wp.getLongitude()), round(wp.getLatitude())));
+      }
+      Map<String, Object> canonical = new LinkedHashMap<>();
+      canonical.put("endpoint", CACHE_KIND_DIRECTIONS);
+      canonical.put("version", CACHE_KEY_VERSION);
+      canonical.put("coordinates", rounded);
+      return sha256Hex(canonicalJson(canonical));
+   }
+
+   private String snapCacheKey(double latitude, double longitude) {
+      return pointCacheKey(CACHE_KIND_SNAP, latitude, longitude);
+   }
+
+   private String elevationCacheKey(double latitude, double longitude) {
+      return pointCacheKey(CACHE_KIND_ELEVATION, latitude, longitude);
+   }
+
+   private String pointCacheKey(String endpoint, double latitude, double longitude) {
+      Map<String, Object> canonical = new LinkedHashMap<>();
+      canonical.put("endpoint", endpoint);
+      canonical.put("version", CACHE_KEY_VERSION);
+      canonical.put("lat", round(latitude));
+      canonical.put("lon", round(longitude));
+      return sha256Hex(canonicalJson(canonical));
+   }
+
+   private static double round(double v) {
+      double scale = Math.pow(10, COORDINATE_DECIMALS);
+      return Math.round(v * scale) / scale;
+   }
+
+   private String canonicalJson(Object obj) {
+      try {
+         return objectMapper.copy()
+               .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+               .writeValueAsString(obj);
+      } catch (Exception e) {
+         throw new RuntimeException("Failed to serialize canonical cache key", e);
+      }
+   }
+
+   private static String sha256Hex(String input) {
+      try {
+         MessageDigest md = MessageDigest.getInstance("SHA-256");
+         byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
+         StringBuilder sb = new StringBuilder(64);
+         for (byte b : digest) {
+            sb.append(String.format("%02x", b));
+         }
+         return sb.toString();
+      } catch (NoSuchAlgorithmException e) {
+         throw new RuntimeException(e);
+      }
+   }
+
+   // ----------------------------------------------------------- API plumbing
+
+   private JsonNode callDirectionsApi(List<RouteRequest.Waypoint> waypoints) throws Exception {
+      RouteRequest request = new RouteRequest();
+      request.setCoordinates(convertWaypointsToCoordinates(waypoints));
+      request.setRadiuses(List.of(-1));
+      request.setElevation(true);
+      request.setInstructions(true);
+      request.setInstructionsFormat("text");
+      request.setLanguage("en");
+
+      String requestBody = objectMapper.writeValueAsString(request);
+      return restClient.post()
+            .uri(DIRECTIONS_ENDPOINT)
+            .header("Authorization", apiKey)
+            .header("Content-Type", "application/json")
+            .body(requestBody)
+            .retrieve()
+            .body(JsonNode.class);
+   }
+
+   private JsonNode callSnapApi(double latitude, double longitude) {
+      Map<String, Object> body = new HashMap<>();
+      body.put("locations", List.of(List.of(longitude, latitude)));
+      body.put("radius", Integer.valueOf(SNAP_RADIUS_METERS));
+      return restClient.post()
+            .uri(SNAP_ENDPOINT)
+            .body(body)
+            .header("Authorization", apiKey)
+            .header("Content-Type", "application/json")
+            .retrieve()
+            .body(JsonNode.class);
+   }
+
+   private JsonNode callElevationApi(double latitude, double longitude) {
+      String url = String.format(ELEVATION_ENDPOINT + "?geometry=%s,%s", longitude, latitude);
+      return restClient.get()
+            .uri(url)
+            .header("Authorization", apiKey)
+            .retrieve()
+            .body(JsonNode.class);
+   }
+
+   // ----------------------------------------------- response parsing helpers
 
    /**
     * Add minutes to a datetime string in the specified timezone. Falls back to
@@ -168,7 +369,7 @@ public class RouteService {
          return resultZonedDateTime.format(formatter);
       } catch (Exception e) {
          log.error("Error adding minutes to datetime: {}", dateTimeStr, e);
-         return dateTimeStr; // Return original if addition fails
+         return dateTimeStr;
       }
    }
 
@@ -186,7 +387,6 @@ public class RouteService {
    private RouteData parseRouteResponseWithArrivalTimesAndDurations(JsonNode response,
          List<RouteRequest.Waypoint> originalWaypoints, ZonedDateTime departureDateTime, List<Integer> durations) {
       try {
-         // First, parse the basic route information (geometry, segments, etc.)
          JsonNode features = response.get("features");
          if (features == null || !features.isArray() || features.size() == 0) {
             return createErrorRoute("No features found in response");
@@ -194,7 +394,6 @@ public class RouteService {
 
          JsonNode firstFeature = features.get(0);
 
-         // Extract geometry from the feature
          JsonNode geometryNode = firstFeature.get("geometry");
          List<List<Double>> geometry = new ArrayList<>();
          if (geometryNode != null && geometryNode.has("coordinates")) {
@@ -203,10 +402,10 @@ public class RouteService {
                for (JsonNode coord : coordinates) {
                   if (coord.isArray() && coord.size() > 1) {
                      List<Double> point = new ArrayList<>();
-                     point.add(coord.get(0).asDouble()); // longitude
-                     point.add(coord.get(1).asDouble()); // latitude
+                     point.add(coord.get(0).asDouble());
+                     point.add(coord.get(1).asDouble());
                      if (coord.size() > 2) {
-                        point.add(coord.get(2).asDouble()); // elevation)
+                        point.add(coord.get(2).asDouble());
                      }
                      geometry.add(point);
                   }
@@ -214,14 +413,12 @@ public class RouteService {
             }
          }
 
-         // Extract summary from properties
          JsonNode properties = firstFeature.get("properties");
          Double distance = null;
          Double duration = null;
          List<RouteData.RouteSegment> segments = new ArrayList<>();
 
          if (properties != null) {
-            // Extract summary
             JsonNode summary = properties.get("summary");
             if (summary != null) {
                if (summary.has("distance")) {
@@ -232,7 +429,6 @@ public class RouteService {
                }
             }
 
-            // Extract segments
             JsonNode segmentsNode = properties.get("segments");
             if (segmentsNode != null && segmentsNode.isArray()) {
                for (JsonNode segmentNode : segmentsNode) {
@@ -251,18 +447,14 @@ public class RouteService {
             }
          }
 
-         // Create waypoint information with arrival times, durations, and timezones
          List<RouteData.WaypointCoordinates> waypointInfo = new ArrayList<>();
          if (departureDateTime != null) {
-            // Calculate arrival times with durations and timezone support
             waypointInfo = calculateArrivalTimesWithDurationAndTimezone(originalWaypoints, segments, departureDateTime,
                   durations);
          } else {
-            // No arrival times needed
             for (RouteRequest.Waypoint wp : originalWaypoints) {
                List<Double> location = List.of(wp.getLongitude(), wp.getLatitude());
                RouteData.WaypointCoordinates waypoint = new RouteData.WaypointCoordinates(location, wp.getName());
-               // Add timezone even if no departure time is set
                String timezone = wp.getTimezoneName();
                waypoint.setTimezone(timezone);
                waypointInfo.add(waypoint);
@@ -297,13 +489,11 @@ public class RouteService {
             RouteRequest.Waypoint originalWaypoint = originalWaypoints.get(i);
             String timezone = originalWaypoint.getTimezoneName();
 
-            // Create waypoint coordinates with location and name
             List<Double> location = List.of(originalWaypoint.getLongitude(), originalWaypoint.getLatitude());
             RouteData.WaypointCoordinates waypoint = new RouteData.WaypointCoordinates(location,
                   originalWaypoint.getName());
             waypoint.setTimezone(timezone);
 
-            // Set duration for this waypoint (default to 0 if not provided)
             Integer waypointDuration = 0;
             if (durations != null && i < durations.size()) {
                waypointDuration = durations.get(i) != null ? durations.get(i) : 0;
@@ -311,10 +501,8 @@ public class RouteService {
             waypoint.setDuration(waypointDuration);
 
             if (i == 0) {
-               // First waypoint gets the departure time
                waypoint.setArrivalTime(currentTimeStr);
             } else {
-               // Convert previous waypoint's departure time to current waypoint's timezone
                RouteRequest.Waypoint previousWaypoint = originalWaypoints.get(i - 1);
                String previousTimezone = previousWaypoint.getTimezoneName();
 
@@ -323,18 +511,13 @@ public class RouteService {
                currentTimeStr = arrivalTimeInCurrentTimezone;
             }
 
-            // Calculate departure time (arrival time + duration)
             String departureTime = addMinutesToDateTime(currentTimeStr, timezone, waypointDuration);
             waypoint.setDepartureTime(departureTime);
 
-            // Update current time for next segment (convert to next waypoint's timezone
-            // when we get there)
             if (i < originalWaypoints.size() - 1) {
-               // Add travel time for next segment
                if (i < segments.size()) {
                   RouteData.RouteSegment segment = segments.get(i);
                   if (segment.getDuration() != null) {
-                     // Add travel time (duration is in seconds)
                      currentTimeStr = addMinutesToDateTime(departureTime, timezone,
                            (int) (segment.getDuration().longValue() / 60));
                   }
@@ -348,7 +531,6 @@ public class RouteService {
 
       } catch (Exception e) {
          log.error("Error calculating arrival times with durations and timezones", e);
-         // Return basic waypoints without arrival times
          List<RouteData.WaypointCoordinates> fallbackWaypoints = new ArrayList<>();
          for (RouteRequest.Waypoint wp : originalWaypoints) {
             List<Double> location = List.of(wp.getLongitude(), wp.getLatitude());
@@ -401,8 +583,6 @@ public class RouteService {
       errorRoute.setGeometry(new ArrayList<>());
       errorRoute.setDistance(0.0);
       errorRoute.setDuration(0.0);
-      // We could add error information to the model, but for now, the frontend will
-      // handle the error case
       return errorRoute;
    }
 

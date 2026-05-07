@@ -1,5 +1,6 @@
 package com.pjr22.tripweather.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
@@ -12,6 +13,7 @@ import java.util.List;
 @Setter
 @ToString
 @Accessors(chain = true)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class LocationData {
     
     @JsonProperty("type")
@@ -28,24 +30,26 @@ public class LocationData {
     @Setter
     @ToString
     @Accessors(chain = true)
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Feature {
         @JsonProperty("type")
         private String type;
-        
+
         @JsonProperty("properties")
         private Properties properties;
-        
+
         @JsonProperty("geometry")
         private Geometry geometry;
-        
+
         @JsonProperty("bbox")
         private List<Double> bbox;
     }
-    
+
     @Getter
     @Setter
     @ToString
     @Accessors(chain = true)
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Properties {
         @JsonProperty("datasource")
         private Datasource datasource;
@@ -124,6 +128,7 @@ public class LocationData {
     @Setter
     @ToString
     @Accessors(chain = true)
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Datasource {
         @JsonProperty("sourcename")
         private String sourcename;
@@ -142,6 +147,7 @@ public class LocationData {
     @Setter
     @ToString
     @Accessors(chain = true)
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Timezone {
         @JsonProperty("name")
         private String name;
@@ -169,6 +175,7 @@ public class LocationData {
     @Setter
     @ToString
     @Accessors(chain = true)
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Rank {
         @JsonProperty("importance")
         private Double importance;
@@ -181,6 +188,7 @@ public class LocationData {
     @Setter
     @ToString
     @Accessors(chain = true)
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Geometry {
         @JsonProperty("type")
         private String type;
@@ -193,6 +201,7 @@ public class LocationData {
     @Setter
     @ToString
     @Accessors(chain = true)
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Query {
         @JsonProperty("lat")
         private Double lat;

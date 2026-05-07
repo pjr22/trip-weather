@@ -1,132 +1,195 @@
 package com.pjr22.tripweather.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pjr22.tripweather.dto.EVChargingStationRequest;
 import com.pjr22.tripweather.dto.EVChargingStationResponse;
+import com.pjr22.tripweather.dto.EVChargingStationResponse.EVChargingStationFeature;
+import com.pjr22.tripweather.dto.EVChargingStationResponse.EVChargingStationGeometry;
+import com.pjr22.tripweather.dto.EVChargingStationResponse.EVChargingStationProperties;
+import com.pjr22.tripweather.repository.EvStationQueryDao;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
- * Service for interacting with the NREL EV Charging Stations API
+ * Returns EV charging stations along a route by querying the local
+ * {@code ev_stations} mirror — no upstream NREL call on the request path.
+ * The mirror is refreshed weekly by {@link EvStationLoader}; the
+ * {@code NREL_API_KEY} is now used only by the loader.
+ *
+ * <p>The request and response shapes are unchanged from when this service
+ * proxied NREL directly: the frontend sends NREL-style filter parameters
+ * ({@code fuel_type}, {@code status}, {@code access}, {@code ev_network},
+ * {@code ev_connector_type}, {@code ev_charging_level}, {@code distance},
+ * {@code limit}) and receives a GeoJSON {@code FeatureCollection} with the
+ * same {@code properties} payload NREL would have returned. Filters apply the
+ * same semantics here that NREL applies to its single-station endpoint, so
+ * switching to the mirror is transparent to the UI.
  */
 @Service
 @Slf4j
 public class EVChargingStationService {
 
-    private final RestClient restClient;
-    private final String nrelBaseUrl;
-    private final String nrelApiKey;
+    private static final double METERS_PER_MILE = 1609.344;
 
-    public EVChargingStationService(
-            @Value("${nrel.base.url}") String nrelBaseUrl,
-            @Value("${nrel.api.key}") String nrelApiKey) {
-        this.nrelBaseUrl = nrelBaseUrl;
-        this.nrelApiKey = nrelApiKey;
-        this.restClient = RestClient.builder()
-                .baseUrl(nrelBaseUrl)
-                .messageConverters(converters -> converters.add(new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter()))
-                .build();
+    private final EvStationQueryDao queryDao;
+    private final ObjectMapper objectMapper;
+    private final double defaultRadiusMiles;
+    private final int defaultLimit;
+
+    public EVChargingStationService(EvStationQueryDao queryDao,
+                                    ObjectMapper objectMapper,
+                                    @Value("${trip.ev.default-radius-miles:1.0}") double defaultRadiusMiles,
+                                    @Value("${trip.ev.default-limit:200}") int defaultLimit) {
+        this.queryDao = queryDao;
+        this.objectMapper = objectMapper;
+        this.defaultRadiusMiles = defaultRadiusMiles;
+        this.defaultLimit = defaultLimit;
     }
 
-    /**
-     * Get EV charging stations along a route
-     * 
-     * @param request The request containing route coordinates and additional parameters
-     * @return EV charging stations along the route
-     */
     public EVChargingStationResponse getStationsAlongRoute(EVChargingStationRequest request) {
-        try {
-            // Convert route coordinates to Well Known Text LINESTRING format
-            String routeWkt = convertRouteToWkt(request.getRoute());
-            
-            log.debug("Making request to NREL EV charging stations API");
-            log.debug("Route WKT: {}...", routeWkt.subSequence(0, 80));
-            log.debug("Request parameters: {}", request.getParameters());
+        EVChargingStationResponse response = new EVChargingStationResponse();
+        response.setType("FeatureCollection");
+        response.setFeatures(new ArrayList<>());
 
-            // Build the URI with only the API key (all parameters will be in request body)
-            UriComponentsBuilder uriBuilder = UriComponentsBuilder
-                    .fromPath("/api/alt-fuel-stations/v1/nearby-route.geojson")
-                    .queryParam("api_key", nrelApiKey);
-
-            String requestUrl = uriBuilder.build().toUriString();
-            // Log the path only; the full URL contains api_key=<secret> in the query string.
-            log.debug("NREL API request path: /api/alt-fuel-stations/v1/nearby-route.geojson");
-
-            // Create request body with route data and all parameters
-            Map<String, Object> requestBody = new java.util.HashMap<>();
-            requestBody.put("route", routeWkt);
-
-            // Add all parameters to request body (including route parameters)
-            if (request.getParameters() != null) {
-                for (Map.Entry<String, Object> entry : request.getParameters().entrySet()) {
-                    if (entry.getValue() != null) {
-                        requestBody.put(entry.getKey(), entry.getValue());
-                    }
-                }
-            }
-
-            log.debug("NREL API request body: {}", requestBody);
-
-            // Make the POST request to NREL API with route in request body
-            EVChargingStationResponse response = restClient.post()
-                  .uri(requestUrl)
-                  .header("Content-Type", MediaType.APPLICATION_JSON.toString())
-                  .header("Accept", MediaType.APPLICATION_JSON.toString())
-                  .body(requestBody)
-                  .retrieve()
-                  .body(EVChargingStationResponse.class);
-
-            log.debug("NREL API response received; type={}, features={}",
-                    response != null ? response.getType() : "null",
-                    response != null && response.getFeatures() != null ? response.getFeatures().size() : 0);
-
+        if (request == null || request.getRoute() == null || request.getRoute().isEmpty()) {
             return response;
-            
-        } catch (Exception e) {
-            log.error("Error calling NREL EV charging stations API", e);
-            // Create an error response
-            EVChargingStationResponse errorResponse = new EVChargingStationResponse();
-            errorResponse.setType("FeatureCollection");
-            
-            // You could add more detailed error handling here if needed
-            return errorResponse;
         }
+
+        Map<String, Object> params = request.getParameters() != null
+                ? request.getParameters() : Map.of();
+
+        String routeWkt;
+        try {
+            routeWkt = convertRouteToWkt(request.getRoute());
+        } catch (IllegalArgumentException e) {
+            log.warn("Rejected EV station request with invalid route geometry: {}", e.getMessage());
+            return response;
+        }
+
+        double radiusMeters = readMiles(params, "distance", defaultRadiusMiles) * METERS_PER_MILE;
+        int limit = readInt(params, "limit", defaultLimit);
+
+        EvStationQueryDao.Filter filter = buildFilter(params);
+
+        List<EvStationQueryDao.StationRow> rows;
+        try {
+            rows = queryDao.findAlongRoute(routeWkt, radiusMeters, filter, limit);
+        } catch (Exception e) {
+            log.error("EV station query failed", e);
+            return response;
+        }
+
+        List<EVChargingStationFeature> features = new ArrayList<>(rows.size());
+        for (EvStationQueryDao.StationRow row : rows) {
+            EVChargingStationFeature feature = toFeature(row);
+            if (feature != null) {
+                features.add(feature);
+            }
+        }
+        response.setFeatures(features);
+        log.debug("EV station query returned {} feature(s) within {} m of route", features.size(), radiusMeters);
+        return response;
     }
-    
-    /**
-     * Convert a list of [longitude, latitude] pairs to Well Known Text LINESTRING format
-     * 
-     * @param route List of [longitude, latitude] pairs
-     * @return WKT LINESTRING format
-     */
-    private String convertRouteToWkt(java.util.List<java.util.List<Double>> route) {
+
+    private EvStationQueryDao.Filter buildFilter(Map<String, Object> params) {
+        String fuelType = readString(params, "fuel_type");
+        String status   = readString(params, "status");
+        String access   = readString(params, "access");
+        List<String> networks       = readCommaSeparated(params, "ev_network");
+        List<String> connectorTypes = readCommaSeparated(params, "ev_connector_type");
+        List<String> chargingLevels = readCommaSeparated(params, "ev_charging_level");
+
+        boolean requireDcFast = chargingLevels.stream().anyMatch(s -> s.equalsIgnoreCase("dc_fast"));
+        boolean requireLevel2 = chargingLevels.stream().anyMatch(s -> s.equals("2") || s.equalsIgnoreCase("level2"));
+        boolean requireLevel1 = chargingLevels.stream().anyMatch(s -> s.equals("1") || s.equalsIgnoreCase("level1"));
+
+        return new EvStationQueryDao.Filter(
+                fuelType, status, access,
+                networks.isEmpty() ? null : networks,
+                connectorTypes.isEmpty() ? null : connectorTypes,
+                requireDcFast, requireLevel2, requireLevel1);
+    }
+
+    private EVChargingStationFeature toFeature(EvStationQueryDao.StationRow row) {
+        EVChargingStationFeature feature = new EVChargingStationFeature();
+        feature.setType("Feature");
+
+        EVChargingStationGeometry geometry = new EVChargingStationGeometry();
+        geometry.setType("Point");
+        geometry.setCoordinates(List.of(row.longitude(), row.latitude()));
+        feature.setGeometry(geometry);
+
+        try {
+            EVChargingStationProperties properties = objectMapper.readValue(
+                    row.propertiesJson(), EVChargingStationProperties.class);
+            feature.setProperties(properties);
+        } catch (Exception e) {
+            log.warn("Could not deserialize cached properties for station id {}; skipping", row.id(), e);
+            return null;
+        }
+        return feature;
+    }
+
+    private static String readString(Map<String, Object> params, String key) {
+        Object v = params.get(key);
+        if (v == null) return null;
+        String s = v.toString().trim();
+        return s.isEmpty() ? null : s;
+    }
+
+    private static List<String> readCommaSeparated(Map<String, Object> params, String key) {
+        String raw = readString(params, key);
+        if (raw == null) return List.of();
+        List<String> parts = new ArrayList<>();
+        for (String p : raw.split(",")) {
+            String trimmed = p.trim();
+            if (!trimmed.isEmpty()) {
+                parts.add(trimmed);
+            }
+        }
+        return parts;
+    }
+
+    private static double readMiles(Map<String, Object> params, String key, double fallback) {
+        Object v = params.get(key);
+        if (v instanceof Number n) return n.doubleValue();
+        if (v instanceof String s && !s.isBlank()) {
+            try { return Double.parseDouble(s.trim()); } catch (NumberFormatException ignore) {}
+        }
+        return fallback;
+    }
+
+    private static int readInt(Map<String, Object> params, String key, int fallback) {
+        Object v = params.get(key);
+        if (v instanceof Number n) return n.intValue();
+        if (v instanceof String s && !s.isBlank()) {
+            try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ignore) {}
+        }
+        return fallback;
+    }
+
+    private String convertRouteToWkt(List<List<Double>> route) {
         if (route == null || route.isEmpty()) {
             throw new IllegalArgumentException("Route cannot be null or empty");
         }
-        
-        StringBuilder wktBuilder = new StringBuilder("LINESTRING (");
-        
+        StringBuilder wkt = new StringBuilder("LINESTRING(");
         for (int i = 0; i < route.size(); i++) {
-            java.util.List<Double> point = route.get(i);
-            if (point == null || point.size() < 2) {
+            List<Double> point = route.get(i);
+            if (point == null || point.size() < 2 || point.get(0) == null || point.get(1) == null) {
                 throw new IllegalArgumentException("Invalid route point at index " + i);
             }
-            
-            // WKT format is "longitude latitude" (note the space, not comma)
-            wktBuilder.append(point.get(0)).append(" ").append(point.get(1));
-            
+            wkt.append(String.format(Locale.ROOT, "%f %f", point.get(0), point.get(1)));
             if (i < route.size() - 1) {
-                wktBuilder.append(", ");
+                wkt.append(", ");
             }
         }
-        
-        wktBuilder.append(")");
-        return wktBuilder.toString();
+        wkt.append(')');
+        return wkt.toString();
     }
 }

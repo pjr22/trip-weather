@@ -1,69 +1,178 @@
 package com.pjr22.tripweather.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.pjr22.tripweather.model.GeocodeReverseCache;
+import com.pjr22.tripweather.model.LocationData;
+import com.pjr22.tripweather.repository.GeocodeReverseCacheRepository;
+
+import lombok.extern.slf4j.Slf4j;
+
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.PrecisionModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.pjr22.tripweather.model.LocationData;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.Locale;
+import java.util.Optional;
 
-import lombok.extern.slf4j.Slf4j;
-
+/**
+ * Wraps Geoapify with two cache layers:
+ *
+ *   1. PostGIS-backed durable cache of /geocode/reverse responses, looked up
+ *      via ST_DWithin within a small radius. Insert-only — refresh-on-stale
+ *      simply inserts a newer row that supersedes the old via the timestamp
+ *      tiebreak.
+ *
+ *   2. In-memory Caffeine cache of /geocode/search responses keyed by
+ *      lowercased + trimmed query string. Plain TTL eviction; forward
+ *      geocoding is low volume and results are non-critical.
+ */
 @Service
 @Slf4j
 public class LocationService {
 
+    private static final int SRID_WGS84 = 4326;
+    private static final GeometryFactory GEOMETRY_FACTORY =
+            new GeometryFactory(new PrecisionModel(), SRID_WGS84);
+
     private final RouteService routeService;
     private final RestClient restClient;
     private final String apiKey;
-    private final String baseUrl;
+    private final ObjectMapper objectMapper;
+    private final GeocodeReverseCacheRepository reverseCacheRepository;
+    private final Cache<String, JsonNode> forwardCache;
+    private final Clock clock;
+    private final double reverseRadiusMeters;
+    private final long reverseRefreshDays;
 
     public LocationService(
-          @Value("${geoapify.api.key}") String apiKey,
-          @Value("${geoapify.base.url:https://api.geoapify.com/v1}") String baseUrl,
-          RouteService routeService
+            @Value("${geoapify.api.key}") String apiKey,
+            RestClient geoapifyRestClient,
+            RouteService routeService,
+            ObjectMapper objectMapper,
+            GeocodeReverseCacheRepository reverseCacheRepository,
+            Cache<String, JsonNode> forwardGeocodeCache,
+            Clock clock,
+            @Value("${trip.geocode.reverse-radius-meters:15}") double reverseRadiusMeters,
+            @Value("${trip.geocode.reverse-refresh-days:365}") long reverseRefreshDays
     ) {
         this.apiKey = apiKey;
-        this.baseUrl = baseUrl;
+        this.restClient = geoapifyRestClient;
         this.routeService = routeService;
-        this.restClient = RestClient.builder()
-                .baseUrl(this.baseUrl)
-                .build();
+        this.objectMapper = objectMapper;
+        this.reverseCacheRepository = reverseCacheRepository;
+        this.forwardCache = forwardGeocodeCache;
+        this.clock = clock;
+        this.reverseRadiusMeters = reverseRadiusMeters;
+        this.reverseRefreshDays = reverseRefreshDays;
     }
 
     public LocationData reverseGeocode(double latitude, double longitude) {
         requireApiKey();
-        String path = String.format("/geocode/reverse?lat=%.6f&lon=%.6f&apiKey=%s", latitude, longitude, apiKey);
 
-        Double elevation = routeService.getElevation(latitude, longitude);
-        LocationData locationData = restClient.get()
-                .uri(path)
-                .retrieve()
-                .body(LocationData.class);
-
-        if (elevation != null && locationData != null
-                && locationData.getFeatures() != null
-                && !locationData.getFeatures().isEmpty()) {
-            locationData.getFeatures().get(0).getGeometry().getCoordinates().add(elevation);
+        Optional<GeocodeReverseCache> cached =
+                reverseCacheRepository.findNearest(longitude, latitude, reverseRadiusMeters);
+        LocationData stale = null;
+        if (cached.isPresent()) {
+            GeocodeReverseCache entry = cached.get();
+            LocalDateTime refreshAfter = entry.getFetchedAt().plusDays(reverseRefreshDays);
+            if (LocalDateTime.now(clock).isBefore(refreshAfter)) {
+                LocationData fresh = deserializeOrNull(entry.getResponseJson());
+                if (fresh != null) {
+                    return mergeElevation(fresh, latitude, longitude);
+                }
+            }
+            stale = deserializeOrNull(entry.getResponseJson());
         }
 
-        return locationData;
+        try {
+            String responseBody = restClient.get()
+                    .uri(String.format(Locale.ROOT,
+                            "/geocode/reverse?lat=%.6f&lon=%.6f&apiKey=%s",
+                            latitude, longitude, apiKey))
+                    .retrieve()
+                    .body(String.class);
+            if (responseBody != null) {
+                LocationData parsed = objectMapper.readValue(responseBody, LocationData.class);
+                GeocodeReverseCache entry = new GeocodeReverseCache(null,
+                        pointFromLatLon(latitude, longitude), responseBody, LocalDateTime.now(clock));
+                try {
+                    reverseCacheRepository.save(entry);
+                } catch (Exception e) {
+                    log.warn("Failed to persist reverse-geocode cache entry for ({}, {})",
+                            latitude, longitude, e);
+                }
+                return mergeElevation(parsed, latitude, longitude);
+            }
+        } catch (Exception e) {
+            if (stale != null) {
+                log.warn("Reverse-geocode refresh failed for ({}, {}); serving stale cached entry",
+                        latitude, longitude, e);
+                return mergeElevation(stale, latitude, longitude);
+            }
+            // Preserve prior behavior: any failure on a true cache miss surfaces
+            // to the caller. The controller wraps this in a 500 response.
+            throw new RuntimeException("Reverse-geocode failed for ("
+                    + latitude + ", " + longitude + ")", e);
+        }
+        return null;
     }
 
     public JsonNode searchLocations(String searchText) {
         requireApiKey();
-        String path = String.format("/geocode/search?apiKey=%s&text=%s", apiKey, searchText);
-        return restClient.get()
-                .uri(path)
+        if (searchText == null || searchText.isBlank()) {
+            return null;
+        }
+        String key = searchText.trim().toLowerCase(Locale.ROOT);
+        JsonNode cached = forwardCache.getIfPresent(key);
+        if (cached != null) {
+            return cached;
+        }
+        JsonNode response = restClient.get()
+                .uri(String.format("/geocode/search?apiKey=%s&text=%s", apiKey, searchText))
                 .retrieve()
                 .body(JsonNode.class);
+        if (response != null) {
+            forwardCache.put(key, response);
+        }
+        return response;
+    }
+
+    private LocationData mergeElevation(LocationData data, double latitude, double longitude) {
+        Double elevation = routeService.getElevation(latitude, longitude);
+        if (elevation != null && data != null
+                && data.getFeatures() != null
+                && !data.getFeatures().isEmpty()) {
+            data.getFeatures().get(0).getGeometry().getCoordinates().add(elevation);
+        }
+        return data;
+    }
+
+    private LocationData deserializeOrNull(String json) {
+        try {
+            return objectMapper.readValue(json, LocationData.class);
+        } catch (Exception e) {
+            log.warn("Could not deserialize cached reverse-geocode response", e);
+            return null;
+        }
+    }
+
+    private static Point pointFromLatLon(double latitude, double longitude) {
+        Point p = GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude));
+        p.setSRID(SRID_WGS84);
+        return p;
     }
 
     private void requireApiKey() {
         if (apiKey == null || apiKey.isBlank()
                 || apiKey.startsWith("set with ")) {
-            // The default value in application.properties is a placeholder string; treat
-            // that as unconfigured too.
             throw new IllegalStateException(
                     "GEOAPIFY_API_KEY environment variable is not set. "
                   + "Location services are unavailable until it is configured.");
@@ -73,7 +182,7 @@ public class LocationService {
     /**
      * Generates a location name from address components.
      * Combines addressLine1, addressLine2, city, and state_code to create a formatted location name.
-     * 
+     *
      * @param properties LocationData.Properties object containing address information
      * @return Generated location name (e.g., "99 West 12th Avenue, Denver, CO")
      *         or null if properties is invalid
@@ -84,38 +193,33 @@ public class LocationService {
         }
 
         StringBuilder locationName = new StringBuilder();
-        
-        // Add addressLine1 if available
+
         if (properties.getAddressLine1() != null && !properties.getAddressLine1().trim().isEmpty()) {
             locationName.append(properties.getAddressLine1().trim());
         }
-        
-        // Add city if available
+
         if (properties.getCity() != null && !properties.getCity().trim().isEmpty()) {
             if (locationName.length() > 0) {
                 locationName.append(", ");
             }
             locationName.append(properties.getCity().trim());
         }
-        
-        // Add state_code if available
+
         if (properties.getStateCode() != null && !properties.getStateCode().trim().isEmpty()) {
             if (locationName.length() > 0) {
                 locationName.append(", ");
             }
             locationName.append(properties.getStateCode().trim());
         }
-        
-        // If we still don't have anything, try using addressLine2 as a fallback
+
         if (locationName.length() == 0 && properties.getAddressLine2() != null && !properties.getAddressLine2().trim().isEmpty()) {
             locationName.append(properties.getAddressLine2().trim());
         }
-        
-        // Final fallback to formatted field if nothing else worked
+
         if (locationName.length() == 0 && properties.getFormatted() != null && !properties.getFormatted().trim().isEmpty()) {
             locationName.append(properties.getFormatted().trim());
         }
-        
+
         return locationName.length() > 0 ? locationName.toString() : null;
     }
 }
