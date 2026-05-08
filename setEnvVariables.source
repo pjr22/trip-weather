@@ -8,6 +8,8 @@ export OPENROUTESERVICE_API_KEY=`cat openRouteService_api_key.txt`
 export GEOAPIFY_API_KEY=`cat geoApify_api_key.txt`
 export NREL_API_KEY=`cat developer.nrel.gov_api_key.txt`
 export TRIP_REMEMBER_ME_KEY="$(openssl rand -base64 48)"
+export TRIP_TILE_PROXY_ENABLED=true
+export TRIP_TILE_PROXY_BASE_URL=http://localhost:8091
 
 echo "TRIP_EMAIL_ENABLED=$TRIP_EMAIL_ENABLED"
 echo "TRIP_EMAIL_URL=$TRIP_EMAIL_URL"
@@ -19,3 +21,6 @@ echo "Using OpenRouteService API key: $OPENROUTESERVICE_API_KEY"
 echo "Using GeoApify API key: $GEOAPIFY_API_KEY"
 echo "Using NREL API key: $NREL_API_KEY"
 echo "TRIP_REMEMBER_ME_KEY=$TRIP_REMEMBER_ME_KEY"
+echo "TRIP_TILE_PROXY_ENABLED=$TRIP_TILE_PROXY_ENABLED"
+echo "TRIP_TILE_PROXY_BASE_URL=$TRIP_TILE_PROXY_BASE_URL"
+

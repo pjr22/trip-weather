@@ -111,7 +111,9 @@ class WeatherServiceTest {
         fixedClock = Clock.fixed(Instant.parse("2030-01-01T20:00:00Z"), ZoneOffset.UTC);
 
         service = new WeatherService(restClient, gridpointRepository, forecastCache,
-                fixedClock, 30L, 6L, 90L);
+                fixedClock,
+                new com.pjr22.tripweather.config.TileProxyConfig(false, ""),
+                30L, 6L, 90L);
     }
 
     @Test

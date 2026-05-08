@@ -1,0 +1,124 @@
+# Phase 4 caching reverse proxy — see LOCAL_CACHING_HOSTING.md.
+#
+# Three locations cache responses to disk; everything else passes through to
+# the Spring backend. ${BACKEND_UPSTREAM} is substituted at container start
+# by the official nginx image's envsubst entrypoint:
+#
+#   * dev (host bootRun):              host.docker.internal:8090
+#   * prod (Spring container on the same Docker network):  tripapp:8080
+#
+# Cache key for all three locations is nginx's default ($scheme$proxy_host$request_uri),
+# which already includes the query string — important for NDFD WMS where the
+# TIME parameter has to vary the cache entry. Cache lives under /var/cache/nginx
+# (mount a Docker volume there to persist across restarts).
+
+# ----- HTTP-level directives (this file is included from /etc/nginx/conf.d/*.conf
+#       which sits inside the http {} block, so cache zones are valid here) -------
+
+resolver 127.0.0.11 valid=5s ipv6=off;
+resolver_timeout 5s;
+
+proxy_cache_path /var/cache/nginx/osm   levels=1:2 keys_zone=osm_cache:32m   max_size=5g    inactive=30d use_temp_path=off;
+proxy_cache_path /var/cache/nginx/ndfd  levels=1:2 keys_zone=ndfd_cache:8m   max_size=1g    inactive=7d  use_temp_path=off;
+proxy_cache_path /var/cache/nginx/icons levels=1:2 keys_zone=icons_cache:8m  max_size=500m  inactive=30d use_temp_path=off;
+
+# Common upstream-TLS settings — every upstream we cache is HTTPS.
+proxy_http_version       1.1;
+proxy_ssl_server_name    on;
+proxy_ssl_protocols      TLSv1.2 TLSv1.3;
+proxy_ssl_session_reuse  on;
+
+# Mirror the in-app cache "stale-on-error" behavior: serve a stale entry if
+# the upstream errors or times out, bounded by the inactive= window above.
+# Applies to the cached locations only (the catch-all has its own behavior).
+proxy_cache_use_stale    error timeout updating http_500 http_502 http_503 http_504;
+proxy_cache_lock         on;
+proxy_cache_lock_timeout 5s;
+
+# NOTE on Set-Cookie / Cache-Control:
+# We deliberately do NOT set proxy_ignore_headers or proxy_hide_header at
+# the http level. Doing so previously stripped Spring's XSRF-TOKEN cookie
+# on the catch-all, which broke CSRF on every state-changing API call.
+# Each cache location below sets these directives locally so stray
+# upstream cookies and short-TTL Cache-Control headers from public CDNs
+# don't pollute the tile/icon caches; the catch-all leaves Set-Cookie
+# alone so session and CSRF cookies flow through cleanly.
+
+# ----- Server -----------------------------------------------------------------
+
+server {
+    listen 8090;
+    server_name _;
+
+    error_log /var/log/nginx/error.log warn;
+    access_log off;
+
+    # ---- OpenStreetMap base tiles -------------------------------------------
+    # tile.openstreetmap.org (no a/b/c subdomain prefix) is the canonical
+    # hostname; HTTP/2 makes the legacy subdomain rotation unnecessary.
+    location ~ ^/tiles/osm/(.+\.png)$ {
+        # Strip upstream cache hints + cookies for the cached locations only:
+        # the public CDNs send short Cache-Control values that would
+        # override our own validity, and any cookies they emit (analytics
+        # etc.) are user-specific and must not enter a shared cache.
+        proxy_ignore_headers Cache-Control Expires Set-Cookie;
+        proxy_hide_header    Set-Cookie;
+
+        proxy_cache       osm_cache;
+        proxy_cache_valid 200 7d;
+        proxy_cache_valid 404 1h;
+        add_header        X-Cache-Status $upstream_cache_status always;
+
+        proxy_set_header  Host       tile.openstreetmap.org;
+        proxy_set_header  User-Agent "TripWeather/1.0 (tripweather.app)";
+        proxy_ssl_name    tile.openstreetmap.org;
+        proxy_pass        https://tile.openstreetmap.org/$1;
+    }
+
+    # ---- NDFD WMS overlay tiles ---------------------------------------------
+    # NDFD's TIME query parameter is part of the request URI, so the default
+    # cache key naturally varies per forecast window.
+    location = /tiles/ndfd-wms {
+        proxy_ignore_headers Cache-Control Expires Set-Cookie;
+        proxy_hide_header    Set-Cookie;
+
+        proxy_cache       ndfd_cache;
+        proxy_cache_valid 200 1h;
+        # Cache 404s briefly so panning across out-of-CONUS areas (where
+        # NDFD legitimately has no tile to render) doesn't re-hit the
+        # upstream every time. CONUS coverage doesn't change, so 30 minutes
+        # is a generous bound on staleness while still covering the typical
+        # session.
+        proxy_cache_valid 404 30m;
+        add_header        X-Cache-Status $upstream_cache_status always;
+
+        proxy_set_header  Host           digital.weather.gov;
+        proxy_ssl_name    digital.weather.gov;
+        proxy_pass        https://digital.weather.gov/ndfd/wms$is_args$args;
+    }
+
+    # ---- weather.gov forecast condition icons -------------------------------
+    location ~ ^/wx-icons/(.+)$ {
+        proxy_ignore_headers Cache-Control Expires Set-Cookie;
+        proxy_hide_header    Set-Cookie;
+
+        proxy_cache       icons_cache;
+        proxy_cache_valid 200 30d;
+        proxy_cache_valid 404 1h;
+        add_header        X-Cache-Status $upstream_cache_status always;
+
+        proxy_set_header  Host       api.weather.gov;
+        proxy_set_header  User-Agent "TripWeather/1.0 (tripweather.app)";
+        proxy_ssl_name    api.weather.gov;
+        proxy_pass        https://api.weather.gov/icons/$1$is_args$args;
+    }
+
+    # ---- Catch-all: everything else goes to the Spring backend --------------
+    location / {
+        proxy_set_header Host              $host;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_pass http://${BACKEND_UPSTREAM};
+    }
+}

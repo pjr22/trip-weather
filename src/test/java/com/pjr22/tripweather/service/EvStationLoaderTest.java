@@ -8,10 +8,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.TaskScheduler;
+import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -29,6 +31,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 @ExtendWith(MockitoExtension.class)
@@ -83,10 +86,20 @@ class EvStationLoaderTest {
     private Clock fixedClock;
     private EvStationLoader loader;
 
+    /** The loader issues one filtered call per Batch in EvStationLoader.BATCHES.
+     *  Tests that exercise the success path expect this many calls; the
+     *  request-order matcher ignores order so we don't have to recreate the
+     *  exact list here. */
+    private static final int BATCH_COUNT = 13;
+
     @BeforeEach
     void setUp() {
         RestClient.Builder builder = RestClient.builder().baseUrl("https://developer.nrel.gov");
-        mockServer = MockRestServiceServer.bindTo(builder).build();
+        // ignoreExpectOrder so a single times(N) expectation can match all N
+        // sequential batched calls without us re-listing every URL.
+        mockServer = MockRestServiceServer.bindTo(builder)
+                .ignoreExpectOrder(true)
+                .build();
         restClient = builder.build();
         objectMapper = new ObjectMapper();
         fixedClock = Clock.fixed(Instant.parse("2030-04-01T04:00:00Z"), ZoneOffset.UTC);
@@ -99,16 +112,20 @@ class EvStationLoaderTest {
 
     @Test
     void successfulLoad_upsertsAllStationsAndDeactivatesMissing() throws Exception {
-        mockServer.expect(requestTo(
-                "https://developer.nrel.gov/api/alt-fuel-stations/v1.json"
-                        + "?fuel_type=ELEC&limit=all&api_key=" + API_KEY))
+        // Each batch is a separate filtered call (state= or country=);
+        // matching just the URL prefix lets one expectation cover all 13.
+        mockServer.expect(ExpectedCount.times(BATCH_COUNT),
+                        requestTo(org.hamcrest.Matchers.startsWith(
+                                "https://developer.nrel.gov/api/alt-fuel-stations/v1.geojson?")))
                 .andRespond(withSuccess(NREL_FEED_RESPONSE, MediaType.APPLICATION_JSON));
 
         int loaded = loader.load();
 
-        assertThat(loaded).isEqualTo(2);
-        verify(jdbcTemplate).batchUpdate(anyString(), any(BatchPreparedStatementSetter.class));
-        // Deactivation pass uses the start-of-fetch timestamp as cutoff.
+        // 2 features per batch × BATCH_COUNT batches.
+        assertThat(loaded).isEqualTo(2 * BATCH_COUNT);
+        verify(jdbcTemplate, times(BATCH_COUNT))
+                .batchUpdate(anyString(), any(BatchPreparedStatementSetter.class));
+        // Deactivation pass runs once at the end, using the start-of-fetch timestamp.
         ArgumentCaptor<Timestamp> cutoff = ArgumentCaptor.forClass(Timestamp.class);
         verify(jdbcTemplate).update(anyString(), cutoff.capture());
         assertThat(cutoff.getValue()).isNotNull();
@@ -128,13 +145,46 @@ class EvStationLoaderTest {
     }
 
     @Test
-    void runWithRetryOnFailure_successPath_doesNotScheduleRetry() {
+    void runWithRetryOnFailure_rateLimited_honorsRetryAfterHeader() {
+        // 30-second Retry-After should beat the default 1h retry delay.
         mockServer.expect(requestTo(org.hamcrest.Matchers.any(String.class)))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
+                        .header("Retry-After", "30")
+                        .body("{\"error\":{\"code\":\"OVER_RATE_LIMIT\"}}")
+                        .contentType(MediaType.APPLICATION_JSON));
+
+        loader.runWithRetryOnFailure();
+
+        verify(taskScheduler).schedule(any(Runnable.class),
+                eq(fixedClock.instant().plusSeconds(30)));
+        mockServer.verify();
+    }
+
+    @Test
+    void runWithRetryOnFailure_rateLimitedWithoutRetryAfter_fallsBackToDefaultDelay() {
+        mockServer.expect(requestTo(org.hamcrest.Matchers.any(String.class)))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
+                        .body("{\"error\":{\"code\":\"OVER_RATE_LIMIT\"}}")
+                        .contentType(MediaType.APPLICATION_JSON));
+
+        loader.runWithRetryOnFailure();
+
+        // Falls back to RETRY_DELAY (1h).
+        verify(taskScheduler).schedule(any(Runnable.class),
+                eq(fixedClock.instant().plusSeconds(3600)));
+        mockServer.verify();
+    }
+
+    @Test
+    void runWithRetryOnFailure_successPath_doesNotScheduleRetry() {
+        mockServer.expect(ExpectedCount.times(BATCH_COUNT),
+                        requestTo(org.hamcrest.Matchers.any(String.class)))
                 .andRespond(withSuccess(NREL_FEED_RESPONSE, MediaType.APPLICATION_JSON));
 
         loader.runWithRetryOnFailure();
 
-        verify(jdbcTemplate, times(1)).batchUpdate(anyString(), any(BatchPreparedStatementSetter.class));
+        verify(jdbcTemplate, times(BATCH_COUNT))
+                .batchUpdate(anyString(), any(BatchPreparedStatementSetter.class));
         verify(jdbcTemplate, times(1)).update(anyString(), any(Timestamp.class));
         verify(taskScheduler, never()).schedule(any(Runnable.class), any(Instant.class));
         mockServer.verify();

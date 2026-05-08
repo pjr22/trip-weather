@@ -7,9 +7,7 @@ window.TripWeather = window.TripWeather || {};
 window.TripWeather.Managers = window.TripWeather.Managers || {};
 
 window.TripWeather.Managers.Layer = {
-    
-    // Configuration
-    wmsUrl: 'https://digital.weather.gov/ndfd/wms',
+
     activeLayerName: null,
     activeLayer: null,
     selectedWaypointSequence: null,
@@ -99,12 +97,44 @@ window.TripWeather.Managers.Layer = {
             },
 
             _customTileOnError: function(done, tile, e) {
+                const self = this;
+                // First failure for this tile: HEAD-probe to distinguish a
+                // permanent miss (e.g., NDFD WMS 404 for an out-of-CONUS bbox —
+                // there's no tile to retry) from a transient error worth
+                // retrying. Without this, every out-of-coverage tile produced
+                // 10 wasted upstream calls. Probe runs once per tile; later
+                // retries within the same tile go straight to the retry path.
+                if (!tile._statusProbed) {
+                    tile._statusProbed = true;
+                    fetch(tile._originalUrl, { method: 'HEAD' })
+                        .then(function(response) {
+                            if (response.status === 404) {
+                                console.debug('Tile not available (HTTP 404, not retrying):',
+                                    tile._originalUrl);
+                                self._tileOnError(done, tile, e);
+                                return;
+                            }
+                            self._scheduleTileRetry(done, tile, e);
+                        })
+                        .catch(function() {
+                            // HEAD itself failed (network blip, CORS-blocked
+                            // upstream when running with the proxy disabled,
+                            // etc.) — fall through to the retry path so we
+                            // behave like the original retry-on-anything loop.
+                            self._scheduleTileRetry(done, tile, e);
+                        });
+                    return;
+                }
+                this._scheduleTileRetry(done, tile, e);
+            },
+
+            _scheduleTileRetry: function(done, tile, e) {
                 if (tile._retries < this.options.maxRetries) {
                     tile._retries++;
                     const delay = this.options.retryDelay * Math.pow(1.5, tile._retries - 1); // Exponential backoff
-                    
+
                     console.warn(`Tile load error, retrying (${tile._retries}/${this.options.maxRetries}) in ${delay}ms:`, tile._originalUrl);
-                    
+
                     setTimeout(() => {
                         // Add timestamp to bypass browser cache for the retry if it was a network error
                         const separator = tile._originalUrl.includes('?') ? '&' : '?';
@@ -645,7 +675,8 @@ window.TripWeather.Managers.Layer = {
 
                     if (!layer) {
                         console.log(`Creating new WMS layer ${this.activeLayerConfig.layerId}`);
-                        layer = new L.TileLayer.WMS.Retrying(this.wmsUrl, {
+                        const wmsUrl = window.TripWeather.Services.TileConfig.get().ndfdWmsBase;
+                        layer = new L.TileLayer.WMS.Retrying(wmsUrl, {
                             layers: this.activeLayerConfig.layerId,
                             format: 'image/png',
                             transparent: true,

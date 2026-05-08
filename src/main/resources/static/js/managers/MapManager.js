@@ -28,7 +28,8 @@ window.TripWeather.Managers.Map = {
     initialize: function(lat, lng, zoom) {
         this.map = L.map('map').setView([lat, lng], zoom);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        const tileBase = window.TripWeather.Services.TileConfig.get().osmTileBase;
+        L.tileLayer(tileBase + '/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             maxZoom: 19
         }).addTo(this.map);

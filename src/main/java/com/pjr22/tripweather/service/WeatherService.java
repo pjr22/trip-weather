@@ -2,6 +2,7 @@ package com.pjr22.tripweather.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.github.benmanes.caffeine.cache.Cache;
+import com.pjr22.tripweather.config.TileProxyConfig;
 import com.pjr22.tripweather.model.NwsGridpoint;
 import com.pjr22.tripweather.model.WeatherData;
 import com.pjr22.tripweather.repository.NwsGridpointRepository;
@@ -48,6 +49,7 @@ public class WeatherService {
     private final NwsGridpointRepository gridpointRepository;
     private final Cache<String, CachedForecast> forecastCache;
     private final Clock clock;
+    private final TileProxyConfig tileProxyConfig;
     private final long forecastTtlMinutes;
     private final long forecastStaleMaxHours;
     private final long gridpointRefreshDays;
@@ -56,6 +58,7 @@ public class WeatherService {
                           NwsGridpointRepository gridpointRepository,
                           Cache<String, CachedForecast> forecastCache,
                           Clock clock,
+                          TileProxyConfig tileProxyConfig,
                           @Value("${trip.weather.forecast-ttl-minutes:30}") long forecastTtlMinutes,
                           @Value("${trip.weather.forecast-stale-max-hours:6}") long forecastStaleMaxHours,
                           @Value("${trip.weather.gridpoint-refresh-days:90}") long gridpointRefreshDays) {
@@ -63,6 +66,7 @@ public class WeatherService {
         this.gridpointRepository = gridpointRepository;
         this.forecastCache = forecastCache;
         this.clock = clock;
+        this.tileProxyConfig = tileProxyConfig;
         this.forecastTtlMinutes = forecastTtlMinutes;
         this.forecastStaleMaxHours = forecastStaleMaxHours;
         this.gridpointRefreshDays = gridpointRefreshDays;
@@ -278,7 +282,7 @@ public class WeatherService {
                 period.get("windDirection").asText() : "Unknown";
 
         String iconUrl = period.has("icon") ?
-                period.get("icon").asText() : null;
+                tileProxyConfig.rewriteIconUrl(period.get("icon").asText()) : null;
 
         Integer precipitationProbability = null;
         if (period.has("probabilityOfPrecipitation")) {

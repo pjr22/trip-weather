@@ -48,28 +48,35 @@ window.TripWeather.App = {
      */
     onDOMReady: function() {
         console.log('DOM ready, initializing application components...');
-        
+
         try {
             // Initialize utility functions
             this.initializeUtilities();
-            
+
             // Initialize services
             this.initializeServices();
-            
+
             // Initialize managers in dependency order
             this.initializeManagers();
-            
+
             // Initialize route header controls
             this.initializeRouteControls();
-            
-            // Initialize map
-            this.initializeMap();
-            
-            // Setup global event listeners
-            this.setupGlobalEvents();
-            
-            console.log('Application initialized successfully');
-            
+
+            // Tile config drives the OSM tile URL, the WMS endpoint, and the
+            // wx-icon base. Map initialisation needs it resolved before
+            // L.tileLayer is created. The fetch falls back to upstream
+            // defaults on failure (TileConfigService.load), so the map still
+            // renders even if /api/config/tiles is unreachable.
+            const self = this;
+            window.TripWeather.Services.TileConfig.load().then(function() {
+                self.initializeMap();
+                self.setupGlobalEvents();
+                console.log('Application initialized successfully');
+            }).catch(function(error) {
+                console.error('Failed to initialize application after tile-config load:', error);
+                self.handleInitializationError(error);
+            });
+
         } catch (error) {
             console.error('Failed to initialize application:', error);
             this.handleInitializationError(error);
@@ -106,7 +113,7 @@ window.TripWeather.App = {
         // They attach to window.TripWeather.Services namespace automatically
 
         // Verify services are available
-        const requiredServices = ['Auth', 'Location', 'Weather', 'RoutePersistence', 'EVChargingStation'];
+        const requiredServices = ['TileConfig', 'Auth', 'Location', 'Weather', 'RoutePersistence', 'EVChargingStation'];
         requiredServices.forEach(function(serviceName) {
             if (!window.TripWeather.Services[serviceName]) {
                 throw new Error(`Required service ${serviceName} not found`);

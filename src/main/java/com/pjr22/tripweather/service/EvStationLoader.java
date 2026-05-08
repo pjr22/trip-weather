@@ -1,5 +1,7 @@
 package com.pjr22.tripweather.service;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pjr22.tripweather.repository.EvStationRepository;
@@ -7,13 +9,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.Array;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -25,12 +31,13 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * Weekly loader that mirrors the NREL Alternative Fuels Data Center electric
- * station dataset into the {@code ev_stations} table. Replaces per-route
- * upstream calls in {@link EVChargingStationService}.
+ * Weekly loader that mirrors the NREL/NLR Alternative Fuels Data Center
+ * electric station dataset into the {@code ev_stations} table. Replaces
+ * per-route upstream calls in {@link EVChargingStationService}.
  *
  * <p>Three triggers, one work method:
  * <ol>
@@ -38,29 +45,84 @@ import java.util.concurrent.locks.ReentrantLock;
  *   <li>{@link ApplicationReadyEvent} when the table is empty — bootstraps a
  *       fresh checkout / first deployment without waiting for Monday.</li>
  *   <li>1-hour retry scheduled by the loader itself when a run fails — keeps
- *       trying until one succeeds, so a transient NREL outage doesn't push
- *       the next refresh out by a week.</li>
+ *       trying until one succeeds, so a transient outage doesn't push the
+ *       next refresh out by a week. 429 responses use the upstream
+ *       {@code Retry-After} header if present.</li>
  * </ol>
  *
  * <p>A {@link ReentrantLock#tryLock() tryLock} guards against the
  * cron-and-retry overlap (a 1h retry that lands on Monday 04:00 would
  * otherwise double-run); the second runner exits without work.
  *
- * <p>Mirror-vs-NREL-parity invariant: only {@code fuel_type=ELEC} stations
- * are mirrored. The user-facing query side rejects any other {@code fuel_type}
- * by returning empty — same behavior the UI sees today, since it only ever
- * sends {@code ELEC}. Stations that disappear from a fetch are flagged
- * {@code active=false} rather than deleted, so a station that comes back the
- * following week is reactivated in place.
+ * <p>Mirror-vs-upstream-parity invariant: only {@code fuel_type=ELEC}
+ * stations are mirrored. The user-facing query side rejects any other
+ * {@code fuel_type} by returning empty — same behavior the UI sees today,
+ * since it only ever sends {@code ELEC}. Stations that disappear from a
+ * fetch are flagged {@code active=false} rather than deleted, so a station
+ * that comes back the following week is reactivated in place.
+ *
+ * <p>Transport details: the endpoint has no {@code offset} parameter and
+ * its single-response output is silently capped around 50,000 records (a
+ * full {@code limit=all} call closes the connection mid-stream past that
+ * mark). To stay below the cap and still cover the full dataset we issue
+ * 13 filtered calls — California alone, the other 49 US states + DC in
+ * groups of 5, US territories together, and Canada — each with its own
+ * {@code limit=all} response of at most ~21K records. Two pieces make
+ * each call practical:
+ * {@link com.pjr22.tripweather.config.HttpClientConfig#nrelRestClient}
+ * forces HTTP/1.1 (the JDK's default HTTP/2 client RST_STREAMs long
+ * responses), and {@link #streamParseFeatures} drives a Jackson
+ * incremental parser so the body never lands fully in memory.
  */
 @Component
 @Slf4j
 public class EvStationLoader {
 
-    private static final String BULK_PATH =
-            "/api/alt-fuel-stations/v1.json?fuel_type=ELEC&limit=all&api_key=%s";
+    // The endpoint has no `offset` parameter and silently caps a single
+    // limit=all response at ~50,000 records (server side closes the
+    // connection mid-stream past that). We split the load into ~13 filtered
+    // calls instead — each well below the cap, all using limit=all. The
+    // .geojson form (vs .json) wraps each station as a Feature with
+    // geometry + properties, which is what parseFeature expects.
+    //
+    // Format string takes the filter expression (e.g. "state=CA",
+    // "state=AL,AK,AZ,AR,CO", "country=CA") and the API key.
+    private static final String BATCH_PATH_TEMPLATE =
+            "/api/alt-fuel-stations/v1.geojson?fuel_type=ELEC&%s&limit=all&api_key=%s";
+
+    /**
+     * The 13 batches that together cover every NLR-tracked ELEC station the
+     * app cares about. Order is deterministic so per-batch logs are
+     * predictable. California is its own batch because it's the largest
+     * single bucket (~21K stations); the other 49 US states + DC are
+     * grouped 5 per call to keep the call count near 10; territories and
+     * Canada (a separate country, distinct from California despite the
+     * shared "CA" code) each get one call.
+     *
+     * <p>Each {@link Batch}'s {@code label} is for log lines and never
+     * contains the API key; {@code filter} is the URL-ready filter clause.
+     */
+    private static final List<Batch> BATCHES = List.of(
+            new Batch("California (state=CA)",          "state=CA"),
+            new Batch("US states  1/10: AL,AK,AZ,AR,CO",  "state=AL,AK,AZ,AR,CO"),
+            new Batch("US states  2/10: CT,DE,FL,GA,HI",  "state=CT,DE,FL,GA,HI"),
+            new Batch("US states  3/10: ID,IL,IN,IA,KS",  "state=ID,IL,IN,IA,KS"),
+            new Batch("US states  4/10: KY,LA,ME,MD,MA",  "state=KY,LA,ME,MD,MA"),
+            new Batch("US states  5/10: MI,MN,MS,MO,MT",  "state=MI,MN,MS,MO,MT"),
+            new Batch("US states  6/10: NE,NV,NH,NJ,NM",  "state=NE,NV,NH,NJ,NM"),
+            new Batch("US states  7/10: NY,NC,ND,OH,OK",  "state=NY,NC,ND,OH,OK"),
+            new Batch("US states  8/10: OR,PA,RI,SC,SD",  "state=OR,PA,RI,SC,SD"),
+            new Batch("US states  9/10: TN,TX,UT,VT,VA",  "state=TN,TX,UT,VT,VA"),
+            new Batch("US states 10/10: WA,WV,WI,WY,DC",  "state=WA,WV,WI,WY,DC"),
+            new Batch("US territories: PR,VI,GU,AS,MP",   "state=PR,VI,GU,AS,MP"),
+            new Batch("Canada (country=CA)",              "country=CA")
+    );
+
+    private record Batch(String label, String filter) {}
 
     private static final int BATCH_SIZE = 500;
+
+    private static final int PROGRESS_LOG_INTERVAL = 5_000;
 
     private static final Duration RETRY_DELAY = Duration.ofHours(1);
 
@@ -154,12 +216,14 @@ public class EvStationLoader {
             log.info("EV station mirror has {} row(s); skipping bootstrap.", count);
             return;
         }
-        log.info("EV station mirror is empty; scheduling bootstrap load.");
         // Schedule rather than run inline: ApplicationReadyEvent listeners
         // shouldn't block app readiness. 5-second delay is just to let the
         // event-publishing thread return cleanly.
+        long delaySeconds = 5;
+        log.info("EV station mirror is empty; scheduling bootstrap load to run in {} seconds.",
+                delaySeconds);
         taskScheduler.schedule(this::runWithRetryOnFailure,
-                clock.instant().plusSeconds(5));
+                clock.instant().plusSeconds(delaySeconds));
     }
 
     /** Single attempt; on failure, schedule a retry RETRY_DELAY out and log
@@ -170,40 +234,134 @@ public class EvStationLoader {
             return;
         }
         try {
+            log.info("EV station load starting ({} filtered batches, streaming parse).",
+                    BATCHES.size());
             long start = System.currentTimeMillis();
             int loaded = load();
             log.info("EV station load complete: {} station(s) upserted in {}ms",
                     loaded, System.currentTimeMillis() - start);
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            // NREL has a per-API-key request budget (1000/hr on the free tier).
+            // Honor a Retry-After header if present; otherwise wait the
+            // default — usually long enough for the rolling window to clear.
+            Duration delay = parseRetryAfter(e.getResponseHeaders()).orElse(RETRY_DELAY);
+            Instant retryAt = clock.instant().plus(delay);
+            log.warn("NREL rate limit exceeded (429 OVER_RATE_LIMIT); scheduling retry at {} (in {}). " +
+                            "Upgrade your NREL API key if this recurs.",
+                    retryAt, delay, e);
+            taskScheduler.schedule(this::runWithRetryOnFailure, retryAt);
         } catch (Exception e) {
-            log.warn("EV station load failed; scheduling retry in {}", RETRY_DELAY, e);
-            taskScheduler.schedule(this::runWithRetryOnFailure,
-                    clock.instant().plus(RETRY_DELAY));
+            Instant retryAt = clock.instant().plus(RETRY_DELAY);
+            log.warn("EV station load failed; scheduling retry at {} (in {})",
+                    retryAt, RETRY_DELAY, e);
+            taskScheduler.schedule(this::runWithRetryOnFailure, retryAt);
         } finally {
             runLock.unlock();
+        }
+    }
+
+    /** Parse RFC 7231 Retry-After (delta-seconds form). HTTP-date form is
+     *  rare for rate-limit responses; we fall back to the default delay
+     *  if the header is missing or in date form. */
+    private static Optional<Duration> parseRetryAfter(HttpHeaders headers) {
+        if (headers == null) return Optional.empty();
+        String value = headers.getFirst(HttpHeaders.RETRY_AFTER);
+        if (value == null || value.isBlank()) return Optional.empty();
+        try {
+            return Optional.of(Duration.ofSeconds(Long.parseLong(value.trim())));
+        } catch (NumberFormatException ignore) {
+            return Optional.empty();
         }
     }
 
     /** Returns the number of stations loaded. Visible for tests. */
     int load() throws Exception {
         LocalDateTime fetchStartedAt = LocalDateTime.now(clock);
+        int totalLoaded = 0;
+        int totalBatches = BATCHES.size();
 
-        String body = restClient.get()
-                .uri(String.format(Locale.ROOT, BULK_PATH, apiKey))
-                .retrieve()
-                .body(String.class);
-        if (body == null || body.isEmpty()) {
-            throw new IllegalStateException("NREL bulk feed returned empty body");
+        for (int i = 0; i < totalBatches; i++) {
+            Batch batch = BATCHES.get(i);
+            int batchNum = i + 1;
+            log.info("EV station load: fetching batch {}/{} — {}",
+                    batchNum, totalBatches, batch.label());
+            long batchStart = System.currentTimeMillis();
+            int batchLoaded = fetchAndIngestBatch(batch, fetchStartedAt);
+            totalLoaded += batchLoaded;
+            log.info("EV station load: batch {}/{} done — {} station(s) in {}ms",
+                    batchNum, totalBatches, batchLoaded,
+                    System.currentTimeMillis() - batchStart);
         }
 
-        JsonNode root = objectMapper.readTree(body);
-        JsonNode features = root.get("features");
-        if (features == null || !features.isArray()) {
+        // Mark stations missing from this fetch as inactive. Anything still
+        // active with a last_seen_at older than this run's start can't have
+        // been seen during this run. Only runs after every batch succeeded;
+        // a partial run's batches stay {@code active=true} so a retry that
+        // covers the missing batches doesn't accidentally deactivate them.
+        int deactivated = jdbcTemplate.update(DEACTIVATE_MISSING_SQL,
+                Timestamp.valueOf(fetchStartedAt));
+        if (deactivated > 0) {
+            log.info("EV station load: deactivated {} station(s) absent from this fetch", deactivated);
+        }
+        return totalLoaded;
+    }
+
+    /** Fetch one batch via .exchange() so the InputStream goes straight
+     *  into the streaming parser. Non-2xx statuses re-thrown as
+     *  HttpClientErrorException so runWithRetryOnFailure's 429 catch fires. */
+    private int fetchAndIngestBatch(Batch batch, LocalDateTime fetchStartedAt) {
+        String path = String.format(Locale.ROOT, BATCH_PATH_TEMPLATE,
+                batch.filter(), apiKey);
+        return restClient.get()
+                .uri(path)
+                .exchange((req, res) -> {
+                    if (!res.getStatusCode().is2xxSuccessful()) {
+                        byte[] errorBody = res.getBody().readAllBytes();
+                        throw HttpClientErrorException.create(
+                                res.getStatusCode(), res.getStatusText(),
+                                res.getHeaders(), errorBody, StandardCharsets.UTF_8);
+                    }
+                    try (InputStream in = res.getBody();
+                         JsonParser parser = objectMapper.getFactory().createParser(in)) {
+                        return streamParseFeatures(parser, fetchStartedAt);
+                    }
+                });
+    }
+
+    /** Walks the FeatureCollection's "features" array one element at a time,
+     *  handing each to {@link #parseFeature} and batching upserts. Holds at
+     *  most one Feature plus the current batch in memory. */
+    private int streamParseFeatures(JsonParser parser, LocalDateTime fetchStartedAt) throws java.io.IOException {
+        // Skip ahead to the "features" field. Top-level shape is
+        // {type, metadata, features:[...]}; metadata can come before or
+        // after features depending on server ordering, but features is the
+        // only field we need.
+        JsonToken token;
+        boolean foundFeatures = false;
+        while ((token = parser.nextToken()) != null) {
+            if (token == JsonToken.FIELD_NAME && "features".equals(parser.currentName())) {
+                JsonToken arrayStart = parser.nextToken();
+                if (arrayStart != JsonToken.START_ARRAY) {
+                    throw new IllegalStateException(
+                            "Expected 'features' to be an array, got " + arrayStart);
+                }
+                foundFeatures = true;
+                break;
+            }
+        }
+        if (!foundFeatures) {
             throw new IllegalStateException("NREL bulk feed missing 'features' array");
         }
 
         List<StationRow> batch = new ArrayList<>(BATCH_SIZE);
         int loaded = 0;
-        for (JsonNode feature : features) {
+        int nextProgressMilestone = PROGRESS_LOG_INTERVAL;
+
+        while (parser.nextToken() != JsonToken.END_ARRAY) {
+            // readTree consumes the current Feature object and advances the
+            // parser past it; subsequent nextToken() returns either the
+            // next Feature's START_OBJECT or END_ARRAY.
+            JsonNode feature = objectMapper.readTree(parser);
             StationRow row = parseFeature(feature, fetchStartedAt);
             if (row == null) {
                 continue;
@@ -213,20 +371,15 @@ public class EvStationLoader {
                 upsertBatch(batch);
                 loaded += batch.size();
                 batch.clear();
+                if (loaded >= nextProgressMilestone) {
+                    log.info("EV station load progress: {} station(s) upserted so far", loaded);
+                    nextProgressMilestone = loaded + PROGRESS_LOG_INTERVAL;
+                }
             }
         }
         if (!batch.isEmpty()) {
             upsertBatch(batch);
             loaded += batch.size();
-        }
-
-        // Mark stations missing from this fetch as inactive. Anything still
-        // active with a last_seen_at older than this run's start can't have
-        // been seen during this run.
-        int deactivated = jdbcTemplate.update(DEACTIVATE_MISSING_SQL,
-                Timestamp.valueOf(fetchStartedAt));
-        if (deactivated > 0) {
-            log.info("EV station load: deactivated {} station(s) absent from this fetch", deactivated);
         }
         return loaded;
     }

@@ -3,7 +3,10 @@ package com.pjr22.tripweather.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
+
+import java.net.http.HttpClient;
 
 /**
  * Centralized RestClient beans for the external HTTP services we talk to.
@@ -37,6 +40,20 @@ public class HttpClientConfig {
     @Bean
     public RestClient nrelRestClient(
             @Value("${nrel.base.url:https://developer.nrel.gov}") String baseUrl) {
-        return RestClient.builder().baseUrl(baseUrl).build();
+        // The NREL/NLR /alt-fuel-stations endpoint has no offset parameter,
+        // so the only way to get the full ~70K-row ELEC dataset is one
+        // limit=all call returning ~100 MB. With the JDK HttpClient's
+        // default HTTP/2 transport, that response trips an RST_STREAM
+        // mid-stream (server-side stream reset). HTTP/1.1 has no stream
+        // concept and accepts the long-running response cleanly.
+        // EvStationLoader pairs this with a Jackson streaming parser so the
+        // 100 MB is never resident in memory at once.
+        HttpClient jdkHttpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .build();
+        return RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(new JdkClientHttpRequestFactory(jdkHttpClient))
+                .build();
     }
 }
