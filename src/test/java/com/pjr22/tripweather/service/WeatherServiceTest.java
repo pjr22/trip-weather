@@ -13,7 +13,6 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.geom.PrecisionModel;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -29,6 +28,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,6 +53,9 @@ class WeatherServiceTest {
     private static final String HOURLY_URL =
             "https://api.weather.gov/gridpoints/BOU/62,61/forecast/hourly";
 
+    // Real /points/ responses return geometry as a Point (the requested
+    // coordinate), not the grid-cell polygon — see api.weather.gov docs.
+    // The polygon lives on the /gridpoints/.../forecast response below.
     private static final String POINTS_RESPONSE = """
             {
               "properties": {
@@ -58,6 +64,29 @@ class WeatherServiceTest {
                 "gridY": 61,
                 "forecast": "%s",
                 "forecastHourly": "%s"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [-105.25, 40.0]
+              }
+            }
+            """.formatted(FORECAST_URL, HOURLY_URL);
+
+    private static final String FORECAST_RESPONSE = """
+            {
+              "properties": {
+                "updateTime": "2030-01-01T12:00:00+00:00",
+                "periods": [{
+                  "startTime": "2030-01-01T13:00:00-07:00",
+                  "endTime":   "2030-01-01T14:00:00-07:00",
+                  "shortForecast": "Sunny",
+                  "temperature": 60,
+                  "temperatureUnit": "F",
+                  "windSpeed": "5 mph",
+                  "windDirection": "NW",
+                  "icon": "https://api.weather.gov/icons/land/day/skc?size=medium",
+                  "probabilityOfPrecipitation": { "value": 0 }
+                }]
               },
               "geometry": {
                 "type": "Polygon",
@@ -70,9 +99,9 @@ class WeatherServiceTest {
                 ]]
               }
             }
-            """.formatted(FORECAST_URL, HOURLY_URL);
+            """;
 
-    private static final String FORECAST_RESPONSE = """
+    private static final String FORECAST_RESPONSE_NO_POLYGON = """
             {
               "properties": {
                 "updateTime": "2030-01-01T12:00:00+00:00",
@@ -126,7 +155,7 @@ class WeatherServiceTest {
         WeatherData result = service.getWeatherForecast(LAT, LON, DATE, TIME);
 
         assertThat(result.getCondition()).isEqualTo("Sunny");
-        verify(gridpointRepository, never()).save(any(NwsGridpoint.class));
+        verifyNoUpsert();
         mockServer.verify();
     }
 
@@ -142,43 +171,63 @@ class WeatherServiceTest {
         WeatherData result = service.getWeatherForecast(LAT, LON, DATE, TIME);
 
         assertThat(result.getCondition()).isEqualTo("Sunny");
-        ArgumentCaptor<NwsGridpoint> saved = ArgumentCaptor.forClass(NwsGridpoint.class);
-        verify(gridpointRepository).save(saved.capture());
-        NwsGridpoint stored = saved.getValue();
-        assertThat(stored.getOffice()).isEqualTo("BOU");
-        assertThat(stored.getGridX()).isEqualTo(62);
-        assertThat(stored.getGridY()).isEqualTo(61);
-        assertThat(stored.getForecastUrl()).isEqualTo(FORECAST_URL);
-        assertThat(stored.getHourlyUrl()).isEqualTo(HOURLY_URL);
-        assertThat(stored.getGeom()).isNotNull();
+        verify(gridpointRepository).upsert(
+                eq("BOU"), eq(62), eq(61),
+                argThat(wkt -> wkt != null && wkt.startsWith("POLYGON")),
+                eq(FORECAST_URL), eq(HOURLY_URL),
+                any(LocalDateTime.class));
         mockServer.verify();
     }
 
     @Test
-    void gridpointResponseMissingGeometry_returnsUrlButDoesNotPersist() {
-        String pointsResponseNoGeom = """
+    void forecastResponseMissingPolygon_returnsForecastButDoesNotPersist() {
+        when(gridpointRepository.findContainingPoint(LON, LAT))
+                .thenReturn(Optional.empty());
+        mockServer.expect(requestTo(POINTS_URL))
+                .andRespond(withSuccess(POINTS_RESPONSE, MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo(HOURLY_URL))
+                .andRespond(withSuccess(FORECAST_RESPONSE_NO_POLYGON, MediaType.APPLICATION_JSON));
+
+        WeatherData result = service.getWeatherForecast(LAT, LON, DATE, TIME);
+
+        assertThat(result.getCondition()).isEqualTo("Sunny");
+        verifyNoUpsert();
+        mockServer.verify();
+    }
+
+    @Test
+    void pointsResponseMissingGridIdentifiers_returnsForecastButDoesNotPersist() {
+        String pointsResponseNoGrid = """
                 {
                   "properties": {
-                    "gridId": "BOU",
-                    "gridX": 62,
-                    "gridY": 61,
                     "forecast": "%s",
                     "forecastHourly": "%s"
+                  },
+                  "geometry": {
+                    "type": "Point",
+                    "coordinates": [-105.25, 40.0]
                   }
                 }
                 """.formatted(FORECAST_URL, HOURLY_URL);
         when(gridpointRepository.findContainingPoint(LON, LAT))
                 .thenReturn(Optional.empty());
         mockServer.expect(requestTo(POINTS_URL))
-                .andRespond(withSuccess(pointsResponseNoGeom, MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(pointsResponseNoGrid, MediaType.APPLICATION_JSON));
         mockServer.expect(requestTo(HOURLY_URL))
                 .andRespond(withSuccess(FORECAST_RESPONSE, MediaType.APPLICATION_JSON));
 
         WeatherData result = service.getWeatherForecast(LAT, LON, DATE, TIME);
 
         assertThat(result.getCondition()).isEqualTo("Sunny");
-        verify(gridpointRepository, never()).save(any(NwsGridpoint.class));
+        verifyNoUpsert();
         mockServer.verify();
+    }
+
+    private void verifyNoUpsert() {
+        verify(gridpointRepository, never()).upsert(
+                anyString(), anyInt(), anyInt(),
+                anyString(), anyString(), anyString(),
+                any(LocalDateTime.class));
     }
 
     @Test
@@ -260,7 +309,11 @@ class WeatherServiceTest {
         WeatherData result = service.getWeatherForecast(LAT, LON, DATE, TIME);
 
         assertThat(result.getCondition()).isEqualTo("Sunny");
-        verify(gridpointRepository).save(any(NwsGridpoint.class));
+        verify(gridpointRepository).upsert(
+                eq("BOU"), eq(62), eq(61),
+                argThat(wkt -> wkt != null && wkt.startsWith("POLYGON")),
+                eq(FORECAST_URL), eq(HOURLY_URL),
+                any(LocalDateTime.class));
         mockServer.verify();
     }
 

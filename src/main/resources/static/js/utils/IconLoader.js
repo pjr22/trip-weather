@@ -7,7 +7,14 @@ window.TripWeather = window.TripWeather || {};
 window.TripWeather.Utils = window.TripWeather.Utils || {};
 
 window.TripWeather.Utils.IconLoader = {
-    
+
+    // path -> Promise<SVGElement>. Resolved entries hold a parsed SVG that
+    // we clone per insertion (so the same icon on N rows costs one fetch +
+    // N cheap clones, not N fetches). In-flight promises are stored too,
+    // which coalesces concurrent calls for the same path. Rejections are
+    // evicted in the catch below so a transient failure can retry.
+    _svgCache: new Map(),
+
     /**
      * Load SVG icon from file path and insert into container
      * @param {string} iconPath - Path to SVG icon file
@@ -17,26 +24,37 @@ window.TripWeather.Utils.IconLoader = {
      */
     loadSvgIcon: function(iconPath, container, className) {
         className = className || '';
-        
-        return fetch(iconPath)
-            .then(function(response) {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.text();
-            })
-            .then(function(svgText) {
-                const parser = new DOMParser();
-                const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
-                const svg = svgDoc.documentElement;
-                
+
+        const self = this;
+        let svgPromise = this._svgCache.get(iconPath);
+        if (!svgPromise) {
+            svgPromise = fetch(iconPath)
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(function(svgText) {
+                    const parser = new DOMParser();
+                    const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
+                    return svgDoc.documentElement;
+                })
+                .catch(function(error) {
+                    self._svgCache.delete(iconPath);
+                    throw error;
+                });
+            this._svgCache.set(iconPath, svgPromise);
+        }
+
+        return svgPromise
+            .then(function(svgTemplate) {
+                const svg = svgTemplate.cloneNode(true);
                 if (className) {
                     svg.classList.add(className);
                 }
-                
                 container.innerHTML = '';
                 container.appendChild(svg);
-                
                 return svg;
             })
             .catch(function(error) {

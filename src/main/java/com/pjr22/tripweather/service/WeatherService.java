@@ -13,6 +13,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.geom.PrecisionModel;
+import org.locationtech.jts.io.WKTWriter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -44,6 +45,7 @@ public class WeatherService {
     private static final int SRID_WGS84 = 4326;
     private static final GeometryFactory GEOMETRY_FACTORY =
             new GeometryFactory(new PrecisionModel(), SRID_WGS84);
+    private static final WKTWriter WKT_WRITER = new WKTWriter();
 
     private final RestClient restClient;
     private final NwsGridpointRepository gridpointRepository;
@@ -74,14 +76,22 @@ public class WeatherService {
 
     public WeatherData getWeatherForecast(double latitude, double longitude, String date, String time) {
         try {
-            String forecastUrl = resolveForecastUrl(latitude, longitude);
-            if (forecastUrl == null) {
+            GridpointResolution resolution = resolveGridpoint(latitude, longitude);
+            if (resolution == null || resolution.forecastUrl() == null) {
                 return WeatherData.createError("Unable to get forecast URL for location");
             }
 
-            JsonNode forecastData = fetchForecastWithCache(forecastUrl);
+            JsonNode forecastData = fetchForecastWithCache(resolution.forecastUrl());
             if (forecastData == null || !forecastData.has("properties")) {
                 return WeatherData.createError("Invalid forecast data");
+            }
+
+            // The grid-cell polygon needed to populate the durable cache lives
+            // on the /gridpoints/.../forecast response, not the /points/ one
+            // (which only echoes the requested coordinate as a Point). Persist
+            // here, after the forecast call has succeeded.
+            if (resolution.pending() != null) {
+                persistGridpoint(latitude, longitude, resolution.pending(), forecastData);
             }
 
             LocalDateTime targetDateTime = parseDateTime(date, time);
@@ -99,26 +109,26 @@ public class WeatherService {
         }
     }
 
-    private String resolveForecastUrl(double latitude, double longitude) {
+    private GridpointResolution resolveGridpoint(double latitude, double longitude) {
         Optional<NwsGridpoint> cached = gridpointRepository.findContainingPoint(longitude, latitude);
         if (cached.isPresent()) {
             NwsGridpoint gp = cached.get();
             LocalDateTime refreshAfter = gp.getFetchedAt().plusDays(gridpointRefreshDays);
             if (LocalDateTime.now(clock).isBefore(refreshAfter)) {
-                return preferredUrl(gp.getHourlyUrl(), gp.getForecastUrl());
+                return GridpointResolution.served(preferredUrl(gp.getHourlyUrl(), gp.getForecastUrl()));
             }
-            String refreshed = fetchAndStoreGridpoint(latitude, longitude);
+            GridpointResolution refreshed = fetchPointsMetadata(latitude, longitude);
             if (refreshed != null) {
                 return refreshed;
             }
             log.warn("Refresh of stale gridpoint failed for ({}, {}); serving stale cached entry",
                     latitude, longitude);
-            return preferredUrl(gp.getHourlyUrl(), gp.getForecastUrl());
+            return GridpointResolution.served(preferredUrl(gp.getHourlyUrl(), gp.getForecastUrl()));
         }
-        return fetchAndStoreGridpoint(latitude, longitude);
+        return fetchPointsMetadata(latitude, longitude);
     }
 
-    private String fetchAndStoreGridpoint(double latitude, double longitude) {
+    private GridpointResolution fetchPointsMetadata(double latitude, double longitude) {
         JsonNode pointsData;
         try {
             pointsData = restClient.get()
@@ -139,31 +149,63 @@ public class WeatherService {
             return null;
         }
 
+        String chosenUrl = preferredUrl(hourlyUrl, forecastUrl);
         String office = textOrNull(props, "gridId");
         Integer gridX = props.has("gridX") ? props.get("gridX").asInt() : null;
         Integer gridY = props.has("gridY") ? props.get("gridY").asInt() : null;
-        Polygon geom  = parseGeoJsonPolygonOrNull(pointsData.get("geometry"));
-
-        if (geom != null && office != null && gridX != null && gridY != null) {
-            NwsGridpoint gp = new NwsGridpoint(office, gridX, gridY, geom,
-                    forecastUrl != null ? forecastUrl : "",
-                    hourlyUrl   != null ? hourlyUrl   : "",
-                    LocalDateTime.now(clock));
-            try {
-                gridpointRepository.save(gp);
-            } catch (Exception e) {
-                log.warn("Failed to persist gridpoint cache entry for ({}, {})",
-                        latitude, longitude, e);
-            }
-        } else {
-            // Per Phase 1 Q6: skip caching rather than cache something
-            // potentially wrong. The request still succeeds via the URL we
-            // pulled from the response — only future calls won't hit cache.
-            log.warn("Skipping gridpoint cache insert for ({}, {}): missing geom or grid identifiers",
+        if (office == null || gridX == null || gridY == null) {
+            // /points/ gave us a forecast URL but not the structured grid
+            // identifiers. We can still serve the request, but the durable
+            // cache row would be unkeyed — skip it.
+            log.warn("Skipping gridpoint cache insert for ({}, {}): missing grid identifiers in /points/ response",
                     latitude, longitude);
+            return new GridpointResolution(chosenUrl, null);
         }
-        return preferredUrl(hourlyUrl, forecastUrl);
+        PendingGridpoint pending = new PendingGridpoint(office, gridX, gridY,
+                forecastUrl != null ? forecastUrl : "",
+                hourlyUrl   != null ? hourlyUrl   : "");
+        return new GridpointResolution(chosenUrl, pending);
     }
+
+    private void persistGridpoint(double latitude, double longitude,
+                                   PendingGridpoint pending, JsonNode forecastData) {
+        Polygon geom = parseGeoJsonPolygonOrNull(forecastData.get("geometry"));
+        if (geom == null) {
+            // Per Phase 1 Q6: skip caching rather than cache something
+            // potentially wrong. The request still succeeds; only future
+            // lookups for nearby coordinates won't hit cache.
+            log.warn("Skipping gridpoint cache insert for ({}, {}): forecast response missing polygon",
+                    latitude, longitude);
+            return;
+        }
+        try {
+            // Native upsert; concurrent requests that resolve to the same grid
+            // cell can both reach this point, and ON CONFLICT serializes them
+            // at the database without raising a constraint-violation exception.
+            gridpointRepository.upsert(pending.office(), pending.gridX(), pending.gridY(),
+                    WKT_WRITER.write(geom),
+                    pending.forecastUrl(), pending.hourlyUrl(),
+                    LocalDateTime.now(clock));
+        } catch (Exception e) {
+            log.warn("Failed to persist gridpoint cache entry for ({}, {})",
+                    latitude, longitude, e);
+        }
+    }
+
+    /**
+     * Result of resolving a (lat, lon) to an NWS forecast URL.
+     * {@code pending} is non-null when the URL came from a fresh /points/
+     * lookup and a durable cache row should be written once the forecast
+     * response provides the grid polygon.
+     */
+    private record GridpointResolution(String forecastUrl, PendingGridpoint pending) {
+        static GridpointResolution served(String forecastUrl) {
+            return new GridpointResolution(forecastUrl, null);
+        }
+    }
+
+    private record PendingGridpoint(String office, int gridX, int gridY,
+                                     String forecastUrl, String hourlyUrl) {}
 
     private JsonNode fetchForecastWithCache(String forecastUrl) {
         Instant now = clock.instant();
