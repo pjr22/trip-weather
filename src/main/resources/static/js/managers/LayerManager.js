@@ -606,9 +606,33 @@ window.TripWeather.Managers.Layer = {
             // If we want to 'deselect', we set activeLayer = null.
             // But updateLayerTime relies on activeLayer being set to check for reuse.
             // Actually, updateLayerTime handles the switch logic itself now.
-            
+
             // If this function is called from 'hideActiveLayer' or 'selectLayer(none)', we should nullify.
             this.activeLayer = null;
+            this.updateLayersButtonState();
+        }
+    },
+
+    /**
+     * Toggle the .active class on the layers control button so it shows the
+     * same green-highlighted state as the EV-charging button when a weather
+     * layer is rendered. Driven off this.activeLayer being non-null —
+     * removeActiveLayer / updateLayerTime are the only places that mutate it.
+     */
+    updateLayersButtonState: function() {
+        const container = document.getElementById('layers-btn');
+        if (!container) {
+            return;
+        }
+        if (this.activeLayer) {
+            container.classList.add('active');
+            const layerName = this.activeLayerConfig && this.activeLayerConfig.name
+                    ? this.activeLayerConfig.name
+                    : 'Layer';
+            container.title = layerName + ' layer active — click to change or remove';
+        } else {
+            container.classList.remove('active');
+            container.title = 'Map Layers';
         }
     },
 
@@ -696,7 +720,12 @@ window.TripWeather.Managers.Layer = {
                     this.activeLayer = layer;
                     this.activeLayer.addTo(map);
                 }
-                
+
+                // Sync the toolbar button highlight (active = a weather layer
+                // is currently rendered on the map). Both branches above end
+                // with this.activeLayer being non-null, so this lights it up.
+                this.updateLayersButtonState();
+
                 // Update info display with both waypoint time and actual valid time used
                 if (window.TripWeather.Managers.WaypointRenderer && typeof window.TripWeather.Managers.WaypointRenderer.formatWaypointTime === 'function') {
                     const waypointDisplayTime = window.TripWeather.Managers.WaypointRenderer.formatWaypointTime(waypoint, false);

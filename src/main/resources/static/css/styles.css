@@ -1974,6 +1974,12 @@ main {
 .layers-control:hover {
     background-color: #f4f4f4;
 }
+.layers-control.active {
+    background-color: #27ae60;
+}
+.layers-control.active .layers-icon {
+    fill: white;
+}
 .layers-icon {
     width: 20px;
     height: 20px;
