@@ -62,7 +62,7 @@ export TRIP_DB_PASSWORD='<password>'
 ./user-accounts-db-migration.sh
 ```
 
-What it sets up: `users.{email,password_hash,enabled}` columns + UNIQUE on email + guest-row backfill; `email_verifications` and `password_resets` tables; `ON DELETE CASCADE` on `waypoints.route_id` and `routes.user_id`; `persistent_logins` table (Spring Security remember-me shape) + `username` index.
+What it sets up: `users.{email,password_hash,enabled}` columns + UNIQUE on email + guest-row backfill; `email_verifications` and `password_resets` tables; `ON DELETE CASCADE` on `waypoints.route_id` and `routes.user_id`. (Earlier revisions also created a `persistent_logins` table for Spring Security's persistent-token remember-me; remember-me has since moved to the stateless `TokenBasedRememberMeServices`, so the table is no longer provisioned and is dropped on the next run of `local-caching-db-migration.sh`.)
 
 Defaults to `localhost` / db `postgres` / user `postgres` — override with `TRIP_DB_HOST`, `TRIP_DB_PORT`, `TRIP_DB_NAME`, `TRIP_DB_USERNAME` if your env differs. Safe to re-run; everything inside one BEGIN/COMMIT, so a failure rolls back to the original schema.
 

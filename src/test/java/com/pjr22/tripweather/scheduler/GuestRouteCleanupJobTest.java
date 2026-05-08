@@ -1,6 +1,5 @@
 package com.pjr22.tripweather.scheduler;
 
-import com.pjr22.tripweather.config.RememberMeConfig;
 import com.pjr22.tripweather.model.User;
 import com.pjr22.tripweather.repository.EmailVerificationRepository;
 import com.pjr22.tripweather.repository.PasswordResetRepository;
@@ -13,11 +12,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -25,7 +21,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -34,9 +29,9 @@ import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for the cleanup job. The actual delete-by-cutoff queries are
- * exercised via JPA / JDBC at runtime; here we verify wiring — that each
- * sweep resolves the right cutoff, calls the right repository / SQL, and
- * (for the guest-route sweep specifically) respects the enabled flag.
+ * exercised via JPA at runtime; here we verify wiring — that each sweep
+ * resolves the right cutoff, calls the right repository, and (for the
+ * guest-route sweep specifically) respects the enabled flag.
  */
 @ExtendWith(MockitoExtension.class)
 class GuestRouteCleanupJobTest {
@@ -45,7 +40,6 @@ class GuestRouteCleanupJobTest {
     @Mock private EmailVerificationRepository emailVerificationRepository;
     @Mock private PasswordResetRepository passwordResetRepository;
     @Mock private UserManagementService userManagementService;
-    @Mock private JdbcTemplate jdbcTemplate;
 
     @InjectMocks
     private GuestRouteCleanupJob job;
@@ -151,53 +145,6 @@ class GuestRouteCleanupJobTest {
         verify(emailVerificationRepository).deleteByExpiresAtBefore(any(LocalDateTime.class));
         verify(passwordResetRepository).deleteByExpiresAtBefore(any(LocalDateTime.class));
         verify(routeRepository, never()).deleteByUserIdAndCreatedBefore(any(UUID.class), any(ZonedDateTime.class));
-    }
-
-    // -------------------- Remember-me cleanup --------------------
-
-    @Test
-    void cleanExpiredRememberMeTokens_deletesRowsOlderThanValidityWindow() {
-        when(jdbcTemplate.update(anyString(), any(Object[].class))).thenReturn(2);
-
-        LocalDateTime before = LocalDateTime.now()
-                .minusSeconds(RememberMeConfig.DEFAULT_VALIDITY_SECONDS);
-        job.cleanExpiredRememberMeTokens();
-        LocalDateTime after = LocalDateTime.now()
-                .minusSeconds(RememberMeConfig.DEFAULT_VALIDITY_SECONDS);
-
-        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Object> argCaptor = ArgumentCaptor.forClass(Object.class);
-        verify(jdbcTemplate).update(sqlCaptor.capture(), argCaptor.capture());
-
-        assertThat(sqlCaptor.getValue())
-                .containsIgnoringCase("DELETE FROM persistent_logins")
-                .containsIgnoringCase("last_used");
-        assertThat(argCaptor.getValue()).isInstanceOf(Timestamp.class);
-        LocalDateTime captured = ((Timestamp) argCaptor.getValue()).toLocalDateTime();
-        assertThat(captured).isBetween(before.minusSeconds(1), after.plusSeconds(1));
-    }
-
-    @Test
-    void cleanExpiredRememberMeTokens_runsEvenWhenGuestRouteCleanupDisabled() {
-        ReflectionTestUtils.setField(job, "guestRouteCleanupEnabled", false);
-
-        job.cleanExpiredRememberMeTokens();
-
-        verify(jdbcTemplate).update(anyString(), any(Object[].class));
-    }
-
-    @Test
-    void cleanExpiredRememberMeTokens_swallowsDataAccessFailure() {
-        // If the persistent_logins table doesn't exist (the user-accounts
-        // migration not yet run on this deployment), the sweep should log
-        // and move on rather than poisoning the rest of the cleanup wakeup.
-        when(jdbcTemplate.update(anyString(), any(Object[].class)))
-                .thenThrow(new DataAccessResourceFailureException("no such table"));
-
-        // Should not propagate the exception.
-        job.cleanExpiredRememberMeTokens();
-
-        verify(jdbcTemplate).update(anyString(), any(Object[].class));
     }
 
     private User newGuest() {

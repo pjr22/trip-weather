@@ -36,8 +36,8 @@ import static org.mockito.Mockito.when;
 /**
  * Unit tests for the Phase 2 self-service flows plus Phase 4's forgot- /
  * reset- / change-password and delete-account flows. Mocks all repositories,
- * the email service, the password encoder, and the remember-me revoker so
- * the suite stays fast and doesn't require a Spring context.
+ * the email service, and the password encoder so the suite stays fast and
+ * doesn't require a Spring context.
  */
 @ExtendWith(MockitoExtension.class)
 class UserAccountServiceTest {
@@ -47,7 +47,6 @@ class UserAccountServiceTest {
     @Mock private PasswordResetRepository passwordResetRepository;
     @Mock private EmailService emailService;
     @Mock private PasswordEncoder passwordEncoder;
-    @Mock private UserAccountService.RememberMeRevoker rememberMeRevoker;
 
     /** Token lifetime injected into the service under test. Tests assert
      *  expiry math against this value. */
@@ -56,7 +55,7 @@ class UserAccountServiceTest {
     @Spy
     @InjectMocks
     private UserAccountService service =
-            new UserAccountService(null, null, null, null, null, null,
+            new UserAccountService(null, null, null, null, null,
                                    "http://localhost:8090", TOKEN_LIFETIME_MINUTES);
 
     @BeforeEach
@@ -68,7 +67,6 @@ class UserAccountServiceTest {
         ReflectionTestUtils.setField(service, "passwordResetRepository", passwordResetRepository);
         ReflectionTestUtils.setField(service, "emailService", emailService);
         ReflectionTestUtils.setField(service, "passwordEncoder", passwordEncoder);
-        ReflectionTestUtils.setField(service, "rememberMeRevoker", rememberMeRevoker);
     }
 
     @Test
@@ -340,7 +338,7 @@ class UserAccountServiceTest {
     // -------------------- Phase 4: reset password --------------------
 
     @Test
-    void resetPassword_validToken_updatesPasswordRevokesTokensAndConsumes() {
+    void resetPassword_validToken_updatesPasswordAndConsumes() {
         String raw = "reset-token-value";
         User user = newUser("alice@example.com", true);
         user.setPasswordHash("OLD-HASH");
@@ -360,11 +358,13 @@ class UserAccountServiceTest {
         verify(passwordResetRepository).save(reset);
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(userCaptor.capture());
+        // Token-based remember-me cookies sign over the password hash, so the
+        // hash change here is what invalidates every browser's cookie — no
+        // separate revocation call is needed or expected.
         assertThat(userCaptor.getValue().getPasswordHash()).isEqualTo("NEW-HASH");
         assertThat(userCaptor.getValue().isEnabled()).isTrue();
         verify(passwordResetRepository, times(1))
                 .consumeOpenForUser(eq(user.getId()), any(LocalDateTime.class));
-        verify(rememberMeRevoker, times(1)).removeAllPersistentTokens("alice@example.com");
     }
 
     @Test
@@ -374,7 +374,6 @@ class UserAccountServiceTest {
         assertThatThrownBy(() -> service.resetPassword("nope", "a-strong-password"))
                 .isInstanceOf(UserAccountService.InvalidTokenException.class);
         verify(userRepository, never()).save(any(User.class));
-        verify(rememberMeRevoker, never()).removeAllPersistentTokens(anyString());
     }
 
     @Test
@@ -390,7 +389,6 @@ class UserAccountServiceTest {
         assertThatThrownBy(() -> service.resetPassword(raw, "a-strong-password"))
                 .isInstanceOf(UserAccountService.InvalidTokenException.class);
         verify(userRepository, never()).save(any(User.class));
-        verify(rememberMeRevoker, never()).removeAllPersistentTokens(anyString());
     }
 
     @Test
@@ -419,7 +417,7 @@ class UserAccountServiceTest {
     // -------------------- Phase 4: change password --------------------
 
     @Test
-    void changePassword_validCurrent_updatesHashAndRevokesTokens() {
+    void changePassword_validCurrent_updatesHash() {
         User user = newUser("alice@example.com", true);
         user.setPasswordHash("CURRENT-HASH");
         when(userRepository.findByEmailIgnoreCase("alice@example.com"))
@@ -432,8 +430,9 @@ class UserAccountServiceTest {
 
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
+        // Token-based remember-me cookies sign over the password hash; the
+        // hash change here is what invalidates every browser's cookie.
         assertThat(captor.getValue().getPasswordHash()).isEqualTo("NEW-HASH");
-        verify(rememberMeRevoker, times(1)).removeAllPersistentTokens("alice@example.com");
         verify(passwordResetRepository, times(1))
                 .consumeOpenForUser(eq(user.getId()), any(LocalDateTime.class));
     }
@@ -451,7 +450,6 @@ class UserAccountServiceTest {
                                                        "a-brand-new-password"))
                 .isInstanceOf(UserAccountService.InvalidCredentialsException.class);
         verify(userRepository, never()).save(any(User.class));
-        verify(rememberMeRevoker, never()).removeAllPersistentTokens(anyString());
     }
 
     @Test
@@ -466,7 +464,7 @@ class UserAccountServiceTest {
     // -------------------- Phase 4: delete account --------------------
 
     @Test
-    void deleteAccount_validCurrent_deletesUserAndRevokesTokens() {
+    void deleteAccount_validCurrent_deletesUser() {
         User user = newUser("alice@example.com", true);
         user.setPasswordHash("CURRENT-HASH");
         when(userRepository.findByEmailIgnoreCase("alice@example.com"))
@@ -475,7 +473,9 @@ class UserAccountServiceTest {
 
         service.deleteAccount("alice@example.com", "current-password");
 
-        verify(rememberMeRevoker, times(1)).removeAllPersistentTokens("alice@example.com");
+        // Cookies are stateless (token-based, signed against the password
+        // hash). loadUserByUsername fails on the now-deleted user, so every
+        // browser's cookie is implicitly rejected — no separate revocation.
         verify(userRepository, times(1)).delete(user);
     }
 
@@ -490,7 +490,6 @@ class UserAccountServiceTest {
         assertThatThrownBy(() -> service.deleteAccount("alice@example.com", "guess"))
                 .isInstanceOf(UserAccountService.InvalidCredentialsException.class);
         verify(userRepository, never()).delete(any(User.class));
-        verify(rememberMeRevoker, never()).removeAllPersistentTokens(anyString());
     }
 
     private static User newUser(String email, boolean enabled) {

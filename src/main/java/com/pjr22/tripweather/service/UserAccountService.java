@@ -36,7 +36,6 @@ public class UserAccountService {
     private final PasswordResetRepository passwordResetRepository;
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
-    private final RememberMeRevoker rememberMeRevoker;
     private final String baseUrl;
     private final long emailTokenLifetimeMinutes;
 
@@ -45,7 +44,6 @@ public class UserAccountService {
                               PasswordResetRepository passwordResetRepository,
                               EmailService emailService,
                               PasswordEncoder passwordEncoder,
-                              RememberMeRevoker rememberMeRevoker,
                               @Value("${trip.app.base-url}") String baseUrl,
                               @Value("${trip.auth.email-token.lifetime-minutes}") long emailTokenLifetimeMinutes) {
         this.userRepository = userRepository;
@@ -53,7 +51,6 @@ public class UserAccountService {
         this.passwordResetRepository = passwordResetRepository;
         this.emailService = emailService;
         this.passwordEncoder = passwordEncoder;
-        this.rememberMeRevoker = rememberMeRevoker;
         this.baseUrl = stripTrailingSlash(baseUrl);
         this.emailTokenLifetimeMinutes = emailTokenLifetimeMinutes;
     }
@@ -208,11 +205,12 @@ public class UserAccountService {
     }
 
     /**
-     * Apply a password-reset token: set a new password hash, mark the token
-     * consumed, and revoke any persistent (remember-me) cookies for this user
-     * so a stale browser session can't keep authenticating after the password
-     * has changed. Throws {@link InvalidTokenException} on unknown / expired /
-     * consumed tokens; the controller maps both to the same user-facing error.
+     * Apply a password-reset token: set a new password hash and mark the token
+     * consumed. The new hash automatically invalidates every browser's
+     * remember-me cookie for this user — those cookies' signatures are
+     * computed over the password hash, so any change breaks them. Throws
+     * {@link InvalidTokenException} on unknown / expired / consumed tokens;
+     * the controller maps all of these to the same user-facing error.
      */
     @Transactional
     public void resetPassword(String rawToken, String newPassword) {
@@ -243,17 +241,15 @@ public class UserAccountService {
         // Invalidate any other still-open reset tokens too, so a coordinated
         // attacker who minted a second token in flight can't use it now.
         invalidateOpenPasswordResets(user);
-
-        rememberMeRevoker.removeAllPersistentTokens(user.getEmail());
         log.info("Password reset completed for user {}.", user.getId());
     }
 
     /**
      * Change the password of the currently-authenticated user. The caller's
      * current password is checked against the stored hash before anything
-     * changes. On success any persistent (remember-me) cookies for this user
-     * are revoked, so other browsers fall back to plain auth on their next
-     * request and need to log in again with the new password.
+     * changes. The new password hash automatically invalidates every browser's
+     * remember-me cookie for this user (the signature is computed over the
+     * hash), so other browsers fall back to plain auth on their next request.
      */
     @Transactional
     public void changePassword(String email, String currentPassword, String newPassword) {
@@ -270,19 +266,19 @@ public class UserAccountService {
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(user);
 
-        // Same revocation hook as reset: any pending password-reset email links
-        // and any other browsers' remember-me cookies should stop working.
+        // Any pending password-reset email links should stop working too.
         invalidateOpenPasswordResets(user);
-        rememberMeRevoker.removeAllPersistentTokens(user.getEmail());
         log.info("Password changed for user {}.", user.getId());
     }
 
     /**
      * Delete the currently-authenticated user's account. The caller's password
      * is required so a stolen session cookie alone can't trigger a delete.
-     * Routes / waypoints / tokens cascade away via the FK ON DELETE CASCADE
-     * established in Phase 1; remember-me rows aren't FK-linked to users
-     * (Spring Security's standard schema), so we drop them explicitly first.
+     * Routes / waypoints / verification + reset tokens cascade away via the
+     * FK ON DELETE CASCADE established in Phase 1. Remember-me cookies are
+     * stateless (token-based, signed against the password hash) — the now-gone
+     * user fails {@code loadUserByUsername} on their next request, so every
+     * browser's cookie is implicitly invalid.
      */
     @Transactional
     public void deleteAccount(String email, String currentPassword) {
@@ -295,9 +291,6 @@ public class UserAccountService {
             throw new InvalidCredentialsException("Current password is incorrect");
         }
 
-        // Drop persistent-login rows before deleting the user — persistent_logins
-        // keys on username (email), not user_id, so it has no FK and no cascade.
-        rememberMeRevoker.removeAllPersistentTokens(user.getEmail());
         userRepository.delete(user);
         log.info("Account deleted for user {}.", user.getId());
     }
@@ -371,14 +364,5 @@ public class UserAccountService {
     /** Re-auth failed inside change-password / delete-account. */
     public static class InvalidCredentialsException extends RuntimeException {
         public InvalidCredentialsException(String message) { super(message); }
-    }
-
-    /**
-     * Indirection over Spring Security's persistent-token store so this
-     * service stays free of the security package and the test can mock it.
-     * Implementation lives in {@code RememberMeConfig}.
-     */
-    public interface RememberMeRevoker {
-        void removeAllPersistentTokens(String username);
     }
 }

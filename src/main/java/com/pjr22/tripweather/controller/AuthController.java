@@ -29,7 +29,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices;
+import org.springframework.security.web.authentication.rememberme.AbstractRememberMeServices;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,14 +50,14 @@ public class AuthController {
     private final CurrentUserService currentUserService;
     private final UserAccountService userAccountService;
     private final AuthenticationManager authenticationManager;
-    private final ObjectProvider<PersistentTokenBasedRememberMeServices> rememberMeServicesProvider;
+    private final ObjectProvider<AbstractRememberMeServices> rememberMeServicesProvider;
     private final SecurityContextRepository securityContextRepository =
             new HttpSessionSecurityContextRepository();
 
     public AuthController(CurrentUserService currentUserService,
                           UserAccountService userAccountService,
                           AuthenticationManager authenticationManager,
-                          ObjectProvider<PersistentTokenBasedRememberMeServices> rememberMeServicesProvider) {
+                          ObjectProvider<AbstractRememberMeServices> rememberMeServicesProvider) {
         this.currentUserService = currentUserService;
         this.userAccountService = userAccountService;
         this.authenticationManager = authenticationManager;
@@ -155,11 +155,11 @@ public class AuthController {
         // flows without TRIP_REMEMBER_ME_KEY still log users in for the
         // session.
         if (request.isRememberMe()) {
-            PersistentTokenBasedRememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
+            AbstractRememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
             if (rememberMeServices != null) {
                 rememberMeServices.loginSuccess(httpRequest, httpResponse, auth);
             } else {
-                log.warn("Login requested rememberMe but the feature is disabled (no PersistentTokenBasedRememberMeServices bean).");
+                log.warn("Login requested rememberMe but the feature is disabled (no rememberMeServices bean).");
             }
         }
 
@@ -172,10 +172,9 @@ public class AuthController {
     public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
         // Invalidate any remember-me cookie tied to this browser as well as
         // the session — otherwise the next request would re-auth from the
-        // persistent-login row and immediately log the user back in. Spring's
-        // logout handler does both removeUserTokens-on-the-current-series
-        // and cookie clearing.
-        PersistentTokenBasedRememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
+        // cookie and immediately log the user back in. Spring's
+        // AbstractRememberMeServices.logout() cancels the cookie.
+        AbstractRememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
         if (rememberMeServices != null) {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             rememberMeServices.logout(request, response, auth);
@@ -217,9 +216,10 @@ public class AuthController {
         // Don't auto-login — per Phase 4 decision, send the user to the login
         // modal with their new password. Clear any current session so a stale
         // tab can't keep going as the now-old user, and clear the cookie tied
-        // to this browser. removeUserTokens(username) for everywhere else
-        // already happened inside the service.
-        PersistentTokenBasedRememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
+        // to this browser. Other browsers' cookies were invalidated implicitly
+        // when the service rewrote the password hash (the cookie's signature
+        // is computed over the hash, so any change to it breaks every cookie).
+        AbstractRememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
         if (rememberMeServices != null) {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             rememberMeServices.logout(httpRequest, httpResponse, auth);
@@ -249,13 +249,13 @@ public class AuthController {
             return ResponseEntity.badRequest()
                     .body(error("INVALID_PASSWORD", e.getMessage()));
         }
-        // The service already wiped persistent tokens for ALL of the user's
-        // browsers. Re-issue a fresh remember-me row for the current browser
-        // if it had one — otherwise the user gets logged out of this tab too,
-        // which is surprising. The simplest path: clear the remember-me cookie
-        // on this browser; the user remains in the current session and can
-        // tick "stay logged in" again at next login.
-        PersistentTokenBasedRememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
+        // The password change rewrote the password hash, which is part of every
+        // remember-me cookie's signature — so every browser's cookie is now
+        // invalid. The current tab is still authenticated via its session, so
+        // the user keeps using the app, but their remember-me cookie no longer
+        // works. Clear it explicitly so it isn't sent on a future request only
+        // to be rejected; the user can tick "stay logged in" again at next login.
+        AbstractRememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
         if (rememberMeServices != null) {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             rememberMeServices.logout(httpRequest, httpResponse, auth);
@@ -276,10 +276,10 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(error("INVALID_CREDENTIALS", "Current password is incorrect."));
         }
-        // Clear the cookie on the current browser too (service wiped DB rows
-        // for every browser already; this just stops the now-orphan series
-        // cookie from being sent on the next request).
-        PersistentTokenBasedRememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
+        // Clear the cookie on the current browser too. The user row is gone,
+        // so loadUserByUsername would reject every browser's cookie anyway —
+        // this just stops the now-orphan cookie from being sent.
+        AbstractRememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
         if (rememberMeServices != null) {
             rememberMeServices.logout(httpRequest, httpResponse, null);
         }

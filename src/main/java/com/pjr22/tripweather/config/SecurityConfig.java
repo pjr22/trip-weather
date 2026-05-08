@@ -17,7 +17,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices;
+import org.springframework.security.web.authentication.rememberme.AbstractRememberMeServices;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfToken;
@@ -41,7 +41,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
-                                           ObjectProvider<PersistentTokenBasedRememberMeServices> rememberMeServicesProvider) throws Exception {
+                                           ObjectProvider<AbstractRememberMeServices> rememberMeServicesProvider) throws Exception {
         CookieCsrfTokenRepository csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         SpaCsrfTokenRequestHandler csrfHandler = new SpaCsrfTokenRequestHandler();
 
@@ -85,14 +85,14 @@ public class SecurityConfig {
             .httpBasic(basic -> basic.disable())
             .logout(logout -> logout.disable());
 
-        // Wire the persistent-token remember-me filter so a stored cookie
-        // re-authenticates on the next request after a browser restart. The
-        // cookie is *only* issued when LoginRequest.rememberMe=true
-        // (AuthController calls rememberMeServices.loginSuccess explicitly);
-        // here we just register the services so the filter runs. Skipped
-        // entirely when trip.auth.remember-me.enabled=false (the bean is
-        // absent and we don't add the filter).
-        PersistentTokenBasedRememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
+        // Wire the remember-me filter so a stored cookie re-authenticates on
+        // the next request after a browser restart. The cookie is *only*
+        // issued when LoginRequest.rememberMe=true (AuthController calls
+        // rememberMeServices.loginSuccess explicitly); here we just register
+        // the services so the filter runs. Skipped entirely when
+        // trip.auth.remember-me.enabled=false (the bean is absent and we
+        // don't add the filter).
+        AbstractRememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
         if (rememberMeServices != null) {
             http.rememberMe(rm -> rm.rememberMeServices(rememberMeServices));
         }
