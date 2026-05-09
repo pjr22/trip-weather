@@ -49,6 +49,12 @@ public class SecurityConfig {
             .csrf(csrf -> csrf
                 .csrfTokenRepository(csrfRepository)
                 .csrfTokenRequestHandler(csrfHandler)
+                // Admin endpoints are called from CLI scripts (no browser
+                // cookies) and authenticated by the X-Admin-Token header,
+                // so CSRF doesn't apply. Actuator endpoints are denied at
+                // the authorize layer above; the ignore here is belt-and-
+                // braces so a misrouted POST returns 403, not 403+CSRF.
+                .ignoringRequestMatchers("/api/admin/**", "/actuator/**")
             )
             // Force the CSRF cookie to be written on every request so the SPA can
             // pick it up before its first state-changing call. Without this, the
@@ -73,6 +79,20 @@ public class SecurityConfig {
                 // unless explicitly opened above (change-password and
                 // delete-account fall under this catch-all)
                 .requestMatchers("/api/auth/**").authenticated()
+                // Actuator endpoints (Phase 5 metrics + health + prometheus)
+                // are server-internal only by haproxy convention — the
+                // public frontend doesn't route /actuator/** outward.
+                // Spring Security permits them so the operator can read
+                // them from localhost in dev and from the private network
+                // in prod. Only the safe endpoints are exposed (see
+                // management.endpoints.web.exposure.include); env, beans,
+                // configprops etc. remain off the wire entirely.
+                .requestMatchers("/actuator/**").permitAll()
+                // Admin-only routing-coverage refresh endpoint, called by
+                // docker/refreshOrsGraph.sh after a successful pbf swap.
+                // Header-based shared-secret check lives in the controller
+                // (no admin role exists yet — see USER_ACCOUNTS_PLAN.md).
+                .requestMatchers("/api/admin/**").permitAll()
                 // Existing anonymous save/load/search flows stay public
                 .requestMatchers(HttpMethod.POST, "/api/routes").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/routes/**").permitAll()

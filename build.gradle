@@ -33,6 +33,11 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	// Prometheus exposition format — single-page text view of every metric
+	// at /actuator/prometheus. Self-contained: no Prometheus server needed,
+	// the endpoint is just plain-text formatted output a browser can render.
+	implementation 'io.micrometer:micrometer-registry-prometheus'
 	implementation 'com.github.ben-manes.caffeine:caffeine'
 	implementation 'org.postgresql:postgresql'
 	implementation 'org.hibernate.orm:hibernate-spatial'

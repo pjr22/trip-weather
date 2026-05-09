@@ -17,7 +17,6 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -28,6 +27,8 @@ import com.pjr22.tripweather.model.LocationData;
 import com.pjr22.tripweather.model.OrsResponseCache;
 import com.pjr22.tripweather.model.RouteData;
 import com.pjr22.tripweather.repository.OrsResponseCacheRepository;
+import com.pjr22.tripweather.routing.PublicOrsClient;
+import com.pjr22.tripweather.routing.RoutingDispatcher;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -50,8 +51,8 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class RouteService {
 
-   private final RestClient restClient;
-   private final String apiKey;
+   private final PublicOrsClient publicOrs;
+   private final RoutingDispatcher dispatcher;
    private final ObjectMapper objectMapper;
    private final OrsResponseCacheRepository cacheRepository;
    private final Clock clock;
@@ -78,8 +79,8 @@ public class RouteService {
    private static final int COORDINATE_DECIMALS = 6;
 
    public RouteService(
-         @Value("${openrouteservice.api.key}") String apiKey,
-         RestClient orsRestClient,
+         PublicOrsClient publicOrs,
+         RoutingDispatcher dispatcher,
          ObjectMapper objectMapper,
          OrsResponseCacheRepository cacheRepository,
          Clock clock,
@@ -90,8 +91,8 @@ public class RouteService {
          @Value("${trip.routing.elevation-ttl-hours:720}") long elevationTtlHours,
          @Value("${trip.routing.elevation-stale-max-hours:2160}") long elevationStaleMaxHours
    ) {
-      this.apiKey = apiKey;
-      this.restClient = orsRestClient;
+      this.publicOrs = publicOrs;
+      this.dispatcher = dispatcher;
       this.objectMapper = objectMapper;
       this.cacheRepository = cacheRepository;
       this.clock = clock;
@@ -104,14 +105,17 @@ public class RouteService {
    }
 
    public LocationData snapToLocation(double latitude, double longitude) {
-      if (apiKey == null || apiKey.isEmpty()) {
+      if (!publicOrs.isConfigured()) {
          return null;
       }
       try {
          String hash = snapCacheKey(latitude, longitude);
+         List<double[]> coords = List.of(new double[]{longitude, latitude});
+         Object body = snapBody(latitude, longitude);
          JsonNode response = getOrFetchCached(hash, CACHE_KIND_SNAP,
                snapTtlHours, snapStaleMaxHours,
-               () -> callSnapApi(latitude, longitude));
+               () -> dispatcher.dispatch(CACHE_KIND_SNAP, coords,
+                     client -> client.post(SNAP_ENDPOINT, body)));
          if (response == null) {
             return null;
          }
@@ -123,20 +127,23 @@ public class RouteService {
    }
 
    public Double getElevation(double latitude, double longitude) {
-      if (apiKey == null || apiKey.isEmpty()) {
+      if (!publicOrs.isConfigured()) {
          return null;
       }
       try {
          String hash = elevationCacheKey(latitude, longitude);
+         List<double[]> coords = List.of(new double[]{longitude, latitude});
+         String path = String.format(ELEVATION_ENDPOINT + "?geometry=%s,%s", longitude, latitude);
          JsonNode response = getOrFetchCached(hash, CACHE_KIND_ELEVATION,
                elevationTtlHours, elevationStaleMaxHours,
-               () -> callElevationApi(latitude, longitude));
+               () -> dispatcher.dispatch(CACHE_KIND_ELEVATION, coords,
+                     client -> client.get(path)));
          if (response == null) {
             return null;
          }
-         JsonNode coords = response.path("geometry").path("coordinates");
-         if (coords.isArray() && coords.size() >= 3 && !coords.get(2).isNull()) {
-            return coords.get(2).asDouble();
+         JsonNode coordsNode = response.path("geometry").path("coordinates");
+         if (coordsNode.isArray() && coordsNode.size() >= 3 && !coordsNode.get(2).isNull()) {
+            return coordsNode.get(2).asDouble();
          }
          return null;
       } catch (Exception e) {
@@ -151,7 +158,7 @@ public class RouteService {
          ZonedDateTime departureDateTime,
          List<Integer> durations
    ) {
-      if (apiKey == null || apiKey.isEmpty()) {
+      if (!publicOrs.isConfigured()) {
          return createErrorRoute("OpenRouteService API key not configured");
       }
       if (waypoints == null || waypoints.size() < 2) {
@@ -161,9 +168,12 @@ public class RouteService {
       JsonNode response;
       try {
          String hash = directionsCacheKey(waypoints);
+         List<double[]> coords = waypointsToCoords(waypoints);
+         String body = objectMapper.writeValueAsString(directionsRequest(waypoints));
          response = getOrFetchCached(hash, CACHE_KIND_DIRECTIONS,
                directionsTtlHours, directionsStaleMaxHours,
-               () -> callDirectionsApi(waypoints));
+               () -> dispatcher.dispatch(CACHE_KIND_DIRECTIONS, coords,
+                     client -> client.post(DIRECTIONS_ENDPOINT, body)));
       } catch (Exception e) {
          return createErrorRoute("Failed to calculate route: " + e.getMessage());
       }
@@ -304,9 +314,9 @@ public class RouteService {
       }
    }
 
-   // ----------------------------------------------------------- API plumbing
+   // ------------------------------------------------------ request body shape
 
-   private JsonNode callDirectionsApi(List<RouteRequest.Waypoint> waypoints) throws Exception {
+   private RouteRequest directionsRequest(List<RouteRequest.Waypoint> waypoints) {
       RouteRequest request = new RouteRequest();
       request.setCoordinates(convertWaypointsToCoordinates(waypoints));
       request.setRadiuses(List.of(-1));
@@ -314,37 +324,22 @@ public class RouteService {
       request.setInstructions(true);
       request.setInstructionsFormat("text");
       request.setLanguage("en");
-
-      String requestBody = objectMapper.writeValueAsString(request);
-      return restClient.post()
-            .uri(DIRECTIONS_ENDPOINT)
-            .header("Authorization", apiKey)
-            .header("Content-Type", "application/json")
-            .body(requestBody)
-            .retrieve()
-            .body(JsonNode.class);
+      return request;
    }
 
-   private JsonNode callSnapApi(double latitude, double longitude) {
+   private static Map<String, Object> snapBody(double latitude, double longitude) {
       Map<String, Object> body = new HashMap<>();
       body.put("locations", List.of(List.of(longitude, latitude)));
       body.put("radius", Integer.valueOf(SNAP_RADIUS_METERS));
-      return restClient.post()
-            .uri(SNAP_ENDPOINT)
-            .body(body)
-            .header("Authorization", apiKey)
-            .header("Content-Type", "application/json")
-            .retrieve()
-            .body(JsonNode.class);
+      return body;
    }
 
-   private JsonNode callElevationApi(double latitude, double longitude) {
-      String url = String.format(ELEVATION_ENDPOINT + "?geometry=%s,%s", longitude, latitude);
-      return restClient.get()
-            .uri(url)
-            .header("Authorization", apiKey)
-            .retrieve()
-            .body(JsonNode.class);
+   private static List<double[]> waypointsToCoords(List<RouteRequest.Waypoint> waypoints) {
+      List<double[]> result = new ArrayList<>(waypoints.size());
+      for (RouteRequest.Waypoint wp : waypoints) {
+         result.add(new double[]{wp.getLongitude(), wp.getLatitude()});
+      }
+      return result;
    }
 
    // ----------------------------------------------- response parsing helpers

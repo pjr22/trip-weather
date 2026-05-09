@@ -1,0 +1,41 @@
+# Phase 5a OpenRouteService config — Colorado, driving-car only.
+#
+# Mounted into the trip-ors container at /home/ors/config/ors-config.yml.
+# The image's stock entrypoint reads this path on startup; the older
+# /home/ors/openrouteservice/ors-config.yml location is ignored by v8+.
+#
+# Schema follows the image's bundled example-ors-config.yml — keep it
+# minimal. Profiles other than driving-car are not enabled, so no extra RAM
+# or graph-build time is spent on them.
+#
+# When LOCAL_CACHING_HOSTING.md Phase 5b expands coverage to Western US,
+# only the source_file path changes (to the larger pbf). The dispatch
+# wrapper is region-agnostic; coverage is governed by routing_coverage rows.
+
+ors:
+  engine:
+    profile_default:
+      build:
+        # The runOrs.sh bind-mount maps the actual region pbf onto this
+        # canonical path, so the config doesn't have to change between
+        # Colorado / Western US / etc.
+        source_file: /home/ors/files/osm-file.osm.pbf
+        elevation: true
+    profiles:
+      driving-car:
+        enabled: true
+        # ORS defaults every per-request distance limit to 100 km, which
+        # rejects almost every road-trip route. Local ORS isn't public-
+        # facing — only the in-process dispatcher reaches it — so the
+        # limits are a sanity bound against accidental runaway requests,
+        # not an abuse guard. Set to 10,000 km; covers any plausible plan
+        # well past the Western US extract's ~2,500 km extent. CH-prepared
+        # routing is logarithmic in graph size, so per-request cost doesn't
+        # scale with this number. Routes that have no path simply return
+        # "no route" regardless of the cap.
+        service:
+          maximum_distance: 10000000
+          maximum_distance_dynamic_weights: 10000000
+          maximum_distance_avoid_areas: 10000000
+          maximum_distance_alternative_routes: 10000000
+          maximum_distance_round_trip_routes: 10000000

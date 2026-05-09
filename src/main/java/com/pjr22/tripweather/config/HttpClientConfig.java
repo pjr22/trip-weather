@@ -37,6 +37,51 @@ public class HttpClientConfig {
         return RestClient.builder().baseUrl(baseUrl).build();
     }
 
+    /**
+     * Local OpenRouteService instance (Phase 5 of LOCAL_CACHING_HOSTING.md).
+     * Separate bean from {@link #orsRestClient} so the dispatch wrapper in
+     * {@code RouteService} can call either at runtime. No Authorization
+     * header — local ORS is unauthenticated on its container-internal port.
+     * The base URL defaults to the {@code trip-ors} container name on
+     * {@code forgotten_net}; override with {@code TRIP_LOCAL_ORS_BASE_URL}
+     * for dev (e.g. {@code http://localhost:8082/ors}). Note: the ORS v8+
+     * image listens on port 8082 inside the container, not 8080.
+     *
+     * <p>Both the connect and read timeouts are set to
+     * {@code trip.local.ors.timeout-ms}: the dispatch wrapper falls back to
+     * public ORS on any timeout, so a slow local engine should fail fast
+     * rather than make the user wait. JdkClientHttpRequestFactory propagates
+     * the connect timeout to the underlying HttpClient and the read timeout
+     * per-request via {@link java.net.http.HttpRequest#timeout}.
+     */
+    @Bean
+    public RestClient localOrsRestClient(
+            @Value("${trip.local.ors.base-url:http://trip-ors:8082/ors}") String baseUrl,
+            @Value("${trip.local.ors.timeout-ms:3000}") long timeoutMs) {
+        java.time.Duration timeout = java.time.Duration.ofMillis(timeoutMs);
+        java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
+                .connectTimeout(timeout)
+                .build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(timeout);
+        return RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(factory)
+                .build();
+    }
+
+    /**
+     * Geofabrik download endpoint, used by GeofabrikCoverageLoader to fetch
+     * .poly files for the routing-coverage table. Default points at the
+     * North America / US bucket; an override is useful for tests that serve
+     * a fixture from MockRestServiceServer.
+     */
+    @Bean
+    public RestClient geofabrikRestClient(
+            @Value("${trip.routing.geofabrik-base-url:https://download.geofabrik.de/north-america/us}") String baseUrl) {
+        return RestClient.builder().baseUrl(baseUrl).build();
+    }
+
     @Bean
     public RestClient nrelRestClient(
             @Value("${nrel.base.url:https://developer.nrel.gov}") String baseUrl) {

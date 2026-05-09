@@ -6,12 +6,19 @@ import com.pjr22.tripweather.model.LocationData;
 import com.pjr22.tripweather.model.OrsResponseCache;
 import com.pjr22.tripweather.model.RouteData;
 import com.pjr22.tripweather.repository.OrsResponseCacheRepository;
+import com.pjr22.tripweather.repository.RoutingCoverageRepository;
+import com.pjr22.tripweather.routing.LocalOrsClient;
+import com.pjr22.tripweather.routing.PublicOrsClient;
+import com.pjr22.tripweather.routing.RoutingDispatcher;
+import com.pjr22.tripweather.routing.RoutingMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -88,6 +95,8 @@ class RouteServiceTest {
             """;
 
     @Mock private OrsResponseCacheRepository cacheRepository;
+    @Mock private RoutingCoverageRepository coverageRepository;
+    @Mock private ObjectProvider<LocalOrsClient> localProvider;
 
     private RestClient restClient;
     private MockRestServiceServer mockServer;
@@ -107,7 +116,15 @@ class RouteServiceTest {
         objectMapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-        service = new RouteService(API_KEY, restClient, objectMapper, cacheRepository,
+        // No local ORS bean -> dispatcher takes the disabled-fast-path and goes
+        // straight to public for every call, which is what these tests assert.
+        // Coverage repo is therefore never consulted.
+        PublicOrsClient publicClient = new PublicOrsClient(restClient, API_KEY);
+        RoutingMetrics metrics = new RoutingMetrics(new SimpleMeterRegistry());
+        RoutingDispatcher dispatcher = new RoutingDispatcher(
+                publicClient, localProvider, coverageRepository, metrics);
+
+        service = new RouteService(publicClient, dispatcher, objectMapper, cacheRepository,
                 fixedClock,
                 24L,    // directions ttl hours
                 168L,   // directions stale-max hours

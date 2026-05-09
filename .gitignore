@@ -44,8 +44,13 @@ out/
 ### VS Code ###
 .vscode/
 
-### API Keys ###
+### API Keys and Passwords ###
 *api_key.txt
+*password.txt
+
+### Phase 5 ORS data — pbf + md5 are downloaded by refreshOrsGraph.sh, never committed ###
+docker/ors-data/*.osm.pbf
+docker/ors-data/*.md5
 
 ### Auto-generated build version (see build.gradle bumpVersion / writeVersionFile) ###
 version.properties
