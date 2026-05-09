@@ -5,7 +5,7 @@
 # by the official nginx image's envsubst entrypoint:
 #
 #   * dev (host bootRun):              host.docker.internal:8090
-#   * prod (Spring container on the same Docker network):  tripapp:8080
+#   * prod (Spring container on the same Docker network):  trip-weather:8080
 #
 # Cache key for all three locations is nginx's default ($scheme$proxy_host$request_uri),
 # which already includes the query string — important for NDFD WMS where the

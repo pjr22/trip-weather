@@ -10,7 +10,7 @@
 #     http://localhost:8090 to bypass it (direct upstream URLs, requires
 #     TRIP_TILE_PROXY_ENABLED=false).
 #
-#   * prod: set BACKEND_UPSTREAM=tripapp:8080 (the Spring container's
+#   * prod: set BACKEND_UPSTREAM=trip-weather:8080 (the Spring container's
 #     internal address on forgotten_net) before running this script.
 #     The container's port 8090 is published as 8091 on host so haproxy
 #     can target 127.0.0.1:8091.
