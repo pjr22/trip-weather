@@ -119,6 +119,19 @@ server {
         proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Real-IP         $remote_addr;
-        proxy_pass http://${BACKEND_UPSTREAM};
+        # Assign the upstream to an nginx variable so proxy_pass uses
+        # request-time DNS resolution (via the resolver directive at the
+        # top of this file — 127.0.0.11 is Docker's embedded DNS) instead
+        # of config-load resolution. Two consequences:
+        #   1. nginx starts even if trip-weather isn't running yet (no
+        #      "host not found in upstream" abort).
+        #   2. If trip-weather restarts and gets a new container IP, nginx
+        #      picks up the new address on the next request without
+        #      needing its own restart.
+        # The cached upstream locations above (tile.openstreetmap.org,
+        # digital.weather.gov, api.weather.gov) already get this behavior
+        # for free because they use $1 / $is_args / $args in proxy_pass.
+        set $backend "${BACKEND_UPSTREAM}";
+        proxy_pass http://$backend;
     }
 }
