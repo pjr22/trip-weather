@@ -13,18 +13,25 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Spring Data JPA repository for Route entities
+ * Spring Data JPA repository for Route entities.
+ *
+ * <p>Every JPQL / derived-query method on this interface is silently filtered
+ * by the {@code @SQLRestriction("deleted_at IS NULL")} on {@link Route}, so
+ * soft-deleted rows are invisible to all of the user-facing read paths. The
+ * {@code admin*} methods at the bottom use native SQL specifically to bypass
+ * that restriction — they are the only callers that should ever see, mutate,
+ * or hard-delete soft-deleted rows. Phase 1 of ADMIN_CONSOLE.md.
  */
 @Repository
 public interface RouteRepository extends JpaRepository<Route, UUID> {
-    
+
     /**
      * Find routes by user ID
      * @param userId The user ID to search for
      * @return List of routes belonging to the user
      */
     List<Route> findByUserId(UUID userId);
-    
+
     /**
      * Find routes by user ID and name (case-insensitive)
      * @param userId The user ID to search for
@@ -32,7 +39,7 @@ public interface RouteRepository extends JpaRepository<Route, UUID> {
      * @return List of routes matching the criteria
      */
     List<Route> findByUserIdAndNameIgnoreCase(UUID userId, String name);
-    
+
     /**
      * Find a route by ID and user ID
      * @param id The route ID to search for
@@ -40,7 +47,7 @@ public interface RouteRepository extends JpaRepository<Route, UUID> {
      * @return Optional containing the route if found
      */
     Optional<Route> findByIdAndUserId(UUID id, UUID userId);
-    
+
     /**
      * Find routes by user ID and name containing the search text (case-insensitive)
      * @param userId The user ID to search for
@@ -49,23 +56,69 @@ public interface RouteRepository extends JpaRepository<Route, UUID> {
      */
     List<Route> findByUserIdAndNameContainingIgnoreCase(UUID userId, String searchText);
 
+    // ------------------------------------------------------------------------
+    // Admin / cleanup paths — native SQL to bypass the entity-level
+    // @SQLRestriction("deleted_at IS NULL"). Phase 1 of ADMIN_CONSOLE.md.
+    // ------------------------------------------------------------------------
+
     /**
-     * Bulk-delete routes belonging to a single user that were created before
-     * the given cutoff. Issues a single {@code DELETE FROM routes WHERE ...}
-     * statement; dependent waypoints are swept by the {@code ON DELETE CASCADE}
-     * on {@code waypoints.route_id} added in Phase 1, so no JPA cascade is
-     * needed here.
+     * Stage 1 of the two-stage cleanup: mark guest-owned routes older than the
+     * retention window as soft-deleted. Native UPDATE; the entity restriction
+     * does not apply, so this can target rows whose {@code deleted_at} is
+     * already null (the only ones that should change).
      *
-     * <p>Bypasses Hibernate's first-level cache by design — only call from a
-     * transaction that doesn't already have these rows loaded (the cleanup
-     * scheduler is the intended caller).
-     *
-     * @param userId  user whose routes are being swept (typically the guest user)
-     * @param cutoff  upper bound on {@code created}; rows older than this go
-     * @return number of routes deleted (matches the cleanup-job log line)
+     * @param userId guest user whose routes are being swept
+     * @param cutoff upper bound on {@code created}; rows older than this go
+     * @param now    timestamp to write into {@code deleted_at}
+     * @return number of rows marked deleted
      */
-    @Modifying
-    @Query("DELETE FROM Route r WHERE r.user.id = :userId AND r.created < :cutoff")
-    int deleteByUserIdAndCreatedBefore(@Param("userId") UUID userId,
-                                       @Param("cutoff") ZonedDateTime cutoff);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE routes SET deleted_at = :now "
+                 + "WHERE user_id = :userId AND created < :cutoff AND deleted_at IS NULL",
+           nativeQuery = true)
+    int softDeleteGuestRoutesCreatedBefore(@Param("userId") UUID userId,
+                                           @Param("cutoff") ZonedDateTime cutoff,
+                                           @Param("now") ZonedDateTime now);
+
+    /**
+     * Stage 2 of the two-stage cleanup: hard-delete any soft-deleted route
+     * (regardless of owner) whose {@code deleted_at} is older than the grace
+     * window. Native DELETE — the {@code waypoints.route_id ON DELETE CASCADE}
+     * sweeps dependent waypoints in the same statement.
+     *
+     * @param cutoff upper bound on {@code deleted_at}; rows marked before this go
+     * @return number of rows hard-deleted
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "DELETE FROM routes WHERE deleted_at IS NOT NULL AND deleted_at < :cutoff",
+           nativeQuery = true)
+    int hardDeleteSoftDeletedBefore(@Param("cutoff") ZonedDateTime cutoff);
+
+    /**
+     * Soft-delete a single route by id. No-op if the row doesn't exist or is
+     * already soft-deleted. Native UPDATE bypasses the entity restriction
+     * (which would otherwise filter out a row already marked deleted, but
+     * also — defensively — could surprise a future maintainer who expected
+     * UPDATE statements to behave like SELECTs do here).
+     *
+     * @return 1 if a row was newly soft-deleted, 0 otherwise
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE routes SET deleted_at = :now "
+                 + "WHERE id = :id AND deleted_at IS NULL",
+           nativeQuery = true)
+    int adminSoftDelete(@Param("id") UUID id, @Param("now") ZonedDateTime now);
+
+    /**
+     * Restore a soft-deleted route. Native UPDATE — the entity-level
+     * {@code @SQLRestriction} would otherwise hide every soft-deleted row
+     * from a JPQL UPDATE's WHERE clause, making restore impossible.
+     *
+     * @return 1 if a row was restored, 0 otherwise (already active or absent)
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE routes SET deleted_at = NULL "
+                 + "WHERE id = :id AND deleted_at IS NOT NULL",
+           nativeQuery = true)
+    int adminRestore(@Param("id") UUID id);
 }

@@ -28,10 +28,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for the cleanup job. The actual delete-by-cutoff queries are
- * exercised via JPA at runtime; here we verify wiring — that each sweep
- * resolves the right cutoff, calls the right repository, and (for the
- * guest-route sweep specifically) respects the enabled flag.
+ * Unit tests for the cleanup job. The actual SQL is exercised at runtime
+ * against the configured database; here we verify wiring — that each sweep
+ * resolves the right cutoff, calls the right repository, and respects the
+ * stage-1-vs-stage-2 split that Phase 1 of ADMIN_CONSOLE.md introduced.
  */
 @ExtendWith(MockitoExtension.class)
 class GuestRouteCleanupJobTest {
@@ -53,48 +53,83 @@ class GuestRouteCleanupJobTest {
         // them explicitly so the test exercises a realistic configuration.
         ReflectionTestUtils.setField(job, "guestRouteCleanupEnabled", true);
         ReflectionTestUtils.setField(job, "retentionDays", 30);
+        ReflectionTestUtils.setField(job, "purgeGraceDays", 7);
     }
 
-    // -------------------- Guest route cleanup --------------------
+    // -------------------- Two-stage route cleanup --------------------
 
     @Test
-    void cleanGuestRoutes_deletesGuestRoutesOlderThanRetention() {
+    void cleanGuestRoutes_runsBothStages_withRetentionAndGraceCutoffs() {
         User guest = newGuest();
         when(userManagementService.getOrCreateGuestUser()).thenReturn(guest);
-        when(routeRepository.deleteByUserIdAndCreatedBefore(eq(guestId), any(ZonedDateTime.class)))
-                .thenReturn(7);
+        when(routeRepository.softDeleteGuestRoutesCreatedBefore(eq(guestId),
+                any(ZonedDateTime.class), any(ZonedDateTime.class))).thenReturn(7);
+        when(routeRepository.hardDeleteSoftDeletedBefore(any(ZonedDateTime.class)))
+                .thenReturn(3);
 
-        ZonedDateTime before = ZonedDateTime.now().minusDays(30);
+        ZonedDateTime nowBefore = ZonedDateTime.now();
         job.cleanGuestRoutes();
-        ZonedDateTime after = ZonedDateTime.now().minusDays(30);
+        ZonedDateTime nowAfter = ZonedDateTime.now();
 
-        ArgumentCaptor<ZonedDateTime> cutoffCaptor = ArgumentCaptor.forClass(ZonedDateTime.class);
-        verify(routeRepository).deleteByUserIdAndCreatedBefore(eq(guestId), cutoffCaptor.capture());
-        assertThat(cutoffCaptor.getValue()).isBetween(before.minusSeconds(1), after.plusSeconds(1));
+        // Stage 1: soft-delete cutoff is now - 30 days
+        ArgumentCaptor<ZonedDateTime> softCutoff = ArgumentCaptor.forClass(ZonedDateTime.class);
+        ArgumentCaptor<ZonedDateTime> softNow = ArgumentCaptor.forClass(ZonedDateTime.class);
+        verify(routeRepository).softDeleteGuestRoutesCreatedBefore(
+                eq(guestId), softCutoff.capture(), softNow.capture());
+        assertThat(softCutoff.getValue())
+                .isBetween(nowBefore.minusDays(30).minusSeconds(1),
+                           nowAfter.minusDays(30).plusSeconds(1));
+        assertThat(softNow.getValue()).isBetween(nowBefore.minusSeconds(1), nowAfter.plusSeconds(1));
+
+        // Stage 2: hard-delete cutoff is now - 7 days
+        ArgumentCaptor<ZonedDateTime> hardCutoff = ArgumentCaptor.forClass(ZonedDateTime.class);
+        verify(routeRepository).hardDeleteSoftDeletedBefore(hardCutoff.capture());
+        assertThat(hardCutoff.getValue())
+                .isBetween(nowBefore.minusDays(7).minusSeconds(1),
+                           nowAfter.minusDays(7).plusSeconds(1));
     }
 
     @Test
-    void cleanGuestRoutes_disabledFlagSkipsAllWork() {
+    void cleanGuestRoutes_disabledFlagSkipsStage1ButStillRunsStage2() {
+        // Stage 2 (hard-delete past grace) must still run when guest cleanup
+        // is disabled, otherwise an admin's manual soft-deletes would never
+        // age out — the disable flag is meant to gate only the auto-aging
+        // of guest routes.
         ReflectionTestUtils.setField(job, "guestRouteCleanupEnabled", false);
+        when(routeRepository.hardDeleteSoftDeletedBefore(any(ZonedDateTime.class)))
+                .thenReturn(2);
 
         job.cleanGuestRoutes();
 
         verifyNoInteractions(userManagementService);
-        verifyNoInteractions(routeRepository);
+        verify(routeRepository, never())
+                .softDeleteGuestRoutesCreatedBefore(any(UUID.class),
+                        any(ZonedDateTime.class), any(ZonedDateTime.class));
+        verify(routeRepository).hardDeleteSoftDeletedBefore(any(ZonedDateTime.class));
     }
 
     @Test
-    void cleanGuestRoutes_honoursCustomRetentionDays() {
-        ReflectionTestUtils.setField(job, "retentionDays", 7);
+    void cleanGuestRoutes_honoursCustomRetentionAndGraceDays() {
+        ReflectionTestUtils.setField(job, "retentionDays", 90);
+        ReflectionTestUtils.setField(job, "purgeGraceDays", 14);
         when(userManagementService.getOrCreateGuestUser()).thenReturn(newGuest());
 
-        ZonedDateTime before = ZonedDateTime.now().minusDays(7);
+        ZonedDateTime nowBefore = ZonedDateTime.now();
         job.cleanGuestRoutes();
-        ZonedDateTime after = ZonedDateTime.now().minusDays(7);
+        ZonedDateTime nowAfter = ZonedDateTime.now();
 
-        ArgumentCaptor<ZonedDateTime> cutoffCaptor = ArgumentCaptor.forClass(ZonedDateTime.class);
-        verify(routeRepository).deleteByUserIdAndCreatedBefore(eq(guestId), cutoffCaptor.capture());
-        assertThat(cutoffCaptor.getValue()).isBetween(before.minusSeconds(1), after.plusSeconds(1));
+        ArgumentCaptor<ZonedDateTime> softCutoff = ArgumentCaptor.forClass(ZonedDateTime.class);
+        verify(routeRepository).softDeleteGuestRoutesCreatedBefore(
+                eq(guestId), softCutoff.capture(), any(ZonedDateTime.class));
+        assertThat(softCutoff.getValue())
+                .isBetween(nowBefore.minusDays(90).minusSeconds(1),
+                           nowAfter.minusDays(90).plusSeconds(1));
+
+        ArgumentCaptor<ZonedDateTime> hardCutoff = ArgumentCaptor.forClass(ZonedDateTime.class);
+        verify(routeRepository).hardDeleteSoftDeletedBefore(hardCutoff.capture());
+        assertThat(hardCutoff.getValue())
+                .isBetween(nowBefore.minusDays(14).minusSeconds(1),
+                           nowAfter.minusDays(14).plusSeconds(1));
     }
 
     // -------------------- Email-token cleanup --------------------
@@ -127,8 +162,8 @@ class GuestRouteCleanupJobTest {
 
     @Test
     void cleanExpiredEmailTokens_runsEvenWhenGuestRouteCleanupDisabled() {
-        // route.cleanup.enabled gates only the guest-route sweep; email-token
-        // cleanup is always-on.
+        // route.cleanup.enabled gates only the stage-1 guest-route sweep;
+        // email-token cleanup is always-on.
         ReflectionTestUtils.setField(job, "guestRouteCleanupEnabled", false);
 
         job.cleanExpiredEmailTokens();
@@ -144,7 +179,9 @@ class GuestRouteCleanupJobTest {
         job.cleanExpiredEmailTokens();
         verify(emailVerificationRepository).deleteByExpiresAtBefore(any(LocalDateTime.class));
         verify(passwordResetRepository).deleteByExpiresAtBefore(any(LocalDateTime.class));
-        verify(routeRepository, never()).deleteByUserIdAndCreatedBefore(any(UUID.class), any(ZonedDateTime.class));
+        verify(routeRepository, never()).softDeleteGuestRoutesCreatedBefore(
+                any(UUID.class), any(ZonedDateTime.class), any(ZonedDateTime.class));
+        verify(routeRepository, never()).hardDeleteSoftDeletedBefore(any(ZonedDateTime.class));
     }
 
     private User newGuest() {

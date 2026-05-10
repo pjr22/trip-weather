@@ -155,9 +155,26 @@ public class SecurityConfig {
                 // Browser hits to /admin/** that aren't authenticated land on
                 // the login page; XHR hits to /api/admin/** get a clean 401 so
                 // the SPA's fetch wrapper can redirect.
+                //
+                // favorRelativeUris=true makes the entry point emit a path-only
+                // Location header (e.g. "/admin/login.html") instead of building
+                // an absolute URL from request.getServerName() + getServerPort().
+                // The default absolute-URL path uses the upstream port, which a
+                // reverse proxy (nginx/haproxy) then rewrites via proxy_redirect
+                // and typically drops in the process — clients lose the port
+                // they actually used. The path-only Location lets the browser
+                // resolve against the URL it requested, preserving scheme/host/
+                // port verbatim. Tomcat's server.tomcat.use-relative-redirects
+                // also matters for any RedirectView in the chain (e.g. /admin
+                // → /admin/), but does nothing here on its own because Spring
+                // Security would otherwise hand Tomcat a fully-qualified URL.
+                LoginUrlAuthenticationEntryPoint loginEntryPoint =
+                        new LoginUrlAuthenticationEntryPoint("/admin/login.html");
+                loginEntryPoint.setFavorRelativeUris(true);
+
                 PathPatternRequestMatcher.Builder matchers = PathPatternRequestMatcher.withDefaults();
                 eh.defaultAuthenticationEntryPointFor(
-                        new LoginUrlAuthenticationEntryPoint("/admin/login.html"),
+                        loginEntryPoint,
                         matchers.matcher("/admin/**"));
                 eh.defaultAuthenticationEntryPointFor(
                         new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),

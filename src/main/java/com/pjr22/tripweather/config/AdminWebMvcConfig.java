@@ -19,6 +19,14 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * before MVC sees them, so anonymous callers still land on
  * {@code /admin/login.html} via the chain's authentication entry point.
  * Phase 0 of ADMIN_CONSOLE.md.
+ *
+ * <p>The redirect emits a path-only {@code Location} header (e.g.
+ * {@code /admin/}) rather than an absolute URL, courtesy of the
+ * {@code server.tomcat.use-relative-redirects=true} property in
+ * {@code application.properties}. Without that, a reverse proxy fronting
+ * the app (nginx, haproxy) can rewrite absolute Location URLs through
+ * {@code proxy_redirect default} and silently drop the port the client
+ * actually used.
  */
 @Configuration
 public class AdminWebMvcConfig implements WebMvcConfigurer {

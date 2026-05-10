@@ -18,9 +18,21 @@ import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
+/**
+ * A saved route belonging to a user (the shared guest user for anonymous saves).
+ *
+ * <p>Soft-delete is enforced at the entity level via {@link SQLRestriction}:
+ * every JPA load / find / JPQL query against {@code Route} silently filters
+ * out rows where {@code deleted_at IS NOT NULL}. The admin console is the
+ * only path that needs to see soft-deleted rows; it bypasses the restriction
+ * by going through native SQL (see {@code AdminRouteService}). Phase 1 of
+ * ADMIN_CONSOLE.md.
+ */
 @Entity
 @Table(name = "routes")
+@SQLRestriction("deleted_at IS NULL")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -35,7 +47,16 @@ public class Route {
     
     @Column(name = "created", nullable = false)
     private ZonedDateTime created;
-    
+
+    /**
+     * Soft-delete marker. {@code null} means active; non-null is the moment
+     * the admin (or the cleanup job's stage 1) marked the route deleted.
+     * The entity-level {@link SQLRestriction} hides any row with a non-null
+     * value from every JPA-level query.
+     */
+    @Column(name = "deleted_at")
+    private ZonedDateTime deletedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, referencedColumnName = "id",
                 foreignKey = @ForeignKey(

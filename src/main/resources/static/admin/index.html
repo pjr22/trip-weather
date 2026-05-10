@@ -16,19 +16,35 @@
             </span>
         </header>
         <nav class="shell-nav">
-            <a href="#routes" class="active">Routes</a>
-            <a href="#data">Data</a>
-            <a href="#metrics">Metrics</a>
-            <a href="#users">Users</a>
+            <a href="#routes"  data-view="routes"  class="active">Routes</a>
+            <a href="#data"    data-view="data">Data</a>
+            <a href="#metrics" data-view="metrics">Metrics</a>
+            <a href="#users"   data-view="users">Users</a>
         </nav>
         <main class="shell-main">
-            <h2>Routes</h2>
-            <div class="placeholder">
-                Route management lands in Phase 1 of ADMIN_CONSOLE.md.
-            </div>
+            <div id="view-root"></div>
         </main>
     </div>
+
+    <div id="admin-confirm-modal" class="admin-modal" role="dialog" aria-modal="true"
+         aria-labelledby="admin-confirm-modal-title" hidden>
+        <div class="admin-modal-card">
+            <header class="admin-modal-header">
+                <h2 id="admin-confirm-modal-title">Confirm</h2>
+            </header>
+            <div class="admin-modal-body">
+                <p id="admin-confirm-modal-message"></p>
+            </div>
+            <footer class="admin-modal-actions">
+                <button id="admin-confirm-modal-cancel" type="button">Cancel</button>
+                <button id="admin-confirm-modal-ok" class="primary" type="button">OK</button>
+            </footer>
+        </div>
+    </div>
+
     <script src="js/api.js"></script>
+    <script src="js/AdminUI.js"></script>
+    <script src="js/managers/RoutesView.js"></script>
     <script src="js/AdminApp.js"></script>
 </body>
 </html>

@@ -20,20 +20,33 @@ import java.util.UUID;
  * <p>Two responsibilities, both fired by the same cron expression
  * ({@code route.cleanup.cron}, default daily at 03:00):
  * <ol>
- *   <li>Delete guest-owned routes (and their waypoints, via the FK cascade
- *       from Phase 1) that are older than the retention window. Defaults
- *       to 30 days; configurable via {@code route.cleanup.guest-route-retention-days}.
- *       <b>Gated</b> by {@code route.cleanup.enabled} — operators who want to
- *       keep guest data around can flip it off without disabling token
- *       cleanup.</li>
- *   <li>Delete expired email-verification and password-reset tokens
- *       ({@code email_verifications}, {@code password_resets}). <b>Always
- *       runs</b> — these tokens are useless past their {@code expires_at}
- *       and there's no reason to leave them in the table.</li>
+ *   <li><b>Two-stage route purge</b> (Phase 1 of ADMIN_CONSOLE.md, was a
+ *       one-shot hard delete pre-Phase 1):
+ *       <ul>
+ *         <li>Stage 1 — soft-delete guest-owned routes whose {@code created}
+ *             is older than {@code route.cleanup.guest-route-retention-days}
+ *             (default 30) and that aren't already marked deleted.
+ *             <b>Gated</b> by {@code route.cleanup.enabled} so operators who
+ *             want to keep guest data around can flip it off without
+ *             disabling the rest of the job.</li>
+ *         <li>Stage 2 — hard-delete <em>any</em> route (guest or otherwise)
+ *             whose {@code deleted_at} is older than
+ *             {@code route.cleanup.purge-grace-days} (default 7). This is
+ *             how an admin's soft-delete eventually becomes permanent: a
+ *             7-day undo window before the row + waypoints disappear via
+ *             the {@code waypoints.route_id ON DELETE CASCADE}. Always
+ *             runs (no enable gate) — the grace window is the safety net.</li>
+ *       </ul></li>
+ *   <li><b>Email-token cleanup</b> — delete expired
+ *       {@code email_verifications} and {@code password_resets} rows.
+ *       <b>Always runs</b>; these tokens are useless past their
+ *       {@code expires_at} and there's no reason to leave them in the table.</li>
  * </ol>
  *
- * <p>Authenticated users' routes are never auto-deleted — only routes whose
- * owner is the shared guest account.
+ * <p>Authenticated users' routes are never auto-soft-deleted by stage 1 —
+ * only the shared guest user's routes age out. Stage 2 is owner-agnostic
+ * because it works on the {@code deleted_at} column, which only carries a
+ * value when stage 1 or an admin set it explicitly.
  */
 @Component
 @Slf4j
@@ -50,6 +63,9 @@ public class GuestRouteCleanupJob {
     @Value("${route.cleanup.guest-route-retention-days:30}")
     private int retentionDays;
 
+    @Value("${route.cleanup.purge-grace-days:7}")
+    private int purgeGraceDays;
+
     public GuestRouteCleanupJob(RouteRepository routeRepository,
                                 EmailVerificationRepository emailVerificationRepository,
                                 PasswordResetRepository passwordResetRepository,
@@ -61,23 +77,37 @@ public class GuestRouteCleanupJob {
     }
 
     /**
-     * Sweep guest-owned routes older than the retention window. Single bulk
-     * {@code DELETE} at the JPQL level — waypoints follow via the database's
-     * {@code ON DELETE CASCADE} on {@code waypoints.route_id}.
+     * Run both stages of the route purge. Stage 1 (soft-delete of aged guest
+     * routes) is gated by {@code route.cleanup.enabled}; stage 2 (hard-delete
+     * past the grace window) always runs so the admin's manual soft-deletes
+     * still age out even when the guest sweep is disabled.
      */
     @Scheduled(cron = "${route.cleanup.cron:0 0 3 * * *}")
     @Transactional
     public void cleanGuestRoutes() {
-        if (!guestRouteCleanupEnabled) {
-            log.debug("Guest route cleanup disabled (route.cleanup.enabled=false); skipping.");
-            return;
-        }
         long start = System.currentTimeMillis();
-        UUID guestId = userManagementService.getOrCreateGuestUser().getId();
-        ZonedDateTime cutoff = ZonedDateTime.now().minusDays(retentionDays);
-        int deleted = routeRepository.deleteByUserIdAndCreatedBefore(guestId, cutoff);
-        log.info("Guest route cleanup: deleted {} route(s) older than {} day(s) in {}ms",
-                deleted, retentionDays, System.currentTimeMillis() - start);
+        ZonedDateTime now = ZonedDateTime.now();
+
+        int softDeleted = 0;
+        if (guestRouteCleanupEnabled) {
+            UUID guestId = userManagementService.getOrCreateGuestUser().getId();
+            ZonedDateTime softCutoff = now.minusDays(retentionDays);
+            softDeleted = routeRepository.softDeleteGuestRoutesCreatedBefore(
+                    guestId, softCutoff, now);
+        } else {
+            log.debug("Guest route cleanup disabled (route.cleanup.enabled=false); "
+                    + "skipping stage 1 (soft-delete of aged guest routes).");
+        }
+
+        ZonedDateTime hardCutoff = now.minusDays(purgeGraceDays);
+        int hardDeleted = routeRepository.hardDeleteSoftDeletedBefore(hardCutoff);
+
+        log.info("Route cleanup: stage 1 soft-deleted {} guest route(s) older than {} day(s); "
+                + "stage 2 hard-deleted {} soft-deleted route(s) past the {} day grace window. "
+                + "Total {}ms.",
+                softDeleted, retentionDays,
+                hardDeleted, purgeGraceDays,
+                System.currentTimeMillis() - start);
     }
 
     /**
