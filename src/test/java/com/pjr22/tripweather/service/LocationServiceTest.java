@@ -4,8 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.pjr22.tripweather.dto.LocationResolution;
+import com.pjr22.tripweather.model.GeoPoint;
 import com.pjr22.tripweather.model.GeocodeReverseCache;
 import com.pjr22.tripweather.model.LocationData;
+import com.pjr22.tripweather.model.SnappedPoint;
 import com.pjr22.tripweather.repository.GeocodeReverseCacheRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -106,15 +109,18 @@ class LocationServiceTest {
         GeocodeReverseCache cached = freshCachedEntry();
         when(reverseCacheRepository.findNearest(LON, LAT, RADIUS_METERS))
                 .thenReturn(Optional.of(cached));
-        when(routeService.getElevation(LAT, LON)).thenReturn(1655.0);
+        when(routeService.resolveLocation(LAT, LON)).thenReturn(routableResolution());
 
         LocationData result = service.reverseGeocode(LAT, LON);
 
         assertThat(result).isNotNull();
         assertThat(result.getFeatures()).hasSize(1);
-        // Elevation merged in as third coordinate.
-        assertThat(result.getFeatures().get(0).getGeometry().getCoordinates())
-                .containsExactly(-105.25, 40.0, 1655.0);
+        // Original/snapped fields populated from the resolution; the geometry
+        // coordinates are no longer mutated.
+        assertThat(result.getOriginal().getLat()).isEqualTo(LAT);
+        assertThat(result.getOriginal().getLon()).isEqualTo(LON);
+        assertThat(result.getSnapped().isRoutable()).isTrue();
+        assertThat(result.getSnapped().getElevation()).isEqualTo(1655.0);
         verify(reverseCacheRepository, never()).save(any(GeocodeReverseCache.class));
         mockServer.verify();
     }
@@ -123,7 +129,7 @@ class LocationServiceTest {
     void reverseGeocode_cacheMiss_callsApiAndPersists() {
         when(reverseCacheRepository.findNearest(LON, LAT, RADIUS_METERS))
                 .thenReturn(Optional.empty());
-        when(routeService.getElevation(LAT, LON)).thenReturn(1655.0);
+        when(routeService.resolveLocation(LAT, LON)).thenReturn(routableResolution());
 
         mockServer.expect(requestTo(String.format(
                 "https://api.geoapify.com/v1/geocode/reverse?lat=%.6f&lon=%.6f&apiKey=%s",
@@ -134,6 +140,7 @@ class LocationServiceTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getFeatures()).hasSize(1);
+        assertThat(result.getSnapped().getElevation()).isEqualTo(1655.0);
         ArgumentCaptor<GeocodeReverseCache> saved = ArgumentCaptor.forClass(GeocodeReverseCache.class);
         verify(reverseCacheRepository).save(saved.capture());
         GeocodeReverseCache stored = saved.getValue();
@@ -150,7 +157,7 @@ class LocationServiceTest {
         stale.setFetchedAt(LocalDateTime.now(fixedClock).minusDays(400));
         when(reverseCacheRepository.findNearest(LON, LAT, RADIUS_METERS))
                 .thenReturn(Optional.of(stale));
-        when(routeService.getElevation(LAT, LON)).thenReturn(1655.0);
+        when(routeService.resolveLocation(LAT, LON)).thenReturn(routableResolution());
 
         mockServer.expect(requestTo(String.format(
                 "https://api.geoapify.com/v1/geocode/reverse?lat=%.6f&lon=%.6f&apiKey=%s",
@@ -161,7 +168,14 @@ class LocationServiceTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getFeatures().get(0).getProperties().getCity()).isEqualTo("Boulder");
+        assertThat(result.getSnapped().getElevation()).isEqualTo(1655.0);
         mockServer.verify();
+    }
+
+    private static LocationResolution routableResolution() {
+        return new LocationResolution(
+                new GeoPoint(LAT, LON),
+                new SnappedPoint(LAT, LON, 1655.0, true));
     }
 
     @Test

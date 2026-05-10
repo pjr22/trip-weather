@@ -2,6 +2,7 @@ package com.pjr22.tripweather.service;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pjr22.tripweather.dto.LocationResolution;
 import com.pjr22.tripweather.model.LocationData;
 import com.pjr22.tripweather.model.OrsResponseCache;
 import com.pjr22.tripweather.model.RouteData;
@@ -35,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -68,6 +70,24 @@ class RouteServiceTest {
                   "type": "Point",
                   "coordinates": [-104.9903, 39.7392]
                 }
+              }]
+            }
+            """;
+
+    private static final String SNAP_EMPTY_RESPONSE = """
+            { "type": "FeatureCollection", "features": [] }
+            """;
+
+    private static final String ELEVATION_LOOKUP_RESPONSE = """
+            {
+              "type": "FeatureCollection",
+              "features": [{
+                "type": "Feature",
+                "geometry": {
+                  "type": "LineString",
+                  "coordinates": [[-104.9903, 39.7392, 1610.0]]
+                },
+                "properties": { "summary": { "distance": 0.0, "duration": 0.0 } }
               }]
             }
             """;
@@ -135,68 +155,124 @@ class RouteServiceTest {
     }
 
     @Test
-    void elevation_cacheHit_skipsApi() {
-        OrsResponseCache cached = new OrsResponseCache("hash-elevation", "elevation",
-                ELEVATION_RESPONSE, LocalDateTime.now(fixedClock).minusHours(1));
-        when(cacheRepository.findById(anyString())).thenReturn(Optional.of(cached));
+    void resolve_bothCachesHit_skipsApi() {
+        // resolveLocation hits snap cache first, then elevation_lookup cache.
+        // No upstream calls expected; both pre-populated entries serve the request.
+        OrsResponseCache snapCached = new OrsResponseCache("hash-snap", "snap",
+                SNAP_RESPONSE, LocalDateTime.now(fixedClock).minusHours(1));
+        OrsResponseCache lookupCached = new OrsResponseCache("hash-lookup", "elevation_lookup",
+                ELEVATION_LOOKUP_RESPONSE, LocalDateTime.now(fixedClock).minusHours(1));
+        when(cacheRepository.findById(anyString()))
+                .thenReturn(Optional.of(snapCached))
+                .thenReturn(Optional.of(lookupCached));
 
-        Double elevation = service.getElevation(LAT, LON);
+        LocationResolution resolution = service.resolveLocation(LAT, LON);
 
-        assertThat(elevation).isEqualTo(1610.0);
+        assertThat(resolution).isNotNull();
+        assertThat(resolution.getOriginal().getLat()).isEqualTo(LAT);
+        assertThat(resolution.getOriginal().getLon()).isEqualTo(LON);
+        assertThat(resolution.getSnapped().isRoutable()).isTrue();
+        assertThat(resolution.getSnapped().getElevation()).isEqualTo(1610.0);
         verify(cacheRepository, never()).save(any(OrsResponseCache.class));
         mockServer.verify();
     }
 
     @Test
-    void elevation_cacheMiss_callsApiAndPersists() {
+    void resolve_bothCachesMiss_callsApisAndPersistsBoth() {
         when(cacheRepository.findById(anyString())).thenReturn(Optional.empty());
-        mockServer.expect(requestTo("https://api.openrouteservice.org/elevation/point?geometry="
-                        + LON + "," + LAT))
-                .andRespond(withSuccess(ELEVATION_RESPONSE, MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo("https://api.openrouteservice.org/v2/snap/driving-car/geojson"))
+                .andRespond(withSuccess(SNAP_RESPONSE, MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo("https://api.openrouteservice.org/v2/directions/driving-car/geojson"))
+                .andRespond(withSuccess(ELEVATION_LOOKUP_RESPONSE, MediaType.APPLICATION_JSON));
 
-        Double elevation = service.getElevation(LAT, LON);
+        LocationResolution resolution = service.resolveLocation(LAT, LON);
 
-        assertThat(elevation).isEqualTo(1610.0);
+        assertThat(resolution.getSnapped().isRoutable()).isTrue();
+        assertThat(resolution.getSnapped().getElevation()).isEqualTo(1610.0);
+
         ArgumentCaptor<OrsResponseCache> saved = ArgumentCaptor.forClass(OrsResponseCache.class);
-        verify(cacheRepository).save(saved.capture());
-        assertThat(saved.getValue().getEndpoint()).isEqualTo("elevation");
-        assertThat(saved.getValue().getRequestHash()).hasSize(64);
+        verify(cacheRepository, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues())
+                .extracting(OrsResponseCache::getEndpoint)
+                .containsExactly("snap", "elevation_lookup");
         mockServer.verify();
     }
 
     @Test
-    void elevation_quantizationCollapsesNearbyCoordinates() {
-        // Same hash key for two coordinates that round to identical 6-decimal values.
+    void resolve_snapEmpty_fallsBackToPublicTerrainElevation() {
+        when(cacheRepository.findById(anyString())).thenReturn(Optional.empty());
+        mockServer.expect(requestTo("https://api.openrouteservice.org/v2/snap/driving-car/geojson"))
+                .andRespond(withSuccess(SNAP_EMPTY_RESPONSE, MediaType.APPLICATION_JSON));
+        // Off-road fallback bypasses the dispatcher; calls public /elevation/point directly.
+        // Coordinates serialised with %.6f so URL is deterministic regardless of locale.
+        String elevationUrl = "https://api.openrouteservice.org/elevation/point?geometry="
+                + String.format(java.util.Locale.ROOT, "%.6f,%.6f", LON, LAT);
+        mockServer.expect(requestTo(elevationUrl))
+                .andRespond(withSuccess(ELEVATION_RESPONSE, MediaType.APPLICATION_JSON));
+
+        LocationResolution resolution = service.resolveLocation(LAT, LON);
+
+        assertThat(resolution.getSnapped().isRoutable()).isFalse();
+        assertThat(resolution.getSnapped().getLat()).isEqualTo(LAT);  // mirrors original
+        assertThat(resolution.getSnapped().getLon()).isEqualTo(LON);
+        assertThat(resolution.getSnapped().getElevation()).isEqualTo(1610.0);
+
+        ArgumentCaptor<OrsResponseCache> saved = ArgumentCaptor.forClass(OrsResponseCache.class);
+        verify(cacheRepository, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues())
+                .extracting(OrsResponseCache::getEndpoint)
+                .containsExactly("snap", "elevation");
+        mockServer.verify();
+    }
+
+    @Test
+    void resolve_quantizationCollapsesNearbyCoordinates() {
+        // Two coords that round to identical 6-decimal values must produce
+        // identical snap+lookup cache keys, so the second call is a full hit.
         when(cacheRepository.findById(anyString())).thenReturn(Optional.empty());
         mockServer.expect(requestTo(org.hamcrest.Matchers.any(String.class)))
-                .andRespond(withSuccess(ELEVATION_RESPONSE, MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(SNAP_RESPONSE, MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo(org.hamcrest.Matchers.any(String.class)))
+                .andRespond(withSuccess(ELEVATION_LOOKUP_RESPONSE, MediaType.APPLICATION_JSON));
 
-        service.getElevation(39.73920000001, -104.99030000001);
+        service.resolveLocation(39.73920000001, -104.99030000001);
 
         ArgumentCaptor<OrsResponseCache> saved = ArgumentCaptor.forClass(OrsResponseCache.class);
-        verify(cacheRepository).save(saved.capture());
+        verify(cacheRepository, times(2)).save(saved.capture());
+        OrsResponseCache snapEntry = saved.getAllValues().stream()
+                .filter(e -> e.getEndpoint().equals("snap")).findFirst().orElseThrow();
+        OrsResponseCache lookupEntry = saved.getAllValues().stream()
+                .filter(e -> e.getEndpoint().equals("elevation_lookup")).findFirst().orElseThrow();
 
-        // Now look up the saved hash, and verify a second call with effectively-the-same
-        // coordinates would be looked up by the same key.
-        String savedHash = saved.getValue().getRequestHash();
-        when(cacheRepository.findById(savedHash)).thenReturn(Optional.of(saved.getValue()));
+        // Re-stub findById to return saved entries by hash; second call must hit both.
+        when(cacheRepository.findById(snapEntry.getRequestHash())).thenReturn(Optional.of(snapEntry));
+        when(cacheRepository.findById(lookupEntry.getRequestHash())).thenReturn(Optional.of(lookupEntry));
 
-        Double elevation = service.getElevation(39.73920000002, -104.99030000002);
-        assertThat(elevation).isEqualTo(1610.0);
+        LocationResolution second = service.resolveLocation(39.73920000002, -104.99030000002);
+        assertThat(second.getSnapped().getElevation()).isEqualTo(1610.0);
         mockServer.verify();
     }
 
     @Test
-    void elevation_staleEntryUpstreamFails_servesStaleWithinMax() {
-        // Stale by 30h (TTL = 720h, well within stale-max = 2160h).
-        OrsResponseCache stale = new OrsResponseCache("hash-elevation", "elevation",
-                ELEVATION_RESPONSE, LocalDateTime.now(fixedClock).minusHours(800));
-        when(cacheRepository.findById(anyString())).thenReturn(Optional.of(stale));
-        mockServer.expect(requestTo(org.hamcrest.Matchers.any(String.class))).andRespond(withServerError());
+    void resolve_staleEntriesAndUpstreamFails_servesStale() {
+        // Both caches stale (800h, TTL=720h, stale-max=2160h). Upstream errors
+        // for refresh; both stale-on-error paths return cached payloads.
+        OrsResponseCache staleSnap = new OrsResponseCache("hash-snap", "snap",
+                SNAP_RESPONSE, LocalDateTime.now(fixedClock).minusHours(800));
+        OrsResponseCache staleLookup = new OrsResponseCache("hash-lookup", "elevation_lookup",
+                ELEVATION_LOOKUP_RESPONSE, LocalDateTime.now(fixedClock).minusHours(800));
+        when(cacheRepository.findById(anyString()))
+                .thenReturn(Optional.of(staleSnap))
+                .thenReturn(Optional.of(staleLookup));
+        mockServer.expect(requestTo(org.hamcrest.Matchers.any(String.class)))
+                .andRespond(withServerError());
+        mockServer.expect(requestTo(org.hamcrest.Matchers.any(String.class)))
+                .andRespond(withServerError());
 
-        Double elevation = service.getElevation(LAT, LON);
+        LocationResolution resolution = service.resolveLocation(LAT, LON);
 
-        assertThat(elevation).isEqualTo(1610.0);
+        assertThat(resolution.getSnapped().isRoutable()).isTrue();
+        assertThat(resolution.getSnapped().getElevation()).isEqualTo(1610.0);
         mockServer.verify();
     }
 

@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -23,9 +24,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.pjr22.tripweather.Utils;
+import com.pjr22.tripweather.dto.LocationResolution;
+import com.pjr22.tripweather.model.GeoPoint;
 import com.pjr22.tripweather.model.LocationData;
 import com.pjr22.tripweather.model.OrsResponseCache;
 import com.pjr22.tripweather.model.RouteData;
+import com.pjr22.tripweather.model.SnappedPoint;
 import com.pjr22.tripweather.repository.OrsResponseCacheRepository;
 import com.pjr22.tripweather.routing.PublicOrsClient;
 import com.pjr22.tripweather.routing.RoutingDispatcher;
@@ -38,14 +42,30 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Wraps OpenRouteService with a Postgres-backed durable response cache. Each
- * of directions / snap / elevation hashes a canonical request payload (with
- * coordinates rounded to ~10 cm precision) and looks the result up in
- * {@code ors_response_cache}. On a hit within TTL, no upstream call. On a
- * miss or stale entry, calls upstream; on upstream failure with a stale
- * entry within the per-endpoint stale-max window, serves stale.
+ * of directions / snap / elevation_lookup / elevation hashes a canonical
+ * request payload (with coordinates rounded to ~10 cm precision) and looks
+ * the result up in {@code ors_response_cache}. On a hit within TTL, no
+ * upstream call. On a miss or stale entry, calls upstream; on upstream
+ * failure with a stale entry within the per-endpoint stale-max window,
+ * serves stale.
  *
- * Per-endpoint TTLs differ because routes can subtly change with road network
- * updates while snap+elevation are essentially geological.
+ * <p>Per-endpoint TTLs differ because routes can subtly change with road
+ * network updates while snap and elevation are essentially geological.
+ *
+ * <p>"Elevation" is split across two cache namespaces because we resolve it
+ * two different ways depending on where the click landed:
+ * <ul>
+ *   <li>{@link #CACHE_KIND_ELEVATION_LOOKUP} caches the response of a tiny
+ *       self-loop directions request ({@code [(lon,lat),(lon,lat)]} with
+ *       {@code elevation:true}). ORS short-circuits coincident waypoints
+ *       and returns a single-point LineString with Z; this works on both
+ *       local and public engines, where the open-source ORS image's
+ *       {@code /elevation/point} endpoint does not exist.</li>
+ *   <li>{@link #CACHE_KIND_ELEVATION} caches public {@code /elevation/point}
+ *       responses for off-road clicks where snap returned no feature, so
+ *       no road point exists to base directions on. Public ORS is the only
+ *       way to get terrain elevation at an arbitrary point.</li>
+ * </ul>
  */
 @Slf4j
 @Service
@@ -70,10 +90,14 @@ public class RouteService {
    private static final String CACHE_KIND_DIRECTIONS = "directions";
    private static final String CACHE_KIND_SNAP = "snap";
    private static final String CACHE_KIND_ELEVATION = "elevation";
+   private static final String CACHE_KIND_ELEVATION_LOOKUP = "elevation_lookup";
 
    /** Bump if the canonical request shape (or upstream response shape) changes
-    *  in a way that invalidates previously-cached entries. */
-   private static final int CACHE_KEY_VERSION = 1;
+    *  in a way that invalidates previously-cached entries. v2 retired the
+    *  {@code /elevation/point}-only elevation path in favour of the
+    *  {@code elevation_lookup}/{@code elevation} two-cache split described
+    *  on the class javadoc. */
+   private static final int CACHE_KEY_VERSION = 2;
 
    private static final int SNAP_RADIUS_METERS = 10_000;
    private static final int COORDINATE_DECIMALS = 6;
@@ -126,31 +150,119 @@ public class RouteService {
       }
    }
 
-   public Double getElevation(double latitude, double longitude) {
+   /**
+    * Resolves an arbitrary input lat/lon to a navigation-ready point with
+    * elevation. See {@link LocationResolution} for the response shape.
+    *
+    * <p>Path:
+    * <ol>
+    *   <li>Snap the input via {@link #snapToLocation(double, double)} (cached).</li>
+    *   <li>If snap returns a feature, use its coordinates as both endpoints
+    *       of a tiny self-loop directions request with {@code elevation:true}.
+    *       ORS short-circuits coincident waypoints and returns a single-point
+    *       LineString carrying the graph's stored Z. Routed through the
+    *       {@link RoutingDispatcher} so local serves it when in coverage and
+    *       public serves it otherwise.</li>
+    *   <li>If snap returns no feature (off-road click outside the 10 km snap
+    *       radius), fall back to public {@code /elevation/point} on the
+    *       original input to get terrain elevation. The local engine's
+    *       open-source build does not expose an elevation REST endpoint, so
+    *       there is nothing local to try here.</li>
+    * </ol>
+    */
+   public LocationResolution resolveLocation(double latitude, double longitude) {
       if (!publicOrs.isConfigured()) {
          return null;
       }
+
+      GeoPoint original = new GeoPoint(latitude, longitude);
+
+      LocationData snapResult = snapToLocation(latitude, longitude);
+      LocationData.Feature snapFeature = firstFeature(snapResult);
+      if (snapFeature != null) {
+         List<Double> coords = snapFeature.getGeometry().getCoordinates();
+         if (coords != null && coords.size() >= 2) {
+            double snappedLon = coords.get(0);
+            double snappedLat = coords.get(1);
+            Double elevation = elevationFromDirections(snappedLat, snappedLon);
+            return new LocationResolution(original,
+                  new SnappedPoint(snappedLat, snappedLon, elevation, true));
+         }
+      }
+
+      Double terrainElevation = elevationFromPublicTerrain(latitude, longitude);
+      return new LocationResolution(original,
+            new SnappedPoint(latitude, longitude, terrainElevation, false));
+   }
+
+   private Double elevationFromDirections(double snappedLat, double snappedLon) {
+      try {
+         String hash = elevationLookupCacheKey(snappedLat, snappedLon);
+         List<double[]> coords = List.of(
+               new double[]{snappedLon, snappedLat},
+               new double[]{snappedLon, snappedLat});
+         String body = objectMapper.writeValueAsString(
+               elevationLookupRequest(snappedLat, snappedLon));
+         JsonNode response = getOrFetchCached(hash, CACHE_KIND_ELEVATION_LOOKUP,
+               elevationTtlHours, elevationStaleMaxHours,
+               () -> dispatcher.dispatch(CACHE_KIND_ELEVATION_LOOKUP, coords,
+                     client -> client.post(DIRECTIONS_ENDPOINT, body)));
+         return extractElevationFromDirections(response);
+      } catch (Exception e) {
+         log.warn("Elevation lookup via directions failed for snapped ({}, {}): {}",
+               snappedLat, snappedLon, e.getMessage());
+         return null;
+      }
+   }
+
+   private Double elevationFromPublicTerrain(double latitude, double longitude) {
       try {
          String hash = elevationCacheKey(latitude, longitude);
-         List<double[]> coords = List.of(new double[]{longitude, latitude});
-         String path = String.format(ELEVATION_ENDPOINT + "?geometry=%s,%s", longitude, latitude);
+         String path = String.format(Locale.ROOT,
+               ELEVATION_ENDPOINT + "?geometry=%.6f,%.6f", longitude, latitude);
          JsonNode response = getOrFetchCached(hash, CACHE_KIND_ELEVATION,
                elevationTtlHours, elevationStaleMaxHours,
-               () -> dispatcher.dispatch(CACHE_KIND_ELEVATION, coords,
-                     client -> client.get(path)));
-         if (response == null) {
-            return null;
-         }
-         JsonNode coordsNode = response.path("geometry").path("coordinates");
-         if (coordsNode.isArray() && coordsNode.size() >= 3 && !coordsNode.get(2).isNull()) {
-            return coordsNode.get(2).asDouble();
-         }
-         return null;
+               () -> publicOrs.get(path));
+         return extractElevationFromPoint(response);
       } catch (Exception e) {
-         log.warn("Failed to get elevation for ({}, {}): {}",
+         log.warn("Public terrain elevation fallback failed for ({}, {}): {}",
                latitude, longitude, e.getMessage());
          return null;
       }
+   }
+
+   private static LocationData.Feature firstFeature(LocationData data) {
+      if (data == null || data.getFeatures() == null || data.getFeatures().isEmpty()) {
+         return null;
+      }
+      return data.getFeatures().get(0);
+   }
+
+   private static Double extractElevationFromDirections(JsonNode response) {
+      if (response == null) {
+         return null;
+      }
+      JsonNode coordArr = response
+            .path("features").path(0)
+            .path("geometry").path("coordinates");
+      if (coordArr.isArray() && coordArr.size() > 0) {
+         JsonNode first = coordArr.get(0);
+         if (first.isArray() && first.size() >= 3 && !first.get(2).isNull()) {
+            return first.get(2).asDouble();
+         }
+      }
+      return null;
+   }
+
+   private static Double extractElevationFromPoint(JsonNode response) {
+      if (response == null) {
+         return null;
+      }
+      JsonNode coordsNode = response.path("geometry").path("coordinates");
+      if (coordsNode.isArray() && coordsNode.size() >= 3 && !coordsNode.get(2).isNull()) {
+         return coordsNode.get(2).asDouble();
+      }
+      return null;
    }
 
    public RouteData calculateRoute(
@@ -272,6 +384,12 @@ public class RouteService {
       return pointCacheKey(CACHE_KIND_SNAP, latitude, longitude);
    }
 
+   private String elevationLookupCacheKey(double snappedLat, double snappedLon) {
+      // Keyed by the snapped point so two distinct clicks that snap to the
+      // same road node share a cache entry.
+      return pointCacheKey(CACHE_KIND_ELEVATION_LOOKUP, snappedLat, snappedLon);
+   }
+
    private String elevationCacheKey(double latitude, double longitude) {
       return pointCacheKey(CACHE_KIND_ELEVATION, latitude, longitude);
    }
@@ -331,6 +449,19 @@ public class RouteService {
       Map<String, Object> body = new HashMap<>();
       body.put("locations", List.of(List.of(longitude, latitude)));
       body.put("radius", Integer.valueOf(SNAP_RADIUS_METERS));
+      return body;
+   }
+
+   private static Map<String, Object> elevationLookupRequest(double lat, double lon) {
+      // Coincident waypoints so ORS short-circuits routing (distance=0,
+      // single-point LineString geometry) and we just get the Z back.
+      // instructions=false trims the response payload.
+      Map<String, Object> body = new LinkedHashMap<>();
+      body.put("coordinates", List.of(
+            List.of(lon, lat),
+            List.of(lon, lat)));
+      body.put("elevation", Boolean.TRUE);
+      body.put("instructions", Boolean.FALSE);
       return body;
    }
 

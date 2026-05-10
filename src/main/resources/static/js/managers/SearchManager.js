@@ -187,53 +187,39 @@ window.TripWeather.Managers.Search = {
     selectSearchResult: function(lat, lng, locationName, feature) {
         this.hideModal();
 
-        // Fetch elevation for the selected location
-        window.TripWeather.Services.Location.getElevation(lat, lng)
-            .then(function(elevation) {
-                const alt = elevation || 0;
-                
-                // Check if we're replacing a waypoint
-                const replacingWaypointSequence = window.TripWeather.Managers.Waypoint.getReplacingWaypointSequence();
-                
-                if (replacingWaypointSequence !== null) {
-                    window.TripWeather.Managers.Search.replaceWaypointLocationFromSearch(replacingWaypointSequence, lat, lng, alt, locationName, feature);
-                    window.TripWeather.Managers.Waypoint.setReplacingWaypointSequence(null);
-                } else {
-                    const waypoint = window.TripWeather.Managers.Search.addWaypointFromSearch(lat, lng, alt, locationName, feature);
-                    
-                    // Open popup for the newly added waypoint after elevation is retrieved
-                    if (waypoint && window.TripWeather.Managers.WaypointRenderer) {
-                        window.TripWeather.Managers.WaypointRenderer.openWaypointPopup(waypoint.sequence);
-                    }
-                }
-                
-                // Center map on selected location
-                window.TripWeather.Managers.Map.centerOn(lat, lng, 13);
+        // Resolve to snapped point + elevation in one call. Search results
+        // are not gated on routability (the user explicitly chose this
+        // address), so an off-road result still gets added — at the search
+        // coords with terrain elevation.
+        window.TripWeather.Services.Location.resolveLocation(lat, lng)
+            .then(function(resolution) {
+                const useLat = resolution && resolution.snapped ? resolution.snapped.lat : lat;
+                const useLng = resolution && resolution.snapped ? resolution.snapped.lng : lng;
+                const alt = resolution && resolution.snapped && resolution.snapped.elevation != null
+                    ? resolution.snapped.elevation : 0;
+                window.TripWeather.Managers.Search._addOrReplaceFromSearch(useLat, useLng, alt, locationName, feature);
+                window.TripWeather.Managers.Map.centerOn(useLat, useLng, 13);
             })
             .catch(function(error) {
-                console.warn('Failed to fetch elevation, using 0 as default:', error);
-                
-                // Fallback to 0 elevation if fetch fails
-                const alt = 0;
-                
-                // Check if we're replacing a waypoint
-                const replacingWaypointSequence = window.TripWeather.Managers.Waypoint.getReplacingWaypointSequence();
-                
-                if (replacingWaypointSequence !== null) {
-                    window.TripWeather.Managers.Search.replaceWaypointLocationFromSearch(replacingWaypointSequence, lat, lng, alt, locationName, feature);
-                    window.TripWeather.Managers.Waypoint.setReplacingWaypointSequence(null);
-                } else {
-                    const waypoint = window.TripWeather.Managers.Search.addWaypointFromSearch(lat, lng, alt, locationName, feature);
-                    
-                    // Open popup for the newly added waypoint even if elevation fetch failed
-                    if (waypoint && window.TripWeather.Managers.WaypointRenderer) {
-                        window.TripWeather.Managers.WaypointRenderer.openWaypointPopup(waypoint.sequence);
-                    }
-                }
-                
-                // Center map on selected location
+                console.warn('Failed to resolve location, falling back to search coords:', error);
+                window.TripWeather.Managers.Search._addOrReplaceFromSearch(lat, lng, 0, locationName, feature);
                 window.TripWeather.Managers.Map.centerOn(lat, lng, 13);
             });
+    },
+
+    /** Internal helper for selectSearchResult: dispatches add vs replace
+     *  based on the manager's pending-replace state. */
+    _addOrReplaceFromSearch: function(lat, lng, alt, locationName, feature) {
+        const replacingWaypointSequence = window.TripWeather.Managers.Waypoint.getReplacingWaypointSequence();
+        if (replacingWaypointSequence !== null) {
+            window.TripWeather.Managers.Search.replaceWaypointLocationFromSearch(replacingWaypointSequence, lat, lng, alt, locationName, feature);
+            window.TripWeather.Managers.Waypoint.setReplacingWaypointSequence(null);
+        } else {
+            const waypoint = window.TripWeather.Managers.Search.addWaypointFromSearch(lat, lng, alt, locationName, feature);
+            if (waypoint && window.TripWeather.Managers.WaypointRenderer) {
+                window.TripWeather.Managers.WaypointRenderer.openWaypointPopup(waypoint.sequence);
+            }
+        }
     },
 
     /**
@@ -248,9 +234,11 @@ window.TripWeather.Managers.Search = {
     addWaypointFromSearch: function(lat, lng, alt, locationName, feature) {
         // Extract location information from search result
         const locationInfo = window.TripWeather.Services.Location.extractLocationFromFeature(feature);
-        
-        // Create waypoint with pre-fetched location data, skip validation since search results are already valid
-        const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(lat, lng, alt, locationInfo, null, true);
+
+        // Create waypoint with pre-fetched location data — search results are
+        // user-intentional, so no routability gating (callers used to pass
+        // skipValidation=true; that knob has been retired).
+        const waypoint = window.TripWeather.Managers.Waypoint.addWaypoint(lat, lng, alt, locationInfo);
         
         // No need to call fetchLocationInfo since we already have all the data
         const index = window.TripWeather.Managers.Waypoint.waypoints.findIndex(w => w.sequence === waypoint.sequence);
@@ -276,9 +264,7 @@ window.TripWeather.Managers.Search = {
     replaceWaypointLocationFromSearch: function(sequence, lat, lng, alt, locationName, feature) {
         // Extract location information from search result
         const locationInfo = window.TripWeather.Services.Location.extractLocationFromFeature(feature);
-        
-        // Replace waypoint with pre-fetched location data, skip validation since search results are already valid
-        window.TripWeather.Managers.Waypoint.replaceWaypointLocation(sequence, lat, lng, alt, locationInfo, true);
+        window.TripWeather.Managers.Waypoint.replaceWaypointLocation(sequence, lat, lng, alt, locationInfo);
     },
 
     /**
@@ -577,8 +563,7 @@ window.TripWeather.Managers.Search = {
                             waypoint.lng,
                             waypoint.alt,
                             null, // No location info needed for loaded waypoints
-                            waypoint, // Pass the existing waypoint object
-                            true // Skip validation for loaded routes
+                            waypoint // Existing waypoint object — preserves the saved name
                         );
                         
                         // Fetch weather for each waypoint if date and time are available

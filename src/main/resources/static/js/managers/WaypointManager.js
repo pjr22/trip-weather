@@ -54,73 +54,62 @@ window.TripWeather.Managers.Waypoint = {
     },
 
     /**
-     * Handle map click events for waypoint creation/replacement
+     * Handle map click events for waypoint creation/replacement.
+     *
+     * Single round-trip: getLocationInfo returns the address details *and*
+     * the snap-routability + snapped point (server orchestrates snap +
+     * elevation). When the click is off-road (not routable), reject with
+     * a toast. Otherwise the waypoint is placed at the snapped road point,
+     * not the click point — the original click is preserved on the
+     * locationInfo for future use.
+     *
      * @param {L.MouseEvent} e - Leaflet mouse event
      */
     handleMapClick: function(e) {
         const self = this;
-        
-        // Validate location using snap endpoint before proceeding
-        window.TripWeather.Services.Location.snapToLocation(e.latlng.lat, e.latlng.lng)
-            .then(function(isRouteable) {
-                if (!isRouteable) {
-                    // Location is not routeable, show error and don't add waypoint
+
+        window.TripWeather.Services.Location.getLocationInfo(e.latlng.lat, e.latlng.lng)
+            .then(function(locationInfo) {
+                if (!locationInfo.routable) {
                     window.TripWeather.Utils.Helpers.showToast('That location is not routeable. Select a different location.', 'error');
                     return;
                 }
-                
-                // Location is valid, proceed with waypoint addition/replacement
+
+                const lat = locationInfo.snapped ? locationInfo.snapped.lat : e.latlng.lat;
+                const lng = locationInfo.snapped ? locationInfo.snapped.lng : e.latlng.lng;
+                const alt = locationInfo.elevation || 0;
+
                 if (self.replacingWaypointSequence !== null) {
-                    self.replaceWaypointLocation(self.replacingWaypointSequence, e.latlng.lat, e.latlng.lng, 0);
+                    self.replaceWaypointLocation(self.replacingWaypointSequence, lat, lng, alt, locationInfo);
                     self.replacingWaypointSequence = null;
                     window.TripWeather.Managers.Map.setCursor('');
                 } else {
-                    self.addWaypoint(e.latlng.lat, e.latlng.lng, 0);
+                    self.addWaypoint(lat, lng, alt, locationInfo);
                 }
             })
             .catch(function(error) {
-                console.error('Error validating location:', error);
-                // If there's an error with validation, show error message
+                console.error('Error resolving location:', error);
                 window.TripWeather.Utils.Helpers.showToast('Error validating location. Please try again.', 'error');
             });
     },
 
     /**
-     * Add a new waypoint at specified coordinates
+     * Add a new waypoint at specified coordinates.
+     *
+     * Validation (snap + routability) is now done upstream of this call —
+     * either by handleMapClick (gates on routable, calls with the snapped
+     * coords) or by callers that explicitly skip validation (search results,
+     * GPS, loaded routes). This function trusts the inputs.
+     *
      * @param {number} lat - Latitude coordinate
      * @param {number} lng - Longitude coordinate
-     * @param {number} alt - altitude
+     * @param {number} alt - Altitude
      * @param {object} locationInfo - Optional pre-fetched location information
      * @param {object} existingWaypoint - Optional existing waypoint object to load
-     * @param {boolean} skipValidation - Skip validation (true for search results/user location, false for map clicks)
      * @returns {object} - Created waypoint
      */
-    addWaypoint: function(lat, lng, alt, locationInfo, existingWaypoint, skipValidation) {
-        const self = this;
-        
-        // If validation is not skipped, validate location using snap endpoint
-        if (!skipValidation) {
-            return window.TripWeather.Services.Location.snapToLocation(lat, lng)
-                .then(function(isRouteable) {
-                    if (!isRouteable) {
-                        // Location is not routeable, show error and don't add waypoint
-                        window.TripWeather.Utils.Helpers.showToast('That location is not routeable. Select a different location.', 'error');
-                        return null;
-                    }
-                    
-                    // Location is valid, proceed with waypoint addition
-                    return self.performWaypointAddition(lat, lng, alt, locationInfo, existingWaypoint);
-                })
-                .catch(function(error) {
-                    console.error('Error validating location:', error);
-                    // If there's an error with validation, show error message
-                    window.TripWeather.Utils.Helpers.showToast('Error validating location. Please try again.', 'error');
-                    return null;
-                });
-        } else {
-            // Skip validation and proceed directly with addition
-            return this.performWaypointAddition(lat, lng, alt, locationInfo, existingWaypoint);
-        }
+    addWaypoint: function(lat, lng, alt, locationInfo, existingWaypoint) {
+        return this.performWaypointAddition(lat, lng, alt, locationInfo, existingWaypoint);
     },
     
     /**
@@ -259,41 +248,22 @@ window.TripWeather.Managers.Waypoint = {
     },
 
     /**
-     * Replace waypoint location
+     * Replace waypoint location.
+     *
+     * Validation (snap + routability) is done upstream — handleMapClick gates
+     * on routable before calling, search/GPS callers skip it. This function
+     * trusts the inputs.
+     *
      * @param {number} sequence - Sequence of waypoint to replace
      * @param {number} newLat - New latitude
      * @param {number} newLng - New longitude
      * @param {number} newAlt - New altitude
      * @param {object} locationInfo - Optional pre-fetched location information
-     * @param {boolean} skipValidation - Skip validation (true for search results, false for map clicks)
      */
-    replaceWaypointLocation: function(sequence, newLat, newLng, newAlt, locationInfo, skipValidation) {
-        const self = this;
+    replaceWaypointLocation: function(sequence, newLat, newLng, newAlt, locationInfo) {
         const waypoint = this.waypoints.find(w => w.sequence === sequence);
         if (!waypoint) return;
-        
-        // If validation is not skipped, validate location using snap endpoint
-        if (!skipValidation) {
-            window.TripWeather.Services.Location.snapToLocation(newLat, newLng)
-                .then(function(isRouteable) {
-                    if (!isRouteable) {
-                        // Location is not routeable, show error and don't replace waypoint
-                        window.TripWeather.Utils.Helpers.showToast('That location is not routeable. Select a different location.', 'error');
-                        return;
-                    }
-                    
-                    // Location is valid, proceed with waypoint replacement
-                    self.performWaypointReplacement(sequence, newLat, newLng, newAlt, locationInfo);
-                })
-                .catch(function(error) {
-                    console.error('Error validating location:', error);
-                    // If there's an error with validation, show error message
-                    window.TripWeather.Utils.Helpers.showToast('Error validating location. Please try again.', 'error');
-                });
-        } else {
-            // Skip validation and proceed directly with replacement
-            this.performWaypointReplacement(sequence, newLat, newLng, newAlt, locationInfo);
-        }
+        this.performWaypointReplacement(sequence, newLat, newLng, newAlt, locationInfo);
     },
     
     /**

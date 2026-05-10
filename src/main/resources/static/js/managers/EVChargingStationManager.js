@@ -253,9 +253,7 @@ window.TripWeather.Managers.EVChargingStation = {
                         station.latitude,
                         station.longitude,
                         0, // Elevation (not available from EV API)
-                        completeLocationInfo,
-                        null, // No existing waypoint object
-                        false // Perform validation
+                        completeLocationInfo
                     );
                     
                     if (waypoint) {
@@ -294,9 +292,7 @@ window.TripWeather.Managers.EVChargingStation = {
                         station.latitude,
                         station.longitude,
                         0, // Elevation (not available from EV API)
-                        fallbackLocationInfo,
-                        null, // No existing waypoint object
-                        false // Perform validation
+                        fallbackLocationInfo
                     );
                     
                     if (waypoint) {

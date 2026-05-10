@@ -18,13 +18,24 @@ public class LocationData {
     
     @JsonProperty("type")
     private String type;
-    
+
     @JsonProperty("features")
     private List<Feature> features;
-    
+
     @JsonProperty("query")
     private Query query;
-    
+
+    /** Caller's input lat/lon. Populated for reverse-geocode responses; null
+     *  for snap responses (where this isn't needed). */
+    @JsonProperty("original")
+    private GeoPoint original;
+
+    /** Navigation-ready point with elevation + routable flag. See
+     *  {@link SnappedPoint} for how it differs in the snap-fail (off-road)
+     *  case. Populated for reverse-geocode responses; null for snap responses. */
+    @JsonProperty("snapped")
+    private SnappedPoint snapped;
+
     // Inner classes for nested JSON structure
     @Getter
     @Setter

@@ -1,8 +1,8 @@
 package com.pjr22.tripweather.controller;
 
 import com.pjr22.tripweather.Utils;
+import com.pjr22.tripweather.dto.LocationResolution;
 import com.pjr22.tripweather.dto.RouteCalculateRequest;
-import com.pjr22.tripweather.model.LocationData;
 import com.pjr22.tripweather.model.RouteData;
 import com.pjr22.tripweather.service.RouteService;
 
@@ -35,20 +35,23 @@ public class RouteController {
         this.routeService = routeService;
     }
 
-    @GetMapping("/snap")
-    public LocationData snapToLocation(
-            @RequestParam @DecimalMin("-90.0") @DecimalMax("90.0") double lat,
-            @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") double lon) {
-
-        return routeService.snapToLocation(lat, lon);
-    }
-
+    /**
+     * Resolves a lat/lon to a navigation-ready point: snaps to the road
+     * network, returns elevation, and reports whether the input is routable.
+     *
+     * <p>The endpoint kept its {@code /elevation} path for continuity, but
+     * now returns a {@link LocationResolution} rather than a raw elevation
+     * number. Search-result and GPS flows in the frontend use the snapped
+     * point's lat/lon as the navigation waypoint and read its elevation
+     * directly. Map clicks use the {@code routable} flag to gate waypoint
+     * creation.
+     */
     @GetMapping("/elevation")
-    public Double getElevationAtPoint(
+    public LocationResolution resolveLocation(
             @RequestParam @DecimalMin("-90.0") @DecimalMax("90.0") double lat,
             @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") double lon) {
 
-        return routeService.getElevation(lat, lon);
+        return routeService.resolveLocation(lat, lon);
     }
 
     @PostMapping("/calculate")

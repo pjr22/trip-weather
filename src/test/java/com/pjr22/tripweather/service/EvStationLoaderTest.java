@@ -94,7 +94,7 @@ class EvStationLoaderTest {
 
     @BeforeEach
     void setUp() {
-        RestClient.Builder builder = RestClient.builder().baseUrl("https://developer.nrel.gov");
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://developer.nlr.gov");
         // ignoreExpectOrder so a single times(N) expectation can match all N
         // sequential batched calls without us re-listing every URL.
         mockServer = MockRestServiceServer.bindTo(builder)
@@ -116,7 +116,7 @@ class EvStationLoaderTest {
         // matching just the URL prefix lets one expectation cover all 13.
         mockServer.expect(ExpectedCount.times(BATCH_COUNT),
                         requestTo(org.hamcrest.Matchers.startsWith(
-                                "https://developer.nrel.gov/api/alt-fuel-stations/v1.geojson?")))
+                                "https://developer.nlr.gov/api/alt-fuel-stations/v1.geojson?")))
                 .andRespond(withSuccess(NREL_FEED_RESPONSE, MediaType.APPLICATION_JSON));
 
         int loaded = loader.load();

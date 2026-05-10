@@ -84,7 +84,7 @@ public class HttpClientConfig {
 
     @Bean
     public RestClient nrelRestClient(
-            @Value("${nrel.base.url:https://developer.nrel.gov}") String baseUrl) {
+            @Value("${nrel.base.url:https://developer.nlr.gov}") String baseUrl) {
         // The NREL/NLR /alt-fuel-stations endpoint has no offset parameter,
         // so the only way to get the full ~70K-row ELEC dataset is one
         // limit=all call returning ~100 MB. With the JDK HttpClient's

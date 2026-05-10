@@ -57,55 +57,48 @@ window.TripWeather.Services.Location = {
     },
 
     /**
-     * Fetch elevation for a given location
-     * @param {number} latitude - Latitude coordinate
-     * @param {number} longitude - Longitude coordinate
-     * @returns {Promise<number>} - Promise that resolves to elevation in meters
+     * Resolve a lat/lng to a navigation-ready point with elevation. The
+     * server snaps the input to the road network, retrieves elevation from
+     * the routing graph (or falls back to public terrain elevation when the
+     * input is off-road), and returns both the original input and the
+     * snapped point along with a `routable` flag.
+     *
+     * Server returns `{ original: {lat,lon}, snapped: {lat,lon,elevation,routable} }`.
+     * This wrapper renames `lon` → `lng` so the rest of the JS, which uses
+     * the Leaflet-style `lng`, doesn't have to special-case this endpoint.
+     *
+     * @param {number} latitude - Input latitude
+     * @param {number} longitude - Input longitude
+     * @returns {Promise<object>} - Resolved location with original + snapped points
      */
-    getElevation: function(latitude, longitude) {
+    resolveLocation: function(latitude, longitude) {
         const params = {
             lat: latitude,
             lon: longitude
         };
-        
-        const url = '/api/route/elevation?' + window.TripWeather.Utils.Helpers.createQueryString(params);
-        
-        return window.TripWeather.Utils.Helpers.httpGet(url)
-            .then(function(elevation) {
-                return elevation;
-            })
-            .catch(function(error) {
-                console.error('Elevation fetch error:', error);
-                throw error;
-            });
-    },
 
-    /**
-     * Validate if a location is routeable using the snap endpoint
-     * @param {number} latitude - Latitude coordinate
-     * @param {number} longitude - Longitude coordinate
-     * @returns {Promise<boolean>} - Promise that resolves to true if location is routeable, false otherwise
-     */
-    snapToLocation: function(latitude, longitude) {
-        const params = {
-            lat: latitude,
-            lon: longitude
-        };
-        
-        const url = '/api/route/snap?' + window.TripWeather.Utils.Helpers.createQueryString(params);
-        
+        const url = '/api/route/elevation?' + window.TripWeather.Utils.Helpers.createQueryString(params);
+
         return window.TripWeather.Utils.Helpers.httpGet(url)
-            .then(function(response) {
-                // Check if the response has features array and it's not empty
-                if (response && response.features && Array.isArray(response.features)) {
-                    return response.features.length > 0;
-                }
-                return false;
+            .then(function(resolution) {
+                if (!resolution) return null;
+                return {
+                    original: resolution.original
+                        ? { lat: resolution.original.lat, lng: resolution.original.lon }
+                        : null,
+                    snapped: resolution.snapped
+                        ? {
+                            lat: resolution.snapped.lat,
+                            lng: resolution.snapped.lon,
+                            elevation: resolution.snapped.elevation,
+                            routable: resolution.snapped.routable
+                        }
+                        : null
+                };
             })
             .catch(function(error) {
-                console.error('Snap validation error:', error);
-                // If there's an error with the snap endpoint, assume the location is not routeable
-                return false;
+                console.error('Location resolve error:', error);
+                throw error;
             });
     },
 

@@ -3,6 +3,7 @@ package com.pjr22.tripweather.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
+import com.pjr22.tripweather.dto.LocationResolution;
 import com.pjr22.tripweather.model.GeocodeReverseCache;
 import com.pjr22.tripweather.model.LocationData;
 import com.pjr22.tripweather.repository.GeocodeReverseCacheRepository;
@@ -86,7 +87,7 @@ public class LocationService {
             if (LocalDateTime.now(clock).isBefore(refreshAfter)) {
                 LocationData fresh = deserializeOrNull(entry.getResponseJson());
                 if (fresh != null) {
-                    return mergeElevation(fresh, latitude, longitude);
+                    return mergeResolution(fresh, latitude, longitude);
                 }
             }
             stale = deserializeOrNull(entry.getResponseJson());
@@ -109,13 +110,13 @@ public class LocationService {
                     log.warn("Failed to persist reverse-geocode cache entry for ({}, {})",
                             latitude, longitude, e);
                 }
-                return mergeElevation(parsed, latitude, longitude);
+                return mergeResolution(parsed, latitude, longitude);
             }
         } catch (Exception e) {
             if (stale != null) {
                 log.warn("Reverse-geocode refresh failed for ({}, {}); serving stale cached entry",
                         latitude, longitude, e);
-                return mergeElevation(stale, latitude, longitude);
+                return mergeResolution(stale, latitude, longitude);
             }
             // Preserve prior behavior: any failure on a true cache miss surfaces
             // to the caller. The controller wraps this in a 500 response.
@@ -145,12 +146,14 @@ public class LocationService {
         return response;
     }
 
-    private LocationData mergeElevation(LocationData data, double latitude, double longitude) {
-        Double elevation = routeService.getElevation(latitude, longitude);
-        if (elevation != null && data != null
-                && data.getFeatures() != null
-                && !data.getFeatures().isEmpty()) {
-            data.getFeatures().get(0).getGeometry().getCoordinates().add(elevation);
+    private LocationData mergeResolution(LocationData data, double latitude, double longitude) {
+        if (data == null) {
+            return null;
+        }
+        LocationResolution resolution = routeService.resolveLocation(latitude, longitude);
+        if (resolution != null) {
+            data.setOriginal(resolution.getOriginal());
+            data.setSnapped(resolution.getSnapped());
         }
         return data;
     }

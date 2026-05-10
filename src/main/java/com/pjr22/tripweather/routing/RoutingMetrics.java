@@ -37,7 +37,11 @@ public class RoutingMetrics {
     private static final String ENDPOINT_TAG = "endpoint";
     private static final String REASON_TAG   = "reason";
 
-    private static final String[] ENDPOINTS = {"directions", "snap", "elevation"};
+    // "elevation_lookup" is the tiny self-loop directions request used to pull
+    // elevation from ORS's graph (RouteService.resolveLocation). Public ORS's
+    // /elevation/point fallback for off-road clicks bypasses the dispatcher,
+    // since the local engine has no elevation REST endpoint to attempt.
+    private static final String[] ENDPOINTS = {"directions", "snap", "elevation_lookup"};
     private static final String[] REASONS = {
             Reason.DISABLED,
             Reason.OUT_OF_COVERAGE,

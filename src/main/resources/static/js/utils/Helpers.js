@@ -18,6 +18,9 @@ window.TripWeather.Utils.Helpers = {
             return {
                 locationName: 'Unknown',
                 elevation: 0,
+                routable: true,
+                original: null,
+                snapped: null,
                 timezoneName: '',
                 timezoneStdOffset: '',
                 timezoneDstOffset: '',
@@ -25,11 +28,10 @@ window.TripWeather.Utils.Helpers = {
                 timezoneDstAbbr: ''
             };
         }
-        
+
         const feature = data.features[0];
         const properties = feature.properties;
-        const geometry = feature.geometry;
-        
+
         // Build location name from address components (same logic as server-side generateLocationName)
         let locationName = '';
         if (properties.address_line1) {
@@ -43,43 +45,55 @@ window.TripWeather.Utils.Helpers = {
             if (locationName) locationName += ', ';
             locationName += properties.state_code.trim();
         }
-        
+
         // Fallback to address_line2 if we still don't have anything
         if (!locationName && properties.address_line2) {
             locationName = properties.address_line2.trim();
         }
-        
+
         // Final fallback to formatted field
         if (!locationName && properties.formatted) {
             locationName = properties.formatted.trim();
         }
 
-        // Extract elevation from API response
-        let elevation = 0;
-        if (geometry && geometry.coordinates && geometry.coordinates.length > 2) {
-            elevation = geometry.coordinates[2];
-        }
-        
+        // Reverse-geocode responses carry the snap+elevation info in `data.snapped`.
+        // Search-feature inputs (from extractLocationFromFeature) don't — callers
+        // separately call resolveLocation for those.
+        const original = data.original
+            ? { lat: data.original.lat, lng: data.original.lon }
+            : null;
+        const snapped = data.snapped
+            ? {
+                lat: data.snapped.lat,
+                lng: data.snapped.lon,
+                elevation: data.snapped.elevation,
+                routable: data.snapped.routable
+            }
+            : null;
+        const elevation = snapped && snapped.elevation != null ? snapped.elevation : 0;
+        const routable = snapped ? snapped.routable : true;
+
         // Extract all timezone information from API response
         let timezoneName = '';
         let timezoneStdOffset = '';
         let timezoneDstOffset = '';
         let timezoneStdAbbr = '';
         let timezoneDstAbbr = '';
-        
+
         if (properties.timezone) {
             timezoneName = properties.timezone.name || '';
             timezoneStdOffset = properties.timezone.offset_STD || '';
             timezoneDstOffset = properties.timezone.offset_DST || '';
             timezoneStdAbbr = properties.timezone.abbreviation_STD || '';
             timezoneDstAbbr = properties.timezone.abbreviation_DST || '';
-            
-            // Note: The 'timezone' field is deprecated and has been removed
         }
-        
+
         return {
             locationName: locationName || 'Unknown',
-            elevation: elevation || 0,
+            elevation: elevation,
+            routable: routable,
+            original: original,
+            snapped: snapped,
             timezoneName: timezoneName,
             timezoneStdOffset: timezoneStdOffset,
             timezoneDstOffset: timezoneDstOffset,
