@@ -12,58 +12,27 @@ import org.springframework.http.ResponseEntity;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Authorization (X-Admin-Token header / ROLE_ADMIN session) is enforced by the
+ * admin SecurityFilterChain — see SecurityConfig and XAdminTokenAuthenticationFilter
+ * — not the controller. These tests cover the loader-dispatch behaviour the
+ * controller is responsible for.
+ */
 @ExtendWith(MockitoExtension.class)
 class AdminControllerTest {
-
-    private static final String TOKEN = "secret-token";
 
     @Mock private ObjectProvider<GeofabrikCoverageLoader> loaderProvider;
     @Mock private GeofabrikCoverageLoader loader;
 
     @Test
-    void refuses_when_token_unconfigured() {
-        AdminController controller = new AdminController(loaderProvider, "");
-
-        ResponseEntity<Map<String, String>> response =
-                controller.refreshCoverage("colorado", TOKEN);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(response.getBody().get("error")).contains("admin token not configured");
-        verify(loaderProvider, never()).getIfAvailable();
-    }
-
-    @Test
-    void refuses_when_token_mismatched() {
-        AdminController controller = new AdminController(loaderProvider, TOKEN);
-
-        ResponseEntity<Map<String, String>> response =
-                controller.refreshCoverage("colorado", "wrong");
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(response.getBody().get("error")).isEqualTo("forbidden");
-    }
-
-    @Test
-    void refuses_when_token_missing() {
-        AdminController controller = new AdminController(loaderProvider, TOKEN);
-
-        ResponseEntity<Map<String, String>> response =
-                controller.refreshCoverage("colorado", null);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-    }
-
-    @Test
     void returns_503_when_local_ors_disabled() {
         when(loaderProvider.getIfAvailable()).thenReturn(null);
-        AdminController controller = new AdminController(loaderProvider, TOKEN);
+        AdminController controller = new AdminController(loaderProvider);
 
         ResponseEntity<Map<String, String>> response =
-                controller.refreshCoverage("colorado", TOKEN);
+                controller.refreshCoverage("colorado");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getBody().get("error")).contains("local ORS not enabled");
@@ -72,15 +41,15 @@ class AdminControllerTest {
     @Test
     void calls_loader_and_returns_200_on_success() {
         when(loaderProvider.getIfAvailable()).thenReturn(loader);
-        AdminController controller = new AdminController(loaderProvider, TOKEN);
+        AdminController controller = new AdminController(loaderProvider);
 
         ResponseEntity<Map<String, String>> response =
-                controller.refreshCoverage("colorado", TOKEN);
+                controller.refreshCoverage("colorado");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("status")).isEqualTo("refreshed");
         assertThat(response.getBody().get("region")).isEqualTo("colorado");
-        verify(loader).refresh("colorado");
+        org.mockito.Mockito.verify(loader).refresh("colorado");
     }
 
     @Test
@@ -88,10 +57,10 @@ class AdminControllerTest {
         when(loaderProvider.getIfAvailable()).thenReturn(loader);
         org.mockito.Mockito.doThrow(new IllegalArgumentException("Region 'wyoming' is not in trip.routing.local-regions"))
                 .when(loader).refresh("wyoming");
-        AdminController controller = new AdminController(loaderProvider, TOKEN);
+        AdminController controller = new AdminController(loaderProvider);
 
         ResponseEntity<Map<String, String>> response =
-                controller.refreshCoverage("wyoming", TOKEN);
+                controller.refreshCoverage("wyoming");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
@@ -101,10 +70,10 @@ class AdminControllerTest {
         when(loaderProvider.getIfAvailable()).thenReturn(loader);
         org.mockito.Mockito.doThrow(new RuntimeException("geofabrik 503"))
                 .when(loader).refresh("colorado");
-        AdminController controller = new AdminController(loaderProvider, TOKEN);
+        AdminController controller = new AdminController(loaderProvider);
 
         ResponseEntity<Map<String, String>> response =
-                controller.refreshCoverage("colorado", TOKEN);
+                controller.refreshCoverage("colorado");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
         assertThat(response.getBody().get("error")).contains("geofabrik 503");

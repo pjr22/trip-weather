@@ -8,7 +8,8 @@ import org.springframework.test.context.TestPropertySource;
 @TestPropertySource(properties = {
         "spring.datasource.password=tripdb",
         "trip.email.enabled=false",
-        "trip.auth.remember-me.enabled=false"
+        "trip.auth.remember-me.enabled=false",
+        "trip.admin.enabled=false"
 })
 class TripweatherApplicationTests {
 

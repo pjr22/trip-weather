@@ -60,5 +60,25 @@ public class StartupConfigValidator implements EnvironmentPostProcessor {
                 );
             }
         }
+
+        boolean adminEnabled = Boolean.parseBoolean(
+                environment.getProperty("trip.admin.enabled", "true"));
+        if (adminEnabled) {
+            String adminUsername = environment.getProperty("trip.admin.username");
+            String adminPassword = environment.getProperty("trip.admin.password");
+            if (adminUsername == null || adminUsername.isBlank()
+                    || adminPassword == null || adminPassword.isBlank()) {
+                throw new IllegalStateException(
+                        "Admin console is enabled (trip.admin.enabled=true) but "
+                      + "TRIP_ADMIN_USERNAME and/or TRIP_ADMIN_PASSWORD is missing.\n"
+                      + "These set the single operator credential for the /admin/ console "
+                      + "(BCrypt-hashed in memory at startup). Set them in the environment, "
+                      + "for example:\n"
+                      + "  export TRIP_ADMIN_USERNAME='admin'\n"
+                      + "  export TRIP_ADMIN_PASSWORD=\"$(openssl rand -base64 24)\"\n"
+                      + "or disable the console locally with TRIP_ADMIN_ENABLED=false."
+                );
+            }
+        }
     }
 }
