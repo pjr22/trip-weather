@@ -202,7 +202,18 @@ Then open http://localhost:8090.
 
 When `TRIP_EMAIL_ENABLED=false`, the app logs would-be email bodies (verification and password-reset links included) at INFO level instead of sending them — useful for the verify / reset flow without provisioning Mailtrap. Set `TRIP_AUTH_EMAIL_TOKEN_LIFETIME_MINUTES` to a larger value if 5 minutes feels too tight while you're testing.
 
-Developer documentation — architecture, module layout, API endpoints, WMS layer handling — lives in [HOWTO_LOCAL_MAP.md](HOWTO_LOCAL_MAP.md) and inline in the source. The user-accounts feature has its own design document in [USER_ACCOUNTS_PLAN.md](USER_ACCOUNTS_PLAN.md). A full code review with known issues and priorities is in [CODE_REVIEW.md](CODE_REVIEW.md).
+### Going easier on the external APIs
+
+Out of the box the app caches aggressively in Postgres — weather forecasts, NWS gridpoint lookups, reverse-geocodes, and OpenRouteService responses — so repeat clicks on the same waypoints, share-link reloads, and returning users mostly hit cache instead of upstream. NREL EV-station data is pulled into a local mirror once a week and served from there.
+
+Two optional sidecars push it further, both documented in [LOCAL_CACHING_HOSTING.md](LOCAL_CACHING_HOSTING.md):
+
+- An **nginx caching reverse proxy** in front of OpenStreetMap tiles and weather.gov icons. Browser hits the proxy; the proxy serves repeats from disk. Useful if a single deployment fans out to many users.
+- A **self-hosted OpenRouteService engine** for the regions you care about, with automatic fallback to public ORS for routes that leave coverage. Driven by Geofabrik OSM extracts. Useful if your users do a lot of in-region routing and you have the RAM (~8 GB for the Western US extract; ~2 GB for a single state).
+
+Both are off by default. The defaults go straight to the public APIs and need none of this to work.
+
+Developer documentation — architecture, module layout, API endpoints, WMS layer handling — lives in [HOWTO_LOCAL_MAP.md](HOWTO_LOCAL_MAP.md) and inline in the source. The user-accounts feature has its own design document in [USER_ACCOUNTS_PLAN.md](USER_ACCOUNTS_PLAN.md), and the caching / self-hosting plan is in [LOCAL_CACHING_HOSTING.md](LOCAL_CACHING_HOSTING.md). A full code review with known issues and priorities is in [CODE_REVIEW.md](CODE_REVIEW.md).
 
 ---
 
