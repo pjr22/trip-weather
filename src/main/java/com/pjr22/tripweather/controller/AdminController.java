@@ -1,6 +1,8 @@
 package com.pjr22.tripweather.controller;
 
+import com.pjr22.tripweather.model.LoaderRun.TriggerType;
 import com.pjr22.tripweather.routing.GeofabrikCoverageLoader;
+import com.pjr22.tripweather.service.LoaderRunRecorder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
@@ -46,11 +48,21 @@ public class AdminController {
                     .body(Map.of("error", "local ORS not enabled (trip.local.ors.enabled=false)"));
         }
 
+        // Phase 2 of ADMIN_CONSOLE.md: every refresh records a loader_runs
+        // row. Production cron (docker/refreshOrsGraph.sh) calls this
+        // endpoint, so its refreshes show up in the admin history alongside
+        // manual ones with trigger=CRON / MANUAL respectively.
         try {
-            loader.refresh(region);
+            loader.refresh(region, TriggerType.CRON);
             return ResponseEntity.ok(Map.of("status", "refreshed", "region", region));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (LoaderRunRecorder.RunInProgressException e) {
+            // Another refresh (manual or cron) is in flight for this
+            // region. Tell the cron to back off; on the next minute's
+            // crontab tick the in-flight run will have finished.
+            return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Coverage refresh failed for region '{}'", region, e);

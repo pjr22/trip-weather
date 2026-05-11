@@ -3,6 +3,7 @@ export TRIP_EMAIL_URL=https://send.api.mailtrap.io/api/send
 export TRIP_EMAIL_APIKEY=`cat mailtrap_api_key.txt`
 export TRIP_EMAIL_FROM=tripweather@pjr22.com
 export TRIP_APP_BASE_URL=https://tripweather.pjr22.com
+export TRIP_LOCAL_APP_BASE_URL=http://localhost:8091
 export TRIP_COOKIE_SECURE=false
 export OPENROUTESERVICE_API_KEY=`cat openRouteService_api_key.txt`
 export GEOAPIFY_API_KEY=`cat geoApify_api_key.txt`
@@ -13,21 +14,23 @@ export TRIP_TILE_PROXY_BASE_URL=http://localhost:8091
 export TRIP_LOCAL_ORS_ENABLED=true
 export TRIP_ROUTING_LOCAL_REGIONS=california,nevada,oregon,washington,idaho,utah,arizona,new-mexico,montana,wyoming,colorado
 export TRIP_LOCAL_ORS_BASE_URL=http://localhost:8082/ors
-export TRIP_ADMIN_REFRESH_TOKEN="$(openssl rand -hex 32)"
+export TRIP_ADMIN_REFRESH_TOKEN=`cat admin_refresh_token.txt`
+export TRIP_REMEMBER_ME_KEY=`cat remember_me_key.txt`
 
 echo "TRIP_EMAIL_ENABLED=$TRIP_EMAIL_ENABLED"
 echo "TRIP_EMAIL_URL=$TRIP_EMAIL_URL"
 echo "TRIP_EMAIL_APIKEY=$TRIP_EMAIL_APIKEY"
 echo "TRIP_EMAIL_FROM=$TRIP_EMAIL_FROM"
 echo "TRIP_APP_BASE_URL=$TRIP_APP_BASE_URL"
+echo "TRIP_LOCAL_APP_BASE_URL=$TRIP_LOCAL_APP_BASE_URL"
 echo "TRIP_COOKIE_SECURE=$TRIP_COOKIE_SECURE"
 echo "Using OpenRouteService API key: $OPENROUTESERVICE_API_KEY"
 echo "Using GeoApify API key: $GEOAPIFY_API_KEY"
 echo "Using NREL API key: $NREL_API_KEY"
+echo "TRIP_ADMIN_REFRESH_TOKEN=$TRIP_ADMIN_REFRESH_TOKEN"
 echo "TRIP_REMEMBER_ME_KEY=$TRIP_REMEMBER_ME_KEY"
 echo "TRIP_TILE_PROXY_ENABLED=$TRIP_TILE_PROXY_ENABLED"
 echo "TRIP_TILE_PROXY_BASE_URL=$TRIP_TILE_PROXY_BASE_URL"
 echo "TRIP_LOCAL_ORS_ENABLED=$TRIP_LOCAL_ORS_ENABLED"
 echo "TRIP_LOCAL_ORS_BASE_URL=$TRIP_LOCAL_ORS_BASE_URL"
-echo "TRIP_ADMIN_REFRESH_TOKEN=$TRIP_ADMIN_REFRESH_TOKEN"
 echo "TRIP_ROUTING_LOCAL_REGIONS=$TRIP_ROUTING_LOCAL_REGIONS"

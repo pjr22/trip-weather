@@ -373,3 +373,315 @@ button.primary:hover {
     outline: 2px solid #2563eb;
     outline-offset: 2px;
 }
+
+/* ----- Data / Loaders view --------------------------------------------- */
+
+.data-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.data-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.data-card-header {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 12px 16px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.data-card-header h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.data-card-subtitle {
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.data-card-actions {
+    margin-left: auto;
+}
+
+.data-card-body {
+    padding: 8px 16px 12px 16px;
+}
+
+.data-empty {
+    color: #6b7280;
+    font-size: 13px;
+    padding: 12px 0;
+    text-align: center;
+}
+
+.data-card-note {
+    background: #eff6ff;
+    border-left: 3px solid #2563eb;
+    color: #1e3a8a;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 10px 12px;
+    margin: 6px 0 10px 0;
+    border-radius: 0 4px 4px 0;
+}
+
+.data-card-note strong {
+    color: #1e3a8a;
+}
+
+.data-card-note code {
+    background: #dbeafe;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+}
+
+.data-loader-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+        "main actions"
+        "error error"
+        "history history";
+    gap: 8px 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.data-loader-row:last-child {
+    border-bottom: none;
+}
+
+.data-loader-main {
+    grid-area: main;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    align-items: baseline;
+}
+
+.data-loader-actions {
+    grid-area: actions;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.data-loader-name {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: #111827;
+    font-weight: 500;
+}
+
+.data-loader-meta {
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.data-status {
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.data-status-running { color: #2563eb; }
+.data-status-success { color: #059669; }
+.data-status-fail    { color: #dc2626; }
+.data-status-never   { color: #9ca3af; }
+
+.data-error {
+    grid-area: error;
+    color: #b91c1c;
+    background: #fef2f2;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: ui-monospace, monospace;
+    white-space: pre-wrap;
+}
+
+.data-history {
+    grid-area: history;
+}
+
+.data-history:empty {
+    display: none;
+}
+
+.data-history-loading,
+.data-history-empty {
+    color: #6b7280;
+    font-size: 13px;
+    padding: 8px 0;
+}
+
+.data-history-table {
+    margin-top: 4px;
+    font-size: 12px;
+}
+
+.data-history-table td {
+    padding: 6px 10px;
+}
+
+.data-history-error {
+    color: #b91c1c;
+    font-family: ui-monospace, monospace;
+    max-width: 360px;
+    word-break: break-word;
+}
+
+/* ----- Pbf rows (Data tab, Phase 2b) ------------------------------------ */
+
+.data-pbf-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+        "main actions"
+        "error error";
+    gap: 8px 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.data-pbf-row:last-child {
+    border-bottom: none;
+}
+
+.data-pbf-main {
+    grid-area: main;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.data-pbf-name {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.data-pbf-state {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+}
+
+.data-pbf-state-uptodate { color: #059669; }
+.data-pbf-state-stale    { color: #d97706; }   /* noticeable amber */
+.data-pbf-state-stuck    { color: #dc2626; }
+.data-pbf-state-inflight { color: #2563eb; }
+.data-pbf-state-unknown  { color: #9ca3af; }
+.data-pbf-state-inactive { opacity: 0.7; }
+
+.data-pbf-meta {
+    color: #4b5563;
+    font-size: 12px;
+}
+
+.data-pbf-url {
+    color: #6b7280;
+    font-family: ui-monospace, monospace;
+    word-break: break-all;
+}
+
+.data-pbf-actions {
+    grid-area: actions;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: flex-start;
+}
+
+.data-pbf-actions button {
+    font-size: 12px;
+    padding: 4px 8px;
+}
+
+.data-pbf-actions button.danger {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+}
+
+.data-pbf-actions button.danger:hover {
+    background: #b91c1c;
+}
+
+.data-pbf-row .data-error {
+    grid-area: error;
+}
+
+/* Edit / Add form, rendered inline in place of a row. */
+.data-pbf-editing {
+    background: #f9fafb;
+    border-radius: 4px;
+    padding: 12px;
+}
+
+.data-pbf-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 16px;
+}
+
+.data-pbf-form label {
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+    color: #4b5563;
+    gap: 3px;
+}
+
+.data-pbf-form label input[type="text"],
+.data-pbf-form label input[type="url"],
+.data-pbf-form label input[type="number"],
+.data-pbf-form label input[type="datetime-local"],
+.data-pbf-form label input:not([type]) {
+    padding: 6px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.data-pbf-form label input[readonly] {
+    background: #e5e7eb;
+    color: #6b7280;
+}
+
+.data-pbf-form-checkbox {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 6px !important;
+}
+
+.data-pbf-form-checkbox input {
+    width: auto;
+}
+
+.data-pbf-form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}

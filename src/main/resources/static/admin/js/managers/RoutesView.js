@@ -96,23 +96,32 @@
                 message:
                     'Run the two-stage cleanup now?\n\n' +
                     'Stage 1 soft-deletes guest routes past the retention window.\n' +
-                    'Stage 2 hard-deletes any soft-deleted route past the grace window.',
+                    'Stage 2 hard-deletes any soft-deleted route past the grace window.\n\n' +
+                    'Progress is recorded in the Data tab’s loader history.',
                 confirmLabel: 'Run cleanup'
             }).then(function (ok) {
                 if (!ok) return;
                 cleanupBtn.disabled = true;
-                AdminApi.post('/api/admin/cleanup/trigger').then(function () {
-                    showMessage('Cleanup triggered. Refreshing list in a moment…', 'ok');
-                    // The async cleanup may take a beat; refresh after a
-                    // short delay so the operator sees the effect on the
-                    // visible page.
-                    setTimeout(function () {
-                        cleanupBtn.disabled = false;
-                        loadAndRender();
-                    }, 1500);
+                // Phase 2: cleanup is now one of several loaders managed
+                // through /api/admin/loaders. The Data tab is the durable
+                // place to watch progress; we still refresh the list here
+                // so soft-deleted rows that the cleanup affects show up.
+                AdminApi.post('/api/admin/loaders/guest-route-cleanup/trigger').then(function () {
+                    showMessage('Cleanup triggered. See Data tab for progress.', 'ok');
+                    // Stagger reloads so soft-deleted rows appear quickly even
+                    // when the cleanup completes in well under 1.5 s. Routes
+                    // tab doesn't poll loaders directly — these reloads pick
+                    // up the route-list changes the cleanup made.
+                    setTimeout(function () { cleanupBtn.disabled = false; loadAndRender(); }, 600);
+                    setTimeout(loadAndRender, 1500);
+                    setTimeout(loadAndRender, 3000);
                 }).catch(function (err) {
                     cleanupBtn.disabled = false;
-                    showMessage('Cleanup trigger failed: ' + (err && err.message), 'err');
+                    if (err && err.status === 409) {
+                        showMessage('Cleanup is already running — see Data tab.', 'err');
+                    } else {
+                        showMessage('Cleanup trigger failed: ' + (err && err.message), 'err');
+                    }
                 });
             });
         });

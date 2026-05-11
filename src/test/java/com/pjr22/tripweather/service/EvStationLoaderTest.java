@@ -1,6 +1,8 @@
 package com.pjr22.tripweather.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pjr22.tripweather.model.LoaderRun;
+import com.pjr22.tripweather.model.LoaderRun.TriggerType;
 import com.pjr22.tripweather.repository.EvStationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,14 +23,17 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
@@ -79,12 +84,26 @@ class EvStationLoaderTest {
     @Mock private EvStationRepository repository;
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private TaskScheduler taskScheduler;
+    @Mock private LoaderRunRecorder recorder;
 
     private MockRestServiceServer mockServer;
     private RestClient restClient;
     private ObjectMapper objectMapper;
     private Clock fixedClock;
     private EvStationLoader loader;
+
+    /** Stand-in run returned by recorder.start(). The loader threads it
+     *  through to recorder.success / recorder.fail; the actual id and
+     *  timestamps don't matter for these tests. */
+    private LoaderRun fakeRun(TriggerType trigger) {
+        LoaderRun run = new LoaderRun();
+        run.setId(1L);
+        run.setLoaderName(EvStationLoader.LOADER_NAME);
+        run.setTriggerType(trigger);
+        run.setStatus(LoaderRun.Status.RUNNING);
+        run.setStartedAt(ZonedDateTime.now());
+        return run;
+    }
 
     /** The loader issues one filtered call per Batch in EvStationLoader.BATCHES.
      *  Tests that exercise the success path expect this many calls; the
@@ -105,7 +124,7 @@ class EvStationLoaderTest {
         fixedClock = Clock.fixed(Instant.parse("2030-04-01T04:00:00Z"), ZoneOffset.UTC);
 
         loader = new EvStationLoader(restClient, repository, jdbcTemplate, objectMapper,
-                taskScheduler, fixedClock, API_KEY,
+                taskScheduler, fixedClock, recorder, API_KEY,
                 /* loaderEnabled */ true,
                 /* bootstrapOnEmpty */ true);
     }
@@ -134,18 +153,23 @@ class EvStationLoaderTest {
 
     @Test
     void runWithRetryOnFailure_schedulesOneHourRetryWhenLoadFails() {
+        when(recorder.start(eq(EvStationLoader.LOADER_NAME), eq(TriggerType.CRON)))
+                .thenReturn(fakeRun(TriggerType.CRON));
         mockServer.expect(requestTo(org.hamcrest.Matchers.any(String.class)))
                 .andRespond(withServerError());
 
-        loader.runWithRetryOnFailure();
+        loader.runWithRetryOnFailure(TriggerType.CRON);
 
         verify(taskScheduler).schedule(any(Runnable.class), eq(fixedClock.instant().plusSeconds(3600)));
         verify(jdbcTemplate, never()).update(anyString(), any(Timestamp.class));
+        verify(recorder).fail(any(LoaderRun.class), any(Throwable.class));
         mockServer.verify();
     }
 
     @Test
     void runWithRetryOnFailure_rateLimited_honorsRetryAfterHeader() {
+        when(recorder.start(eq(EvStationLoader.LOADER_NAME), eq(TriggerType.CRON)))
+                .thenReturn(fakeRun(TriggerType.CRON));
         // 30-second Retry-After should beat the default 1h retry delay.
         mockServer.expect(requestTo(org.hamcrest.Matchers.any(String.class)))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
@@ -153,21 +177,24 @@ class EvStationLoaderTest {
                         .body("{\"error\":{\"code\":\"OVER_RATE_LIMIT\"}}")
                         .contentType(MediaType.APPLICATION_JSON));
 
-        loader.runWithRetryOnFailure();
+        loader.runWithRetryOnFailure(TriggerType.CRON);
 
         verify(taskScheduler).schedule(any(Runnable.class),
                 eq(fixedClock.instant().plusSeconds(30)));
+        verify(recorder).fail(any(LoaderRun.class), any(Throwable.class));
         mockServer.verify();
     }
 
     @Test
     void runWithRetryOnFailure_rateLimitedWithoutRetryAfter_fallsBackToDefaultDelay() {
+        when(recorder.start(eq(EvStationLoader.LOADER_NAME), eq(TriggerType.CRON)))
+                .thenReturn(fakeRun(TriggerType.CRON));
         mockServer.expect(requestTo(org.hamcrest.Matchers.any(String.class)))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
                         .body("{\"error\":{\"code\":\"OVER_RATE_LIMIT\"}}")
                         .contentType(MediaType.APPLICATION_JSON));
 
-        loader.runWithRetryOnFailure();
+        loader.runWithRetryOnFailure(TriggerType.CRON);
 
         // Falls back to RETRY_DELAY (1h).
         verify(taskScheduler).schedule(any(Runnable.class),
@@ -177,23 +204,56 @@ class EvStationLoaderTest {
 
     @Test
     void runWithRetryOnFailure_successPath_doesNotScheduleRetry() {
+        when(recorder.start(eq(EvStationLoader.LOADER_NAME), eq(TriggerType.CRON)))
+                .thenReturn(fakeRun(TriggerType.CRON));
         mockServer.expect(ExpectedCount.times(BATCH_COUNT),
                         requestTo(org.hamcrest.Matchers.any(String.class)))
                 .andRespond(withSuccess(NREL_FEED_RESPONSE, MediaType.APPLICATION_JSON));
 
-        loader.runWithRetryOnFailure();
+        loader.runWithRetryOnFailure(TriggerType.CRON);
 
         verify(jdbcTemplate, times(BATCH_COUNT))
                 .batchUpdate(anyString(), any(BatchPreparedStatementSetter.class));
         verify(jdbcTemplate, times(1)).update(anyString(), any(Timestamp.class));
         verify(taskScheduler, never()).schedule(any(Runnable.class), any(Instant.class));
+        verify(recorder).success(any(LoaderRun.class), anyLong());
         mockServer.verify();
+    }
+
+    @Test
+    void runWithRetryOnFailure_runInProgress_skipsCronWithoutThrowing() {
+        // Recorder reports another run already in flight; the loader must
+        // log-and-skip on the CRON path and NOT throw or hit the network.
+        when(recorder.start(eq(EvStationLoader.LOADER_NAME), eq(TriggerType.CRON)))
+                .thenThrow(new LoaderRunRecorder.RunInProgressException(EvStationLoader.LOADER_NAME));
+
+        loader.runWithRetryOnFailure(TriggerType.CRON);
+
+        verify(jdbcTemplate, never()).batchUpdate(anyString(), any(BatchPreparedStatementSetter.class));
+        verify(taskScheduler, never()).schedule(any(Runnable.class), any(Instant.class));
+        // No mock requests expected; verify nothing slipped through.
+        mockServer.verify();
+    }
+
+    @Test
+    void runWithRetryOnFailure_runInProgress_propagatesOnManualPath() {
+        // On a MANUAL trigger the conflict must propagate so the controller
+        // can map it to HTTP 409.
+        when(recorder.start(eq(EvStationLoader.LOADER_NAME), eq(TriggerType.MANUAL)))
+                .thenThrow(new LoaderRunRecorder.RunInProgressException(EvStationLoader.LOADER_NAME));
+
+        try {
+            loader.runWithRetryOnFailure(TriggerType.MANUAL);
+            org.junit.jupiter.api.Assertions.fail("Expected RunInProgressException");
+        } catch (LoaderRunRecorder.RunInProgressException expected) {
+            assertThat(expected.getMessage()).contains(EvStationLoader.LOADER_NAME);
+        }
     }
 
     @Test
     void loaderDisabled_scheduledLoadIsNoOp() {
         EvStationLoader disabled = new EvStationLoader(restClient, repository, jdbcTemplate,
-                objectMapper, taskScheduler, fixedClock, API_KEY,
+                objectMapper, taskScheduler, fixedClock, recorder, API_KEY,
                 /* loaderEnabled */ false,
                 /* bootstrapOnEmpty */ true);
 

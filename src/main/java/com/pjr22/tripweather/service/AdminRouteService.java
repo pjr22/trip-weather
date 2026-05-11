@@ -3,7 +3,6 @@ package com.pjr22.tripweather.service;
 import com.pjr22.tripweather.dto.AdminRoutePage;
 import com.pjr22.tripweather.dto.AdminRouteSummary;
 import com.pjr22.tripweather.repository.RouteRepository;
-import com.pjr22.tripweather.scheduler.GuestRouteCleanupJob;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
@@ -19,17 +18,21 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Admin-side route operations: paginated list (including soft-deleted),
- * soft-delete, restore, and an async trigger for the cleanup job.
+ * soft-delete, and restore.
  *
  * <p>The list query goes through {@link EntityManager#createNativeQuery} so
  * Hibernate's {@code @SQLRestriction("deleted_at IS NULL")} on
  * {@link com.pjr22.tripweather.model.Route} does not apply — the admin must be
  * able to see and act on soft-deleted rows. JPA paths elsewhere remain
  * automatically filtered. Phase 1 of ADMIN_CONSOLE.md.
+ *
+ * <p>The Phase-1 placeholder {@code triggerCleanupAsync} moved to
+ * {@link AdminLoaderService} as part of Phase 2's loader-runs framework;
+ * the cleanup is now reachable as
+ * {@code POST /api/admin/loaders/guest-route-cleanup/trigger}.
  */
 @Service
 @Slf4j
@@ -61,14 +64,11 @@ public class AdminRouteService {
 
     private final RouteRepository routeRepository;
     private final UserManagementService userManagementService;
-    private final GuestRouteCleanupJob cleanupJob;
 
     public AdminRouteService(RouteRepository routeRepository,
-                             UserManagementService userManagementService,
-                             GuestRouteCleanupJob cleanupJob) {
+                             UserManagementService userManagementService) {
         this.routeRepository = routeRepository;
         this.userManagementService = userManagementService;
-        this.cleanupJob = cleanupJob;
     }
 
     /**
@@ -193,23 +193,6 @@ public class AdminRouteService {
             return true;
         }
         return false;
-    }
-
-    /**
-     * Fire the cleanup job's two-stage purge on a background thread so the
-     * admin endpoint can return 202 immediately. Logs the outcome; Phase 2
-     * will replace this with a {@code loader_runs} row + run id surfaced in
-     * the response.
-     */
-    public void triggerCleanupAsync() {
-        log.info("Admin triggered cleanup (async)");
-        CompletableFuture.runAsync(() -> {
-            try {
-                cleanupJob.cleanGuestRoutes();
-            } catch (Exception e) {
-                log.error("Admin-triggered cleanup failed", e);
-            }
-        });
     }
 
     private static int clampSize(int requested) {

@@ -29,11 +29,12 @@ import java.util.UUID;
  *   <li>{@code DELETE /api/admin/routes/{id}} — soft-delete (sets
  *       {@code deleted_at = now()}).</li>
  *   <li>{@code POST   /api/admin/routes/{id}/restore} — clears {@code deleted_at}.</li>
- *   <li>{@code POST   /api/admin/cleanup/trigger} — fires
- *       {@link com.pjr22.tripweather.scheduler.GuestRouteCleanupJob#cleanGuestRoutes}
- *       on a background thread, returns 202 immediately. Phase 2 will wire
- *       this up to a {@code loader_runs} row + run id surfaced in the body.</li>
  * </ul>
+ *
+ * <p>The cleanup-trigger endpoint moved to
+ * {@link com.pjr22.tripweather.controller.AdminLoaderController} as
+ * {@code POST /api/admin/loaders/guest-route-cleanup/trigger} in Phase 2 of
+ * ADMIN_CONSOLE.md, alongside the EV loader and ORS coverage triggers.
  */
 @RestController
 @RequestMapping(value = "/api/admin", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -76,16 +77,5 @@ public class AdminRouteController {
                     "Route " + id + " not found or not currently deleted");
         }
         return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * Fire-and-forget — the cleanup runs asynchronously and the response
-     * carries no body. Phase 2 will replace this with a 202 carrying a
-     * {@code run_id} that the SPA can poll for status.
-     */
-    @PostMapping("/cleanup/trigger")
-    public ResponseEntity<Void> triggerCleanup() {
-        adminRouteService.triggerCleanupAsync();
-        return ResponseEntity.accepted().build();
     }
 }

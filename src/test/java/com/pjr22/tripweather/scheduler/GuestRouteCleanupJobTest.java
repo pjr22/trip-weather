@@ -1,9 +1,12 @@
 package com.pjr22.tripweather.scheduler;
 
+import com.pjr22.tripweather.model.LoaderRun;
+import com.pjr22.tripweather.model.LoaderRun.TriggerType;
 import com.pjr22.tripweather.model.User;
 import com.pjr22.tripweather.repository.EmailVerificationRepository;
 import com.pjr22.tripweather.repository.PasswordResetRepository;
 import com.pjr22.tripweather.repository.RouteRepository;
+import com.pjr22.tripweather.service.LoaderRunRecorder;
 import com.pjr22.tripweather.service.UserManagementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,7 +23,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,8 +35,9 @@ import static org.mockito.Mockito.when;
 /**
  * Unit tests for the cleanup job. The actual SQL is exercised at runtime
  * against the configured database; here we verify wiring — that each sweep
- * resolves the right cutoff, calls the right repository, and respects the
- * stage-1-vs-stage-2 split that Phase 1 of ADMIN_CONSOLE.md introduced.
+ * resolves the right cutoff, calls the right repository, records the right
+ * loader_runs entries (Phase 2 of ADMIN_CONSOLE.md), and respects the
+ * stage-1-vs-stage-2 split (Phase 1).
  */
 @ExtendWith(MockitoExtension.class)
 class GuestRouteCleanupJobTest {
@@ -40,6 +46,7 @@ class GuestRouteCleanupJobTest {
     @Mock private EmailVerificationRepository emailVerificationRepository;
     @Mock private PasswordResetRepository passwordResetRepository;
     @Mock private UserManagementService userManagementService;
+    @Mock private LoaderRunRecorder recorder;
 
     @InjectMocks
     private GuestRouteCleanupJob job;
@@ -56,10 +63,23 @@ class GuestRouteCleanupJobTest {
         ReflectionTestUtils.setField(job, "purgeGraceDays", 7);
     }
 
+    private LoaderRun fakeRun(String name, TriggerType trigger) {
+        LoaderRun run = new LoaderRun();
+        run.setId(42L);
+        run.setLoaderName(name);
+        run.setTriggerType(trigger);
+        run.setStatus(LoaderRun.Status.RUNNING);
+        run.setStartedAt(ZonedDateTime.now());
+        return run;
+    }
+
     // -------------------- Two-stage route cleanup --------------------
 
     @Test
-    void cleanGuestRoutes_runsBothStages_withRetentionAndGraceCutoffs() {
+    void cleanGuestRoutes_runsBothStages_andRecordsSumOfRowsAffected() {
+        when(recorder.start(eq(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME),
+                eq(TriggerType.CRON)))
+                .thenReturn(fakeRun(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME, TriggerType.CRON));
         User guest = newGuest();
         when(userManagementService.getOrCreateGuestUser()).thenReturn(guest);
         when(routeRepository.softDeleteGuestRoutesCreatedBefore(eq(guestId),
@@ -71,7 +91,8 @@ class GuestRouteCleanupJobTest {
         job.cleanGuestRoutes();
         ZonedDateTime nowAfter = ZonedDateTime.now();
 
-        // Stage 1: soft-delete cutoff is now - 30 days
+        // Stage 1 cutoff = now - 30d, with the same `now` threaded through
+        // as deletedAt for newly soft-deleted rows.
         ArgumentCaptor<ZonedDateTime> softCutoff = ArgumentCaptor.forClass(ZonedDateTime.class);
         ArgumentCaptor<ZonedDateTime> softNow = ArgumentCaptor.forClass(ZonedDateTime.class);
         verify(routeRepository).softDeleteGuestRoutesCreatedBefore(
@@ -81,12 +102,17 @@ class GuestRouteCleanupJobTest {
                            nowAfter.minusDays(30).plusSeconds(1));
         assertThat(softNow.getValue()).isBetween(nowBefore.minusSeconds(1), nowAfter.plusSeconds(1));
 
-        // Stage 2: hard-delete cutoff is now - 7 days
+        // Stage 2 cutoff = now - 7d.
         ArgumentCaptor<ZonedDateTime> hardCutoff = ArgumentCaptor.forClass(ZonedDateTime.class);
         verify(routeRepository).hardDeleteSoftDeletedBefore(hardCutoff.capture());
         assertThat(hardCutoff.getValue())
                 .isBetween(nowBefore.minusDays(7).minusSeconds(1),
                            nowAfter.minusDays(7).plusSeconds(1));
+
+        // Recorder gets soft+hard summed as rowsAffected.
+        ArgumentCaptor<Long> rows = ArgumentCaptor.forClass(Long.class);
+        verify(recorder).success(any(LoaderRun.class), rows.capture());
+        assertThat(rows.getValue()).isEqualTo(10L);
     }
 
     @Test
@@ -95,6 +121,9 @@ class GuestRouteCleanupJobTest {
         // is disabled, otherwise an admin's manual soft-deletes would never
         // age out — the disable flag is meant to gate only the auto-aging
         // of guest routes.
+        when(recorder.start(eq(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME),
+                eq(TriggerType.CRON)))
+                .thenReturn(fakeRun(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME, TriggerType.CRON));
         ReflectionTestUtils.setField(job, "guestRouteCleanupEnabled", false);
         when(routeRepository.hardDeleteSoftDeletedBefore(any(ZonedDateTime.class)))
                 .thenReturn(2);
@@ -106,36 +135,65 @@ class GuestRouteCleanupJobTest {
                 .softDeleteGuestRoutesCreatedBefore(any(UUID.class),
                         any(ZonedDateTime.class), any(ZonedDateTime.class));
         verify(routeRepository).hardDeleteSoftDeletedBefore(any(ZonedDateTime.class));
+        verify(recorder).success(any(LoaderRun.class), eq(2L));
     }
 
     @Test
-    void cleanGuestRoutes_honoursCustomRetentionAndGraceDays() {
-        ReflectionTestUtils.setField(job, "retentionDays", 90);
-        ReflectionTestUtils.setField(job, "purgeGraceDays", 14);
-        when(userManagementService.getOrCreateGuestUser()).thenReturn(newGuest());
+    void cleanGuestRoutes_runInProgressOnCron_logsAndSkipsWithoutThrowing() {
+        // Recorder reports another run in flight on a CRON tick. The cron
+        // entry point must catch and log-skip, not propagate.
+        when(recorder.start(eq(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME),
+                eq(TriggerType.CRON)))
+                .thenThrow(new LoaderRunRecorder.RunInProgressException(
+                        GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME));
 
-        ZonedDateTime nowBefore = ZonedDateTime.now();
         job.cleanGuestRoutes();
-        ZonedDateTime nowAfter = ZonedDateTime.now();
 
-        ArgumentCaptor<ZonedDateTime> softCutoff = ArgumentCaptor.forClass(ZonedDateTime.class);
-        verify(routeRepository).softDeleteGuestRoutesCreatedBefore(
-                eq(guestId), softCutoff.capture(), any(ZonedDateTime.class));
-        assertThat(softCutoff.getValue())
-                .isBetween(nowBefore.minusDays(90).minusSeconds(1),
-                           nowAfter.minusDays(90).plusSeconds(1));
+        verifyNoInteractions(userManagementService);
+        verify(routeRepository, never())
+                .softDeleteGuestRoutesCreatedBefore(any(UUID.class),
+                        any(ZonedDateTime.class), any(ZonedDateTime.class));
+        verify(routeRepository, never()).hardDeleteSoftDeletedBefore(any(ZonedDateTime.class));
+    }
 
-        ArgumentCaptor<ZonedDateTime> hardCutoff = ArgumentCaptor.forClass(ZonedDateTime.class);
-        verify(routeRepository).hardDeleteSoftDeletedBefore(hardCutoff.capture());
-        assertThat(hardCutoff.getValue())
-                .isBetween(nowBefore.minusDays(14).minusSeconds(1),
-                           nowAfter.minusDays(14).plusSeconds(1));
+    @Test
+    void runRouteCleanup_runInProgressOnManual_propagates() {
+        // On a MANUAL trigger, the conflict must propagate so the
+        // controller can map it to HTTP 409.
+        when(recorder.start(eq(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME),
+                eq(TriggerType.MANUAL)))
+                .thenThrow(new LoaderRunRecorder.RunInProgressException(
+                        GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME));
+
+        assertThatThrownBy(() -> job.runRouteCleanup(TriggerType.MANUAL))
+                .isInstanceOf(LoaderRunRecorder.RunInProgressException.class);
+    }
+
+    @Test
+    void runRouteCleanup_failurePath_recordsFailAndDoesNotThrowOnCron() {
+        // A CRON-path failure should still be recorded, but the cron
+        // method shouldn't propagate so a misbehaving cleanup doesn't
+        // poison Spring's scheduler thread.
+        when(recorder.start(eq(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME),
+                eq(TriggerType.CRON)))
+                .thenReturn(fakeRun(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME, TriggerType.CRON));
+        when(userManagementService.getOrCreateGuestUser())
+                .thenThrow(new RuntimeException("simulated DB outage"));
+
+        job.cleanGuestRoutes();   // must not throw
+
+        verify(recorder).fail(any(LoaderRun.class), any(Throwable.class));
+        verify(recorder, never()).success(any(LoaderRun.class), anyLong());
     }
 
     // -------------------- Email-token cleanup --------------------
 
     @Test
-    void cleanExpiredEmailTokens_deletesBothTablesUsingCurrentTime() {
+    void cleanExpiredEmailTokens_deletesBothTablesAndRecordsCount() {
+        when(recorder.start(eq(GuestRouteCleanupJob.EMAIL_TOKEN_CLEANUP_LOADER_NAME),
+                eq(TriggerType.CRON)))
+                .thenReturn(fakeRun(GuestRouteCleanupJob.EMAIL_TOKEN_CLEANUP_LOADER_NAME,
+                        TriggerType.CRON));
         when(emailVerificationRepository.deleteByExpiresAtBefore(any(LocalDateTime.class)))
                 .thenReturn(3);
         when(passwordResetRepository.deleteByExpiresAtBefore(any(LocalDateTime.class)))
@@ -150,14 +208,14 @@ class GuestRouteCleanupJobTest {
         ArgumentCaptor<LocalDateTime> resetCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(passwordResetRepository).deleteByExpiresAtBefore(resetCaptor.capture());
 
-        // Both cutoffs should be "approximately now" — captured between the
-        // bookend timestamps. truncatedTo blunts nanosecond-precision flake.
         assertThat(verifCaptor.getValue())
                 .isBetween(before.truncatedTo(ChronoUnit.MILLIS).minusSeconds(1),
                            after.plusSeconds(1));
         assertThat(resetCaptor.getValue())
                 .isBetween(before.truncatedTo(ChronoUnit.MILLIS).minusSeconds(1),
                            after.plusSeconds(1));
+
+        verify(recorder).success(any(LoaderRun.class), eq(8L));
     }
 
     @Test
@@ -165,6 +223,10 @@ class GuestRouteCleanupJobTest {
         // route.cleanup.enabled gates only the stage-1 guest-route sweep;
         // email-token cleanup is always-on.
         ReflectionTestUtils.setField(job, "guestRouteCleanupEnabled", false);
+        when(recorder.start(eq(GuestRouteCleanupJob.EMAIL_TOKEN_CLEANUP_LOADER_NAME),
+                eq(TriggerType.CRON)))
+                .thenReturn(fakeRun(GuestRouteCleanupJob.EMAIL_TOKEN_CLEANUP_LOADER_NAME,
+                        TriggerType.CRON));
 
         job.cleanExpiredEmailTokens();
 
@@ -176,7 +238,13 @@ class GuestRouteCleanupJobTest {
     void cleanExpiredEmailTokens_independentFromGuestRouteCleanup() {
         // Tokens get cleaned without touching routes — useful sanity check
         // that the two methods don't accidentally short-circuit each other.
+        when(recorder.start(eq(GuestRouteCleanupJob.EMAIL_TOKEN_CLEANUP_LOADER_NAME),
+                eq(TriggerType.CRON)))
+                .thenReturn(fakeRun(GuestRouteCleanupJob.EMAIL_TOKEN_CLEANUP_LOADER_NAME,
+                        TriggerType.CRON));
+
         job.cleanExpiredEmailTokens();
+
         verify(emailVerificationRepository).deleteByExpiresAtBefore(any(LocalDateTime.class));
         verify(passwordResetRepository).deleteByExpiresAtBefore(any(LocalDateTime.class));
         verify(routeRepository, never()).softDeleteGuestRoutesCreatedBefore(

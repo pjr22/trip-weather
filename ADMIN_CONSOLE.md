@@ -7,8 +7,10 @@ A separate `/admin` SPA, gated by a single admin credential supplied via Spring 
 | Phase | Status |
 |---|---|
 | 0 — Authentication & shell | **Done** (2026-05-10). Two-chain SecurityConfig + namespaced session attribute, JSON login/logout/me, X-Admin-Token coexists on `refresh-coverage` only, login → empty shell. Smoke-tested live; 161/161 unit tests pass. |
-| 1 — Route management | Not started. |
-| 2 — Loader & data management | Not started. |
+| 1 — Route management | **Done** (2026-05-10). `routes.deleted_at` + `@SQLRestriction`, native-SQL admin paths, two-stage cleanup (soft → grace → hard), four admin endpoints, Routes view with search / owner / show-deleted toggle, sortable paginated table. |
+| 2 — Loader & data management | **Done** (2026-05-10). `loader_runs` table + recorder + concurrency guard, manual triggers for cleanup / EV / ORS coverage, sequential refresh-all, polling Data view, legacy `refresh-coverage` endpoint records as CRON. |
+| 2b — Pbf orchestration | Not started. Pbf-file freshness observability + table-driven cron-rewrite of `docker/refreshOrsGraph.sh`. |
+| 2c — Region management | Not started. UI for adding/removing per-region rows in `routing_coverage` (tied to a pbf via `routing_coverage.pbf_name`). |
 | 3 — Metrics dashboard | Not started. |
 | 4 — User management | Not started. |
 | 5 — Hardening (optional) | Not started. |
@@ -227,6 +229,120 @@ CREATE INDEX IF NOT EXISTS loader_runs_loader_started_idx
 ### Done when
 
 - Every cron tick and manual trigger appears as a row in `loader_runs`. The console shows the last 20 of each. Admin can fire any of the three loaders and watch the row flip from RUNNING to SUCCESS or FAIL.
+
+---
+
+## Phase 2b — Pbf orchestration
+
+Bring all `.osm.pbf` lifecycle state into a database table the admin console controls, and refactor `docker/refreshOrsGraph.sh` from a once-per-month single-pbf script into a minute-frequency table-driven worker. Admin console becomes the operator's window into "what extracts am I serving, are they fresh, when's the next rebuild scheduled" — without any in-JVM docker access.
+
+### Architecture
+
+Two responsibilities that this design separates cleanly:
+
+- **Host-side work** (download multi-GB pbf, swap file, wipe graph volume, restart trip-ors container, wait for `/ors/v2/health`, then call `/api/admin/refresh-coverage/{region}` per region) — stays in `docker/refreshOrsGraph.sh`, runs from host crontab. Has filesystem and docker access; trip-weather doesn't.
+- **Orchestration state** (which pbfs are managed, when each is due for processing, last-known remote md5, last-applied md5, last-run status / error) — lives in the new `pbf_files` table. Admin console edits rows; cron reads them.
+
+### Schema
+
+```sql
+CREATE TABLE pbf_files (
+  pbf_name             VARCHAR(64) PRIMARY KEY,           -- 'us-west', 'colorado', 'us-central', etc.
+  geofabrik_url        TEXT NOT NULL,                     -- absolute URL to the .pbf (the .md5 is at .pbf.md5)
+  active               BOOLEAN NOT NULL DEFAULT TRUE,     -- when false, cron ignores the row entirely
+
+  -- Cheap-check schedule. Auto-rescheduled by the cron after each check
+  -- using check_interval_days. NULL next_check_at means "do it on the
+  -- next tick" — typical for freshly-added rows.
+  check_interval_days  INTEGER NOT NULL DEFAULT 7,
+  next_check_at        TIMESTAMPTZ,
+
+  -- Full-apply schedule. Default behaviour is admin-driven: the admin
+  -- clicks "Schedule now" (or sets next_update_at directly) and the cron
+  -- picks it up on the next tick. If update_interval_days is non-null,
+  -- the cron auto-reschedules next_update_at after each successful apply.
+  -- NULL next_update_at = no apply scheduled (paused).
+  update_interval_days INTEGER,
+  next_update_at       TIMESTAMPTZ,
+
+  -- State written by the cron / admin actions:
+  last_check_at        TIMESTAMPTZ,                       -- when cron (or admin "Check now") last fetched upstream .md5
+  last_remote_md5      VARCHAR(32),                       -- md5 Geofabrik served at last_check_at
+  last_remote_modified TIMESTAMPTZ,                       -- Last-Modified header from upstream
+
+  last_apply_started_at  TIMESTAMPTZ,                     -- doubles as a stale-detection signal when an apply is in flight
+  last_apply_finished_at TIMESTAMPTZ,
+  last_apply_md5         VARCHAR(32),                     -- md5 of the pbf currently deployed (matches latest upstream when up-to-date)
+  last_apply_status      VARCHAR(16),                     -- OK | NO_CHANGE | CHECK_FAILED | DOWNLOAD_FAILED | BUILD_FAILED | RESTART_FAILED
+  last_apply_error       TEXT
+);
+
+ALTER TABLE routing_coverage
+  ADD COLUMN IF NOT EXISTS pbf_name VARCHAR(64) REFERENCES pbf_files(pbf_name) ON DELETE SET NULL;
+```
+
+Two decoupled schedules per row — admin can manually trigger either without affecting the other:
+
+- **Check schedule**: cron auto-reschedules every `check_interval_days` (default 7). Cheap (~50 bytes per check), used to keep `last_remote_md5` fresh in the admin UI so staleness is visible.
+- **Apply schedule**: admin-driven by default (`update_interval_days IS NULL`). Setting `update_interval_days = 30` opts into monthly auto-rebuild attempts; the cron auto-reschedules `next_update_at` after each successful apply.
+
+`routing_coverage.pbf_name` is the back-link the cron uses to know which polygons to refresh after applying a specific pbf. `ON DELETE SET NULL` so removing a pbf row doesn't cascade into the coverage table — polygons just lose their link.
+
+Bootstrap seed in the migration: after creating the table, the script scans `docker/ors-data/` for `*.osm.pbf` files and INSERTs one `pbf_files` row per file it finds. Geofabrik URLs are derived from a name → URL map of common slugs (US sub-region extracts, individual states, Canada, Mexico); unknown slugs get a clearly-marked placeholder URL the operator fixes via the admin UI. If the file has a sibling `.md5`, that hash seeds `last_apply_md5` so the admin's freshness widget lights up on first load. When exactly one pbf was seeded, the migration also backfills `routing_coverage.pbf_name` for rows that were NULL — single-extract deployments don't need any manual linking step. Multi-extract deployments leave the backfill to the operator (per-region choice).
+
+Re-running the migration is safe: the seed uses `ON CONFLICT (pbf_name) DO NOTHING`, and the backfill targets only rows with `pbf_name IS NULL`.
+
+### Cron logic (new shape of `docker/refreshOrsGraph.sh`)
+
+Crontab change: from `0 3 1 * *` (monthly) to `* * * * *` (every minute). Host-level `flock` so two ticks can't overlap regardless of duration:
+
+```bash
+exec 9>/var/lock/trip-pbf-cron.lock
+flock -n 9 || exit 0
+```
+
+Per tick:
+
+1. Query `SELECT * FROM pbf_files WHERE active = TRUE`.
+2. For each row, **cheap upstream check (only when due)**: if `next_check_at IS NULL OR next_check_at <= now()`, `GET <geofabrik_url>.md5`, write `last_check_at` + `last_remote_md5` + `last_remote_modified`, set `next_check_at = now() + check_interval_days`. Manual check from the admin console hits a JVM-side endpoint that does the same fetch but **leaves `next_check_at` alone** — manual checks are independent of the cron's automatic schedule.
+3. **Stale-apply recovery**: if a row has `last_apply_started_at` set, `last_apply_finished_at` null, and `last_apply_started_at` older than **4 hours**, treat as a crashed/killed previous apply — clear the marker and proceed.
+4. For each row whose `next_update_at IS NOT NULL AND next_update_at <= now()`, perform the **full apply**. Fetch the upstream `.md5` first; if it matches `last_apply_md5`, record `last_apply_status = 'NO_CHANGE'` and skip the heavy pbf work. Otherwise (md5 differs): download the pbf, verify against `.md5`, stop trip-ors, swap file, wipe `trip_ors_graph` volume, run `runOrs.sh`, wait for `/ors/v2/health`, then refresh **every** linked region's polygon. On success: `last_apply_md5 = remote_md5`, `last_apply_status = 'OK'`. On any stage failure: `last_apply_status` records the stage, `last_apply_error` captures the stderr, `next_update_at` is left alone so it retries on the next tick.
+5. For every active row (every tick, regardless of whether check or apply ran), do the **polygon staleness self-heal**: a single SELECT against `routing_coverage` joined with `pbf_files` finds rows whose `fetched_at < last_apply_finished_at` (or `fetched_at IS NULL`). If any exist, POST `/api/admin/refresh-coverage/{region}` for just those rows. Common case (everything in sync) is the one SELECT and a "polygons in sync with last apply" log line. This is the recovery path for failures of an earlier apply's polygon-refresh step — operator can wait for the next cron tick, or run the script manually with `--force` (which only forces the cheap upstream md5 check; the staleness self-heal runs unconditionally either way).
+5. After a successful apply, **auto-reschedule** if `update_interval_days IS NOT NULL`: `next_update_at = now() + update_interval_days`. If null, `next_update_at` is cleared (admin must schedule the next one explicitly).
+
+### Backend
+
+- `PbfFile` entity (`@Entity @Table("pbf_files")`) + `PbfFileRepository`.
+- `PbfFileService` — CRUD wrappers + `summarizeWithFreshness()` (rows annotated with derived flags `isStale`, `isApplyInFlight`, `applyAgeMinutes`) + `checkUpstreamNow(pbfName)` (JVM-side `.md5` fetch).
+- `AdminPbfController` — endpoints:
+  - `GET /api/admin/pbfs` — list, freshness-annotated.
+  - `POST /api/admin/pbfs` — create. Body `{pbfName, geofabrikUrl, active, checkIntervalDays, updateIntervalDays, nextCheckAt, nextUpdateAt}`.
+  - `PATCH /api/admin/pbfs/{name}` — update mutable fields.
+  - `DELETE /api/admin/pbfs/{name}` — drop the row. `routing_coverage.pbf_name` rows pointing here go null via FK.
+  - `POST /api/admin/pbfs/{name}/schedule-now` — sets `next_update_at = now()` so the next cron tick processes it.
+  - `POST /api/admin/pbfs/{name}/check-md5` — fetches `.md5` from Geofabrik in the calling thread; updates `last_check_at` + `last_remote_*`; does NOT touch `next_check_at`.
+  - `POST /api/admin/pbfs/{name}/retry-apply` — clears `last_apply_started_at` (so the row is no longer flagged as in-flight) and sets `next_update_at = now()`. UI surfaces this only when the row is in "apply in flight" state; lets the admin recover from a crashed apply without waiting for the 4 h stale-detection window.
+
+### Frontend
+
+- The ORS Coverage card (with per-region "Trigger" buttons and "Refresh all regions") is **removed** from the Data tab. Polygon refresh is now a backend-only concern, driven by the cron's post-apply step.
+- New **Pbfs card** on the Data tab (replaces the coverage card). Shows the pbf_files rows in a table:
+  - Name · Geofabrik URL · Active · Last applied (md5 + timestamp) · Last upstream (md5 + Last-Modified) · Stale? · Next check at · Next update at
+  - "Schedule now" button per row (sets `next_update_at = now()`).
+  - "Check upstream now" button per row (calls the JVM-side md5 fetch).
+  - "Retry stuck apply" button — visible only when the row's state is "apply in flight".
+  - Toggle Active.
+  - Edit URL / check-interval / update-interval / scheduled times via inline form.
+  - Add new pbf row, with a confirmation that it's just the orchestration record — the pbf doesn't get processed until the next cron tick that finds `next_update_at` due.
+  - Delete row (confirmation modal).
+
+### Migration considerations
+
+- Existing deployments with the old `refreshOrsGraph.sh` and a working us-west extract: the migration auto-seeds the `us-west` row by inspecting `docker/ors-data/` (see "Bootstrap seed" above) and backfills `routing_coverage.pbf_name = 'us-west'` because there's exactly one pbf detected. The operator just runs the migration, then swaps the host crontab from monthly to per-minute. The new script's cheap-check step fills in `last_remote_*` on the next tick. From that point, the old refreshOrsGraph.sh's behaviour is fully replaced.
+
+### Done when
+
+- Admin opens the Data tab and the Pbfs card shows their deployed extract with a freshness state ("up to date as of HH:MM" or "**stale — new pbf available**" with a noticeable colour). They can click "Schedule now" to ask the cron to rebuild on the next minute. Adding a new pbf row creates a `pbf_files` entry that the cron picks up on its next tick.
 
 ---
 

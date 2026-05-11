@@ -108,15 +108,9 @@ class AdminRouteControllerTest {
                         .isEqualTo(HttpStatus.NOT_FOUND));
     }
 
-    @Test
-    void triggerCleanup_returns202_andDispatchesAsynchronously() {
-        ResponseEntity<Void> response = controller.triggerCleanup();
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
-        // Phase 1: empty body. Phase 2 will swap this for {run_id}.
-        assertThat(response.hasBody()).isFalse();
-        verify(service).triggerCleanupAsync();
-    }
+    // Phase 1's POST /api/admin/cleanup/trigger moved to
+    // POST /api/admin/loaders/guest-route-cleanup/trigger in Phase 2.
+    // Coverage for that endpoint lives in AdminLoaderControllerTest.
 
     @Test
     void list_withDefaultDeletedFilterMatchesActiveOnlyConvention() throws Exception {

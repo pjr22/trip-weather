@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pjr22.tripweather.model.LoaderRun;
+import com.pjr22.tripweather.model.LoaderRun.TriggerType;
 import com.pjr22.tripweather.repository.EvStationRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -77,6 +79,9 @@ import java.util.concurrent.locks.ReentrantLock;
 @Component
 @Slf4j
 public class EvStationLoader {
+
+    /** Loader name for the {@code loader_runs} entries. Phase 2 of ADMIN_CONSOLE.md. */
+    public static final String LOADER_NAME = "ev-stations";
 
     // The endpoint has no `offset` parameter and silently caps a single
     // limit=all response at ~50,000 records (server side closes the
@@ -163,6 +168,7 @@ public class EvStationLoader {
     private final ObjectMapper objectMapper;
     private final TaskScheduler taskScheduler;
     private final Clock clock;
+    private final LoaderRunRecorder recorder;
     private final String apiKey;
     private final boolean loaderEnabled;
     private final boolean bootstrapOnEmpty;
@@ -175,6 +181,7 @@ public class EvStationLoader {
                            ObjectMapper objectMapper,
                            TaskScheduler taskScheduler,
                            Clock clock,
+                           LoaderRunRecorder recorder,
                            @Value("${nrel.api.key}") String apiKey,
                            @Value("${trip.ev.loader-enabled:true}") boolean loaderEnabled,
                            @Value("${trip.ev.loader-bootstrap-on-empty:true}") boolean bootstrapOnEmpty) {
@@ -184,6 +191,7 @@ public class EvStationLoader {
         this.objectMapper = objectMapper;
         this.taskScheduler = taskScheduler;
         this.clock = clock;
+        this.recorder = recorder;
         this.apiKey = apiKey;
         this.loaderEnabled = loaderEnabled;
         this.bootstrapOnEmpty = bootstrapOnEmpty;
@@ -195,7 +203,7 @@ public class EvStationLoader {
             log.debug("EV station loader disabled (trip.ev.loader-enabled=false); skipping.");
             return;
         }
-        runWithRetryOnFailure();
+        runWithRetryOnFailure(TriggerType.CRON);
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -222,22 +230,47 @@ public class EvStationLoader {
         long delaySeconds = 5;
         log.info("EV station mirror is empty; scheduling bootstrap load to run in {} seconds.",
                 delaySeconds);
-        taskScheduler.schedule(this::runWithRetryOnFailure,
+        taskScheduler.schedule(() -> runWithRetryOnFailure(TriggerType.BOOTSTRAP),
                 clock.instant().plusSeconds(delaySeconds));
     }
 
-    /** Single attempt; on failure, schedule a retry RETRY_DELAY out and log
-     *  WARN. Public for tests. */
-    void runWithRetryOnFailure() {
+    /**
+     * Single attempt; on failure, schedule a retry RETRY_DELAY out and log
+     * WARN. Public for tests and for the admin manual-trigger entry point.
+     *
+     * <p>The {@code trigger} threads through to the {@code loader_runs}
+     * record (see {@link LoaderRunRecorder}). On retry, the original
+     * trigger type is preserved — a CRON that fails and retries is still
+     * fundamentally a CRON, not a separate kind of run.
+     *
+     * <p>If a {@code loader_runs} row is already RUNNING for this loader
+     * (e.g. a prior cron is still going when a manual trigger arrives),
+     * {@link LoaderRunRecorder.RunInProgressException} is thrown by the
+     * recorder. CRON / BOOTSTRAP triggers catch and log-skip; MANUAL
+     * triggers let it propagate so the controller can return HTTP 409.
+     */
+    void runWithRetryOnFailure(TriggerType trigger) {
         if (!runLock.tryLock()) {
-            log.info("EV station load already in progress; skipping this trigger.");
+            log.info("EV station load already in progress (in-process lock); skipping this trigger.");
+            return;
+        }
+        LoaderRun run;
+        try {
+            run = recorder.start(LOADER_NAME, trigger);
+        } catch (LoaderRunRecorder.RunInProgressException e) {
+            runLock.unlock();
+            if (trigger == TriggerType.MANUAL) {
+                throw e;
+            }
+            log.info("EV station load skipped — another run already in progress (recorder).");
             return;
         }
         try {
-            log.info("EV station load starting ({} filtered batches, streaming parse).",
-                    BATCHES.size());
+            log.info("EV station load starting ({}, {} filtered batches, streaming parse).",
+                    trigger, BATCHES.size());
             long start = System.currentTimeMillis();
             int loaded = load();
+            recorder.success(run, loaded);
             log.info("EV station load complete: {} station(s) upserted in {}ms",
                     loaded, System.currentTimeMillis() - start);
         } catch (HttpClientErrorException.TooManyRequests e) {
@@ -249,12 +282,14 @@ public class EvStationLoader {
             log.warn("NREL rate limit exceeded (429 OVER_RATE_LIMIT); scheduling retry at {} (in {}). " +
                             "Upgrade your NREL API key if this recurs.",
                     retryAt, delay, e);
-            taskScheduler.schedule(this::runWithRetryOnFailure, retryAt);
+            recorder.fail(run, e);
+            taskScheduler.schedule(() -> runWithRetryOnFailure(trigger), retryAt);
         } catch (Exception e) {
             Instant retryAt = clock.instant().plus(RETRY_DELAY);
             log.warn("EV station load failed; scheduling retry at {} (in {})",
                     retryAt, RETRY_DELAY, e);
-            taskScheduler.schedule(this::runWithRetryOnFailure, retryAt);
+            recorder.fail(run, e);
+            taskScheduler.schedule(() -> runWithRetryOnFailure(trigger), retryAt);
         } finally {
             runLock.unlock();
         }
