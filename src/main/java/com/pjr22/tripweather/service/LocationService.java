@@ -3,6 +3,7 @@ package com.pjr22.tripweather.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
+import com.pjr22.tripweather.config.CacheMetricsConfig.CacheMeterNames;
 import com.pjr22.tripweather.dto.LocationResolution;
 import com.pjr22.tripweather.model.GeocodeReverseCache;
 import com.pjr22.tripweather.model.LocationData;
@@ -49,6 +50,7 @@ public class LocationService {
     private final ObjectMapper objectMapper;
     private final GeocodeReverseCacheRepository reverseCacheRepository;
     private final Cache<String, JsonNode> forwardCache;
+    private final DbCacheMetrics cacheMetrics;
     private final Clock clock;
     private final double reverseRadiusMeters;
     private final long reverseRefreshDays;
@@ -60,6 +62,7 @@ public class LocationService {
             ObjectMapper objectMapper,
             GeocodeReverseCacheRepository reverseCacheRepository,
             Cache<String, JsonNode> forwardGeocodeCache,
+            DbCacheMetrics cacheMetrics,
             Clock clock,
             @Value("${trip.geocode.reverse-radius-meters:15}") double reverseRadiusMeters,
             @Value("${trip.geocode.reverse-refresh-days:365}") long reverseRefreshDays
@@ -70,6 +73,7 @@ public class LocationService {
         this.objectMapper = objectMapper;
         this.reverseCacheRepository = reverseCacheRepository;
         this.forwardCache = forwardGeocodeCache;
+        this.cacheMetrics = cacheMetrics;
         this.clock = clock;
         this.reverseRadiusMeters = reverseRadiusMeters;
         this.reverseRefreshDays = reverseRefreshDays;
@@ -87,6 +91,7 @@ public class LocationService {
             if (LocalDateTime.now(clock).isBefore(refreshAfter)) {
                 LocationData fresh = deserializeOrNull(entry.getResponseJson());
                 if (fresh != null) {
+                    cacheMetrics.recordHit(CacheMeterNames.REVERSE_GEOCODE);
                     return mergeResolution(fresh, latitude, longitude);
                 }
             }
@@ -101,6 +106,7 @@ public class LocationService {
                     .retrieve()
                     .body(String.class);
             if (responseBody != null) {
+                cacheMetrics.recordMiss(CacheMeterNames.REVERSE_GEOCODE);
                 LocationData parsed = objectMapper.readValue(responseBody, LocationData.class);
                 GeocodeReverseCache entry = new GeocodeReverseCache(null,
                         pointFromLatLon(latitude, longitude), responseBody, LocalDateTime.now(clock));
@@ -114,15 +120,19 @@ public class LocationService {
             }
         } catch (Exception e) {
             if (stale != null) {
+                // Stale-on-error counts as a hit: the cache served the response.
+                cacheMetrics.recordHit(CacheMeterNames.REVERSE_GEOCODE);
                 log.warn("Reverse-geocode refresh failed for ({}, {}); serving stale cached entry",
                         latitude, longitude, e);
                 return mergeResolution(stale, latitude, longitude);
             }
+            cacheMetrics.recordMiss(CacheMeterNames.REVERSE_GEOCODE);
             // Preserve prior behavior: any failure on a true cache miss surfaces
             // to the caller. The controller wraps this in a 500 response.
             throw new RuntimeException("Reverse-geocode failed for ("
                     + latitude + ", " + longitude + ")", e);
         }
+        cacheMetrics.recordMiss(CacheMeterNames.REVERSE_GEOCODE);
         return null;
     }
 

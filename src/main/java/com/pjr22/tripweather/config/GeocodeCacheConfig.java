@@ -21,9 +21,13 @@ public class GeocodeCacheConfig {
     public Cache<String, JsonNode> forwardGeocodeCache(
             @Value("${trip.geocode.forward-cache-max:1000}") long maxEntries,
             @Value("${trip.geocode.forward-cache-ttl-hours:24}") long ttlHours) {
+        // recordStats() is required for the Caffeine→Micrometer binder
+        // registered in CacheMetricsConfig to report non-zero hit/miss
+        // counters on the admin Metrics tab.
         return Caffeine.newBuilder()
                 .maximumSize(maxEntries)
                 .expireAfterWrite(Duration.ofHours(ttlHours))
+                .recordStats()
                 .build();
     }
 }

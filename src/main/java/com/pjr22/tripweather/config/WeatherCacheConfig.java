@@ -24,9 +24,14 @@ public class WeatherCacheConfig {
     public Cache<String, CachedForecast> forecastCache(
             @Value("${trip.weather.forecast-cache-max:10000}") long maxEntries,
             @Value("${trip.weather.forecast-stale-max-hours:6}") long staleMaxHours) {
+        // recordStats() is required for the Caffeine→Micrometer binder
+        // registered in CacheMetricsConfig to report non-zero hit/miss
+        // counters on the admin Metrics tab. Cheap (Caffeine keeps four
+        // longs per cache); not visible anywhere else.
         return Caffeine.newBuilder()
                 .maximumSize(maxEntries)
                 .expireAfterWrite(Duration.ofHours(staleMaxHours))
+                .recordStats()
                 .build();
     }
 

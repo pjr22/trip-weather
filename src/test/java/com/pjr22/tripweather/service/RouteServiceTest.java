@@ -123,6 +123,7 @@ class RouteServiceTest {
     private Clock fixedClock;
     private ObjectMapper objectMapper;
     private RouteService service;
+    private SimpleMeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
@@ -140,11 +141,13 @@ class RouteServiceTest {
         // straight to public for every call, which is what these tests assert.
         // Coverage repo is therefore never consulted.
         PublicOrsClient publicClient = new PublicOrsClient(restClient, API_KEY);
-        RoutingMetrics metrics = new RoutingMetrics(new SimpleMeterRegistry());
+        meterRegistry = new SimpleMeterRegistry();
+        RoutingMetrics metrics = new RoutingMetrics(meterRegistry);
         RoutingDispatcher dispatcher = new RoutingDispatcher(
                 publicClient, localProvider, coverageRepository, metrics);
 
         service = new RouteService(publicClient, dispatcher, objectMapper, cacheRepository,
+                new DbCacheMetrics(meterRegistry),
                 fixedClock,
                 24L,    // directions ttl hours
                 168L,   // directions stale-max hours
@@ -354,6 +357,43 @@ class RouteServiceTest {
                 new RouteService.RouteRequest.Waypoint(LAT, LON, "Start", "America/Denver"),
                 new RouteService.RouteRequest.Waypoint(LAT + 0.01, LON - 0.01, "End", "America/Denver")
         );
+    }
+
+    /**
+     * Step 3 of ADMIN_CONSOLE.md phase 3: instrumenting the DB cache. A
+     * cache hit on snap + elevation_lookup should record two
+     * {@code cache.gets{result=hit}} increments under the
+     * {@code ors-snap} and {@code ors-elevation-lookup} cache tags, with no
+     * miss counters firing.
+     */
+    @Test
+    void cacheHitOnSnapAndElevationLookup_recordsHitCounters() {
+        // Cache rows pre-loaded; the service path is the same as
+        // resolve_bothCachesHit_skipsApi.
+        OrsResponseCache snapEntry = new OrsResponseCache("snap-hash", "snap",
+                """
+                {"type":"FeatureCollection","features":[{"geometry":{"coordinates":[-104.9903,39.7392]},"properties":{"distance":0}}]}
+                """, LocalDateTime.now(fixedClock));
+        OrsResponseCache elevEntry = new OrsResponseCache("elev-hash", "elevation_lookup",
+                ELEVATION_RESPONSE, LocalDateTime.now(fixedClock));
+        when(cacheRepository.findById(anyString()))
+                .thenReturn(Optional.of(snapEntry))   // snap lookup
+                .thenReturn(Optional.of(elevEntry));  // elevation_lookup lookup
+
+        service.resolveLocation(LAT, LON);
+
+        assertThat(meterRegistry.find("cache.gets")
+                .tag("cache", "ors-snap").tag("result", "hit").counter())
+                .isNotNull()
+                .extracting(c -> (long) c.count()).isEqualTo(1L);
+        assertThat(meterRegistry.find("cache.gets")
+                .tag("cache", "ors-elevation-lookup").tag("result", "hit").counter())
+                .isNotNull()
+                .extracting(c -> (long) c.count()).isEqualTo(1L);
+        // No miss counters should have been touched.
+        assertThat(meterRegistry.find("cache.gets")
+                .tag("cache", "ors-snap").tag("result", "miss").counter())
+                .isNull();
     }
 
 }

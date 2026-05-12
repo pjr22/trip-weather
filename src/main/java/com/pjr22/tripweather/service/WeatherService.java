@@ -2,6 +2,7 @@ package com.pjr22.tripweather.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.github.benmanes.caffeine.cache.Cache;
+import com.pjr22.tripweather.config.CacheMetricsConfig.CacheMeterNames;
 import com.pjr22.tripweather.config.TileProxyConfig;
 import com.pjr22.tripweather.model.NwsGridpoint;
 import com.pjr22.tripweather.model.WeatherData;
@@ -50,6 +51,7 @@ public class WeatherService {
     private final RestClient restClient;
     private final NwsGridpointRepository gridpointRepository;
     private final Cache<String, CachedForecast> forecastCache;
+    private final DbCacheMetrics cacheMetrics;
     private final Clock clock;
     private final TileProxyConfig tileProxyConfig;
     private final long forecastTtlMinutes;
@@ -59,6 +61,7 @@ public class WeatherService {
     public WeatherService(RestClient nwsRestClient,
                           NwsGridpointRepository gridpointRepository,
                           Cache<String, CachedForecast> forecastCache,
+                          DbCacheMetrics cacheMetrics,
                           Clock clock,
                           TileProxyConfig tileProxyConfig,
                           @Value("${trip.weather.forecast-ttl-minutes:30}") long forecastTtlMinutes,
@@ -67,6 +70,7 @@ public class WeatherService {
         this.restClient = nwsRestClient;
         this.gridpointRepository = gridpointRepository;
         this.forecastCache = forecastCache;
+        this.cacheMetrics = cacheMetrics;
         this.clock = clock;
         this.tileProxyConfig = tileProxyConfig;
         this.forecastTtlMinutes = forecastTtlMinutes;
@@ -115,16 +119,22 @@ public class WeatherService {
             NwsGridpoint gp = cached.get();
             LocalDateTime refreshAfter = gp.getFetchedAt().plusDays(gridpointRefreshDays);
             if (LocalDateTime.now(clock).isBefore(refreshAfter)) {
+                cacheMetrics.recordHit(CacheMeterNames.NWS_GRIDPOINTS);
                 return GridpointResolution.served(preferredUrl(gp.getHourlyUrl(), gp.getForecastUrl()));
             }
             GridpointResolution refreshed = fetchPointsMetadata(latitude, longitude);
             if (refreshed != null) {
+                cacheMetrics.recordMiss(CacheMeterNames.NWS_GRIDPOINTS);
                 return refreshed;
             }
+            // Refresh failed → stale entry served; count as hit (cache served
+            // the response, matching the convention used elsewhere).
+            cacheMetrics.recordHit(CacheMeterNames.NWS_GRIDPOINTS);
             log.warn("Refresh of stale gridpoint failed for ({}, {}); serving stale cached entry",
                     latitude, longitude);
             return GridpointResolution.served(preferredUrl(gp.getHourlyUrl(), gp.getForecastUrl()));
         }
+        cacheMetrics.recordMiss(CacheMeterNames.NWS_GRIDPOINTS);
         return fetchPointsMetadata(latitude, longitude);
     }
 

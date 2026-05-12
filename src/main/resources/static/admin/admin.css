@@ -735,3 +735,140 @@ button.primary:hover {
     grid-area: error;
 }
 
+/* ----- Metrics view (Phase 3) ------------------------------------------- */
+
+.metrics-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.metrics-toolbar .metrics-last-updated {
+    color: #6b7280;
+    font-size: 12px;
+    margin-left: auto;
+}
+
+.metrics-panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 16px;
+}
+
+.metrics-panel {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.metrics-panel-header {
+    padding: 10px 16px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.metrics-panel-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.metrics-panel-body {
+    padding: 12px 16px;
+}
+
+.metrics-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 12px;
+}
+
+.metrics-stat-label {
+    color: #6b7280;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+}
+
+.metrics-stat-value {
+    color: #111827;
+    font-size: 17px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.metrics-stat-value-unit {
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 400;
+    margin-left: 2px;
+}
+
+.metrics-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.metrics-table th,
+.metrics-table td {
+    padding: 5px 8px;
+    text-align: left;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.metrics-table thead th {
+    color: #6b7280;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.metrics-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.metrics-table td.num,
+.metrics-table th.num {
+    text-align: right;
+}
+
+.metrics-empty {
+    color: #6b7280;
+    font-size: 12px;
+    padding: 6px 0;
+}
+
+.metrics-footer {
+    margin-top: 16px;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.metrics-paused-flag {
+    display: inline-block;
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.metrics-cache-kind {
+    color: #6b7280;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-left: 6px;
+}

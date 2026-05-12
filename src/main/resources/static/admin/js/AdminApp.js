@@ -31,7 +31,6 @@
     function renderPlaceholder(view) {
         var phaseByView = {
             data:    { phase: 'Phase 2', title: 'Data' },
-            metrics: { phase: 'Phase 3', title: 'Metrics' },
             users:   { phase: 'Phase 4', title: 'Users' }
         };
         var info = phaseByView[view];

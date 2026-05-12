@@ -10,6 +10,7 @@ import com.pjr22.tripweather.model.GeocodeReverseCache;
 import com.pjr22.tripweather.model.LocationData;
 import com.pjr22.tripweather.model.SnappedPoint;
 import com.pjr22.tripweather.repository.GeocodeReverseCacheRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -100,7 +101,9 @@ class LocationServiceTest {
         objectMapper = new ObjectMapper();
 
         service = new LocationService(API_KEY, restClient, routeService, objectMapper,
-                reverseCacheRepository, forwardCache, fixedClock,
+                reverseCacheRepository, forwardCache,
+                new DbCacheMetrics(new SimpleMeterRegistry()),
+                fixedClock,
                 RADIUS_METERS, REFRESH_DAYS);
     }
 

@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.pjr22.tripweather.Utils;
+import com.pjr22.tripweather.config.CacheMetricsConfig.CacheMeterNames;
 import com.pjr22.tripweather.dto.LocationResolution;
 import com.pjr22.tripweather.model.GeoPoint;
 import com.pjr22.tripweather.model.LocationData;
@@ -75,6 +76,7 @@ public class RouteService {
    private final RoutingDispatcher dispatcher;
    private final ObjectMapper objectMapper;
    private final OrsResponseCacheRepository cacheRepository;
+   private final DbCacheMetrics cacheMetrics;
    private final Clock clock;
    private final long directionsTtlHours;
    private final long directionsStaleMaxHours;
@@ -107,6 +109,7 @@ public class RouteService {
          RoutingDispatcher dispatcher,
          ObjectMapper objectMapper,
          OrsResponseCacheRepository cacheRepository,
+         DbCacheMetrics cacheMetrics,
          Clock clock,
          @Value("${trip.routing.directions-ttl-hours:24}") long directionsTtlHours,
          @Value("${trip.routing.directions-stale-max-hours:168}") long directionsStaleMaxHours,
@@ -119,6 +122,7 @@ public class RouteService {
       this.dispatcher = dispatcher;
       this.objectMapper = objectMapper;
       this.cacheRepository = cacheRepository;
+      this.cacheMetrics = cacheMetrics;
       this.clock = clock;
       this.directionsTtlHours = directionsTtlHours;
       this.directionsStaleMaxHours = directionsStaleMaxHours;
@@ -313,40 +317,66 @@ public class RouteService {
                                      ApiCall apiCall) throws Exception {
       Optional<OrsResponseCache> cached = cacheRepository.findById(requestHash);
       LocalDateTime now = LocalDateTime.now(clock);
+      String cacheMetricName = cacheMetricName(endpoint);
 
       if (cached.isPresent()) {
          OrsResponseCache entry = cached.get();
          if (now.isBefore(entry.getFetchedAt().plusHours(ttlHours))) {
+            cacheMetrics.recordHit(cacheMetricName);
             return parseJsonOrNull(entry.getResponseJson());
          }
          try {
             JsonNode fresh = apiCall.execute();
             if (fresh != null) {
+               cacheMetrics.recordMiss(cacheMetricName);
                persist(requestHash, endpoint, fresh, now);
                return fresh;
             }
          } catch (Exception e) {
             if (now.isBefore(entry.getFetchedAt().plusHours(staleMaxHours))) {
+               // Stale-on-error counts as a hit: the cache served the
+               // response. Operators read elevated miss-rates as upstream
+               // pressure; recording stale-served as a miss would falsely
+               // imply we paid the upstream cost.
+               cacheMetrics.recordHit(cacheMetricName);
                log.warn("ORS {} refresh failed; serving stale cached entry from {}",
                      endpoint, entry.getFetchedAt(), e);
                return parseJsonOrNull(entry.getResponseJson());
             }
+            cacheMetrics.recordMiss(cacheMetricName);
             throw e;
          }
          // apiCall returned null without throwing — fall back to stale within window
          if (now.isBefore(entry.getFetchedAt().plusHours(staleMaxHours))) {
+            cacheMetrics.recordHit(cacheMetricName);
             log.warn("ORS {} returned null; serving stale cached entry from {}",
                   endpoint, entry.getFetchedAt());
             return parseJsonOrNull(entry.getResponseJson());
          }
+         cacheMetrics.recordMiss(cacheMetricName);
          return null;
       }
 
+      cacheMetrics.recordMiss(cacheMetricName);
       JsonNode fresh = apiCall.execute();
       if (fresh != null) {
          persist(requestHash, endpoint, fresh, now);
       }
       return fresh;
+   }
+
+   /** Map the internal {@code endpoint} string used as a {@code ors_response_cache.endpoint}
+    *  value to the {@code cache} tag value on {@code cache.gets} meters. Keeps a single
+    *  source of truth in {@link CacheMeterNames}; the four endpoint values are stable
+    *  ({@code directions}, {@code snap}, {@code elevation}, {@code elevation_lookup}). */
+   private static String cacheMetricName(String endpoint) {
+      return switch (endpoint) {
+         case CACHE_KIND_DIRECTIONS         -> CacheMeterNames.ORS_DIRECTIONS;
+         case CACHE_KIND_SNAP               -> CacheMeterNames.ORS_SNAP;
+         case CACHE_KIND_ELEVATION          -> CacheMeterNames.ORS_ELEVATION;
+         case CACHE_KIND_ELEVATION_LOOKUP   -> CacheMeterNames.ORS_ELEVATION_LOOKUP;
+         default -> "ors-" + endpoint;
+      };
    }
 
    private void persist(String hash, String endpoint, JsonNode response, LocalDateTime fetchedAt) {
