@@ -12,7 +12,7 @@ A separate `/admin` SPA, gated by a single admin credential supplied via Spring 
 | 2b — Pbf orchestration | **Done** (2026-05-10). `pbf_files` table + cron-rewrite of `docker/refreshOrsGraph.sh` (table-driven, per-minute, flock-guarded), Pbfs UI card replacing ORS Coverage card, JVM-side manual md5 check, retry-stuck-apply endpoint, polygon staleness self-heal independent of apply gate, migration auto-seeds from `docker/ors-data/`. Live-smoke-tested in dev. |
 | 2c — Region / pbf collapse | **Done** (2026-05-11). One `routing_coverage` row per pbf (name == pbf_name, CASCADE FK); `trip.routing.local-regions` removed; Routing column + Enable/Disable toggle on Pbfs card; `PATCH /api/admin/pbfs/{name}` extended with `routingEnabled`. Plus single-loaded-pbf invariant in the cron (one extract loaded at a time; merging multiple is the deferred follow-up), filterable region picker in a modal add/edit form, shared toast utility extracted to `/static/js/utils/Toast.js` for both SPAs. 237 tests pass. |
 | 3 — Metrics dashboard | **Done** (2026-05-12). `MetricsSnapshotService` reads live from `MeterRegistry`; `GET /api/admin/metrics` (admin-chain protected). Five-panel view (HTTP p50/p95/p99 + mean/max/count, routing dispatch with per-reason fallback breakdown, JVM heap, Top-5 URIs, cache hit ratios). `recordStats()` + `CaffeineCacheMetrics` binder on `forecast` + `geocode-forward` caches; hand-rolled `cache.gets{result=hit\|miss}` counters in `RouteService` / `LocationService` / `WeatherService` for the four ORS DB-caches + reverse-geocode + NWS-gridpoint caches (stale-on-error counts as hit). Stretched the deck: 60 s auto-refresh + Pause/Resume + manual Refresh. `management.metrics.distribution.percentiles-histogram.http.server.requests=true` so the percentile fields actually populate. 249 tests pass. |
-| 4 — User management | Not started. |
+| 4 — User management | **Done** (2026-05-12). `AdminUserController` + `AdminUserService` + three DTOs (`AdminUserSummary` / `AdminUserPage` / `AdminUserDeleteResult`). Five endpoints: paginated list with email/name substring search + enabled tri-state filter + sortable columns (`created` / `email` / `name` / `enabled`, default `created,desc`); enable / disable (idempotent — 204 even when already at the target state, 404 only on missing user); force-verify (consumes still-open `email_verifications` AND `password_resets` rows in one call — deliberate scope-widening from the original sketch); hard-delete (responds with `{activeRoutesDeleted, softDeletedRoutesDeleted}` from a pre-delete native COUNT so the toast can surface what cascaded; existing `ON DELETE CASCADE` FKs on routes/verifications/resets sweep dependents, including soft-deleted routes the JPA `@SQLRestriction` would otherwise hide). Frontend: `UsersView.js` modelled on `RoutesView` (per-row buttons, not a "Manage" modal, for consistency); inline "pending" badge alongside emails with an unconsumed unexpired verification; muted row style for disabled accounts. No schema migration (`User.enabled` + `email_verifications` + `password_resets` all existed). 271 tests pass. |
 | 5 — Hardening (optional) | Not started. |
 
 ## Decisions already made
@@ -546,21 +546,22 @@ None. `User.enabled` and the existing `email_verifications` table cover the oper
 
 ### Endpoints
 
-- `GET  /api/admin/users?q=&enabled=&page=&size=&sort=` — paginated list. Returns `{id, email, name, enabled, created, routeCount, hasPendingVerification}`.
+- `GET  /api/admin/users?q=&enabled=&page=&size=&sort=` — paginated list. Returns `{id, email, name, enabled, created, routeCount, hasPendingVerification}`. Sort fields whitelisted (`created`, `email`, `name`, `enabled`); default `created,desc`. The shared `guest` user is hard-excluded — it's a structural row that must always exist and stay enabled, so none of the user-management actions apply to it. (Guest-owned routes are still visible in the Routes view via the `owner=GUEST` filter.) The mutation endpoints aren't separately guarded against the guest UUID; the list filter is the operator-facing affordance only.
 - `POST /api/admin/users/{id}/enable` — `enabled=true`.
 - `POST /api/admin/users/{id}/disable` — `enabled=false`.
-- `POST /api/admin/users/{id}/force-verify` — `enabled=true` AND delete any pending `email_verifications` row for the user.
-- `DELETE /api/admin/users/{id}` — hard delete; cascade to routes via existing FK.
+- `POST /api/admin/users/{id}/force-verify` — `enabled=true` AND mark every still-open `email_verifications` row AND every still-open `password_resets` row consumed for that user. Clearing both is deliberate: a stuck signup commonly co-exists with a stale reset, and the operator's intent is "unstick this account" — leaving a half-valid reset token would surprise them later.
+- `DELETE /api/admin/users/{id}` — hard delete. Cascades to routes via existing FK (both active and soft-deleted rows go — the FK is unconditional). Response is `200 {activeRoutesDeleted, softDeletedRoutesDeleted}` instead of `204` so the SPA can put the cascaded counts into the success toast and ops have something to diff against if a delete looks off later.
 
 ### Frontend
 
-`admin/users.html` (and `UsersView.js`): search box (email substring), enabled filter, sortable columns, action buttons. Delete requires double-confirm modal showing email + route count.
+`UsersView.js` (no separate `users.html` — the shell renders by hash, same shape as `MetricsView`): search box (email substring), enabled filter, sortable columns, per-row Enable / Disable / Force-verify / Delete buttons. Per-row action buttons (not a "Manage" modal) to stay consistent with `RoutesView`. Delete uses a double-confirm modal showing email + active + soft-deleted route counts; on success the toast shows the cascaded counts returned by the API.
 
 ### Tests
 
 - Enable/disable round-trip.
-- Force-verify clears `email_verifications` row and flips enabled.
-- Delete cascades to that user's routes (including soft-deleted ones — they all go).
+- Force-verify with a pending verification and no reset → both rows still untouched on other users; the target user's verification is consumed and `enabled=true`.
+- Force-verify with both a pending verification AND a pending reset → both are consumed in the same call.
+- Delete cascades to that user's routes — active AND soft-deleted rows both go; response carries the right counts.
 - Search by email substring; pagination boundaries; sort by `created` DESC default.
 
 ### Done when
@@ -602,6 +603,6 @@ Phase 2: new `LoaderRun` / `LoaderRunRepository` / `LoaderRunRecorder`; wrap `Gu
 
 Phase 3 (landed): new `MetricsSnapshotService` / `AdminMetricsController` / `MetricsSnapshotDto` / `DbCacheMetrics` / `CacheMetricsConfig`; `.recordStats()` added to `WeatherCacheConfig` + `GeocodeCacheConfig`; hit/miss instrumentation in `RouteService.getOrFetchCached` + `LocationService.reverseGeocode` + `WeatherService.resolveGridpoint` (constructor signatures changed — accept `DbCacheMetrics`); `application.properties` adds `management.metrics.distribution.percentiles-histogram.http.server.requests=true`. Frontend: `static/admin/js/managers/MetricsView.js` + new CSS in `static/admin/admin.css` + script tag in `index.html` + placeholder map entry removed in `AdminApp.js`. No new `.html` (single-page admin shell renders `metrics.html` ≡ `#metrics` hash). No schema, no migration entry. Tests: new `MetricsSnapshotServiceTest`, `AdminMetricsControllerTest`; constructor-signature updates in `RouteServiceTest` / `LocationServiceTest` / `WeatherServiceTest`; one additional `RouteServiceTest` case asserting the hit-counter contract.
 
-Phase 4: new `AdminUserController`; small additions to `UserAccountService` for force-verify (or call existing pieces); `static/admin/users.html` + `UsersView.js`. No schema, no migration entry.
+Phase 4 (landed): new `AdminUserController` / `AdminUserService` / `AdminUserSummary` / `AdminUserPage` / `AdminUserDeleteResult`. Reuses existing `UserRepository` / `EmailVerificationRepository.consumeOpenForUser` / `PasswordResetRepository.consumeOpenForUser` — no changes needed to those. Frontend: new `static/admin/js/managers/UsersView.js` (no separate `users.html` — the shell renders by hash, same as `MetricsView`); CSS additions in `static/admin/admin.css` for `.users-row-disabled`, `.users-pending-badge`, and `.admin-table button.danger` (inline danger button on per-row Delete, alongside the existing modal danger button). `index.html` adds the script tag; `AdminApp.js` retires its placeholder map (every view now ships). No schema, no migration entry. Tests: new `AdminUserServiceTest` + `AdminUserControllerTest`.
 
 Phase 5: optional, see above.

@@ -29,21 +29,11 @@
     }
 
     function renderPlaceholder(view) {
-        var phaseByView = {
-            data:    { phase: 'Phase 2', title: 'Data' },
-            users:   { phase: 'Phase 4', title: 'Users' }
-        };
-        var info = phaseByView[view];
-        if (!info) {
-            rootEl.innerHTML = '';
-            return;
-        }
-        rootEl.innerHTML =
-            '<h2>' + info.title + '</h2>' +
-            '<div class="placeholder">' +
-                info.title + ' management lands in ' + info.phase +
-                ' of ADMIN_CONSOLE.md.' +
-            '</div>';
+        // Every phase view is now shipped (routes, data, metrics, users).
+        // The placeholder map stays as a safety net for any future nav entry
+        // added before its view JS lands; for unknown hashes, fall back to
+        // a blank pane rather than a stale "coming in phase N" sign.
+        rootEl.innerHTML = '';
     }
 
     function renderActiveView() {

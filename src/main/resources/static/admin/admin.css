@@ -277,6 +277,44 @@ button.primary:hover {
     background: #fafafa;
 }
 
+/* Users view: disabled rows are muted (same treatment as soft-deleted routes
+ * — the row's still there but the user is currently inert). */
+.users-row-disabled td {
+    color: #9ca3af;
+    background: #fafafa;
+}
+
+/* Inline badge next to a user's email when there's a pending (unconsumed,
+ * unexpired) email verification. The cue for "this is who Force-verify
+ * is useful for." */
+.users-pending-badge {
+    display: inline-block;
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin-left: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+}
+
+/* Inline danger button — used for the per-row Delete action on the users
+ * table, alongside the existing modal-confirm danger button. */
+.admin-table button.danger {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+}
+
+.admin-table button.danger:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
+}
+
 .routes-pagination {
     display: flex;
     gap: 12px;
