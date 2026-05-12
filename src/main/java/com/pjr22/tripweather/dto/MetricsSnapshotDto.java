@@ -21,8 +21,13 @@ public record MetricsSnapshotDto(
 
     /**
      * Overall {@code http.server.requests} timer aggregated across all URIs.
-     * Percentile fields require the histogram be enabled
-     * ({@code management.metrics.distribution.percentiles-histogram.http.server.requests=true}).
+     * Percentile fields require server-side percentile aggregation to be
+     * enabled via
+     * {@code management.metrics.distribution.percentiles.http.server.requests=0.5,0.95,0.99}
+     * (note: <em>not</em> the {@code percentiles-histogram.*} flag — that
+     * one publishes bucket time-series for Prometheus client-side quantile
+     * computation but does not populate {@code percentileValues()} on the
+     * Timer snapshot).
      */
     public record HttpLatency(
             long count,

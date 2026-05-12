@@ -791,7 +791,13 @@ button.primary:hover {
 
 .metrics-panels {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    /* ~540px min-width yields three panels per row on a typical 1900px
+     * desktop (220 px nav + ~1680 px content - 2 * 16 px gap fits 3 columns
+     * around 545 px each). Below that — 1366 px laptops — it drops to two
+     * per row and Top URIs gets a comfortable column. The previous 360 px
+     * minimum let four panels share the row at 100 % zoom, which clipped
+     * Top URIs' Max column off the right edge. */
+    grid-template-columns: repeat(auto-fit, minmax(540px, 1fr));
     gap: 16px;
 }
 
@@ -810,39 +816,54 @@ button.primary:hover {
 
 .metrics-panel-header h3 {
     margin: 0;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: #111827;
 }
 
 .metrics-panel-body {
-    padding: 12px 16px;
+    padding: 14px 18px;
 }
 
 .metrics-stat-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 14px;
+}
+
+/* Force exactly three columns regardless of cell count or panel width. The
+ * HTTP latency panel uses this so Mean (row 1 col 1) lines up vertically
+ * with P50 (row 2 col 1), Max with P95, and the empty third col on row 1
+ * reads as "Min slot left intentionally blank" (Micrometer doesn't expose
+ * min from a Timer snapshot). */
+.metrics-stat-grid-three-cols {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .metrics-stat-label {
     color: #6b7280;
-    font-size: 11px;
+    font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin-bottom: 2px;
+    white-space: nowrap;
 }
 
 .metrics-stat-value {
     color: #111827;
-    font-size: 17px;
+    font-size: 18px;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
+    /* Keep the value and its unit suffix on the same line — formatMs/formatMb
+     * append a unit-span with a leading space, and without nowrap a narrow
+     * stat cell wraps "ms" / "MB" / "GB" / "%" to a second line under the
+     * number, which looks broken. */
+    white-space: nowrap;
 }
 
 .metrics-stat-value-unit {
     color: #6b7280;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 400;
     margin-left: 2px;
 }
@@ -850,13 +871,13 @@ button.primary:hover {
 .metrics-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12px;
+    font-size: 13px;
     font-variant-numeric: tabular-nums;
 }
 
 .metrics-table th,
 .metrics-table td {
-    padding: 5px 8px;
+    padding: 6px 10px;
     text-align: left;
     border-bottom: 1px solid #f3f4f6;
 }
@@ -867,6 +888,10 @@ button.primary:hover {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    /* Two-word headers like "Fallback reasons" or "Used %" otherwise wrap
+     * to two rows when the panel is on the narrow side. The header row's
+     * intrinsic height is fine either way; nowrap just keeps it tidy. */
+    white-space: nowrap;
 }
 
 .metrics-table tbody tr:last-child td {
@@ -876,6 +901,9 @@ button.primary:hover {
 .metrics-table td.num,
 .metrics-table th.num {
     text-align: right;
+    /* Same reasoning as .metrics-stat-value: keep "7.9 ms" together so the
+     * unit doesn't drop to a new line when the column is tight. */
+    white-space: nowrap;
 }
 
 .metrics-empty {
@@ -901,6 +929,24 @@ button.primary:hover {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+}
+
+/* Author rule `display: inline-block` above has equal specificity (0,1,0) to
+ * the UA-stylesheet `[hidden] { display: none }`, but author rules win the
+ * cascade — so the bare `hidden` attribute set in shellHtml() / toggled by
+ * updatePauseUi() does nothing on its own. Explicit selector at 0,2,0
+ * specificity restores the hide behaviour. */
+.metrics-paused-flag[hidden] {
+    display: none;
+}
+
+/* Toolbar Pause/Resume button toggles its label between "Pause auto-refresh"
+ * and "Resume auto-refresh"; the two strings render at slightly different
+ * widths, so without a fixed min-width the button reflows and adjacent
+ * elements (the paused flag) jump on each click. Sized to comfortably hold
+ * the longer "Resume auto-refresh" string at the toolbar's 14 px font. */
+#metrics-pause {
+    min-width: 168px;
 }
 
 .metrics-cache-kind {

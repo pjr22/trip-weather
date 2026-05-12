@@ -148,15 +148,24 @@
             return panelWrapper('HTTP latency',
                 '<div class="metrics-empty">No HTTP requests recorded yet.</div>');
         }
+        // Request count moves to the title; rows below carry only latency
+        // statistics. Row 1: Mean, Max (the Min slot is intentionally empty
+        // — Micrometer's Timer.takeSnapshot() exposes count/mean/max/
+        // percentiles but not min, so MetricsSnapshotDto has no minMs).
+        // Row 2: percentiles. The empty <div></div> consumes col 3 row 1
+        // so P50 starts at col 1 row 2, keeping Mean above P50 and Max
+        // above P95.
+        var requestsLabel = formatInt(http.count)
+                + (http.count === 1 ? ' request' : ' requests');
         var stats = ''
-            + statCell('Requests', formatInt(http.count))
             + statCell('Mean', formatMs(http.meanMs))
+            + statCell('Max', formatMs(http.maxMs))
+            + '<div></div>'
             + statCell('p50', formatMs(http.p50Ms))
             + statCell('p95', formatMs(http.p95Ms))
-            + statCell('p99', formatMs(http.p99Ms))
-            + statCell('Max', formatMs(http.maxMs));
-        return panelWrapper('HTTP latency',
-            '<div class="metrics-stat-grid">' + stats + '</div>');
+            + statCell('p99', formatMs(http.p99Ms));
+        return panelWrapper('HTTP latency (' + requestsLabel + ')',
+            '<div class="metrics-stat-grid metrics-stat-grid-three-cols">' + stats + '</div>');
     }
 
     // ----------------------------------------------- Panel: Routing dispatch

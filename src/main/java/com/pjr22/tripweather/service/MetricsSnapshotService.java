@@ -37,10 +37,15 @@ import java.util.concurrent.TimeUnit;
  * <ul>
  *   <li><b>HTTP latency</b> — aggregates every {@code http.server.requests}
  *       Timer (one per URI × method × status combination) into one mean /
- *       p50 / p95 / p99 / max. Percentiles require
- *       {@code management.metrics.distribution.percentiles-histogram.http.server.requests=true}
- *       in {@code application.properties}; without it the histogram is
- *       empty and the percentile fields are zero.</li>
+ *       p50 / p95 / p99 / max. Percentile values come from each Timer's
+ *       {@link io.micrometer.core.instrument.distribution.HistogramSnapshot#percentileValues()},
+ *       which is only populated when
+ *       {@code management.metrics.distribution.percentiles.http.server.requests=0.5,0.95,0.99}
+ *       is set in {@code application.properties}. The separate
+ *       {@code percentiles-histogram.*} flag publishes bucket time-series
+ *       for Prometheus client-side quantile computation, but does <em>not</em>
+ *       populate {@code percentileValues()} — without {@code percentiles.*}
+ *       the snapshot reports zeros even with histogram buckets enabled.</li>
  *   <li><b>Routing dispatch</b> — reads the three {@link
  *       com.pjr22.tripweather.routing.RoutingMetrics} counter families
  *       ({@code trip.routing.local.success}, {@code .local.fallback},
