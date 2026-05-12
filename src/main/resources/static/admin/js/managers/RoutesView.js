@@ -52,7 +52,6 @@
             +   '</select>'
             +   '<button id="routes-trigger-cleanup">Trigger cleanup</button>'
             + '</div>'
-            + '<div id="routes-message" class="routes-message"></div>'
             + '<div id="routes-table-wrap"></div>';
     }
 
@@ -288,11 +287,21 @@
         }
     }
 
+    /**
+     * Delegate to the shared floating toast (window.Toast — same code the
+     * main SPA uses). The legacy {kind: 'ok' | 'err'} convention used by
+     * this view is mapped to Toast's {type: 'success' | 'error'}. Calls
+     * without a kind (the previous "Loading…" inline indicator pattern)
+     * are dropped — those don't translate cleanly to a floating toast and
+     * the table re-rendering is already feedback enough.
+     */
     function showMessage(text, kind) {
-        var el = document.getElementById('routes-message');
-        if (!el) return;
-        el.textContent = text || '';
-        el.className = 'routes-message' + (kind ? ' routes-message-' + kind : '');
+        if (!text || !window.Toast) return;
+        var type;
+        if (kind === 'ok')       type = 'success';
+        else if (kind === 'err') type = 'error';
+        else                     return;
+        window.Toast.show(text, type);
     }
 
     function formatTimestamp(value) {

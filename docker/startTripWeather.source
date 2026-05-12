@@ -1,11 +1,20 @@
 OPENROUTESERVICE_API_KEY=`cat ../openRouteService_api_key.txt`
 GEOAPIFY_API_KEY=`cat ../geoApify_api_key.txt`
 NREL_API_KEY=`cat ../developer.nrel.gov_api_key.txt`
+TRIP_EMAIL_ENABLED=true
 TRIP_EMAIL_URL=https://send.api.mailtrap.io/api/send
 TRIP_EMAIL_APIKEY=`cat ../mailtrap_api_key.txt`
 TRIP_EMAIL_FROM=tripweather@pjr22.com
+TRIP_EMAIL_FROM_NAME="Trip Weather"
+TRIP_APP_BASE_URL=https://tripweather.pjr22.com
 TRIP_DB_PASSWORD=`cat ../trip_db_password.txt`
-TRIP_REMEMBER_ME_KEY="$(openssl rand -base64 48)"
+TRIP_REMEMBER_ME_KEY=`cat ../remember_me_key.txt`
+TRIP_ADMIN_USERNAME=admin
+TRIP_ADMIN_PASSWORD=`cat ../admin_password.txt`
+TRIP_ADMIN_REFRESH_TOKEN=`cat ../admin_refresh_token.txt`
+TRIP_LOCAL_ORS_ENABLED=true
+TRIP_LOCAL_ORS_BASE_URL=http://trip-ors:8082/ors
+TRIP_TILE_PROXY_ENABLED=true
 
 echo "Using OpenRouteService API key: $OPENROUTESERVICE_API_KEY"
 echo "Using GeoApify API key: $GEOAPIFY_API_KEY"
@@ -18,11 +27,20 @@ docker run --name trip-weather \
  -e OPENROUTESERVICE_API_KEY=${OPENROUTESERVICE_API_KEY} \
  -e GEOAPIFY_API_KEY=${GEOAPIFY_API_KEY} \
  -e NREL_API_KEY=${NREL_API_KEY} \
+ -e TRIP_EMAIL_ENABLED=${TRIP_EMAIL_ENABLED} \
  -e TRIP_EMAIL_APIKEY=${TRIP_EMAIL_APIKEY} \
  -e TRIP_EMAIL_URL=${TRIP_EMAIL_URL} \
  -e TRIP_EMAIL_FROM=${TRIP_EMAIL_FROM} \
+ -e TRIP_EMAIL_FROM_NAME="${TRIP_EMAIL_FROM_NAME}" \
+ -e TRIP_APP_BASE_URL=${TRIP_APP_BASE_URL} \
  -e TRIP_DB_URL=jdbc:postgresql://tripdb:5432/postgres \
  -e TRIP_DB_PASSWORD=${TRIP_DB_PASSWORD} \
  -e TRIP_REMEMBER_ME_KEY=${TRIP_REMEMBER_ME_KEY} \
+ -e TRIP_ADMIN_USERNAME=${TRIP_ADMIN_USERNAME} \
+ -e TRIP_ADMIN_PASSWORD=${TRIP_ADMIN_PASSWORD} \
+ -e TRIP_ADMIN_REFRESH_TOKEN=${TRIP_ADMIN_REFRESH_TOKEN} \
+ -e TRIP_LOCAL_ORS_ENABLED=${TRIP_LOCAL_ORS_ENABLED} \
+ -e TRIP_LOCAL_ORS_BASE_URL=${TRIP_LOCAL_ORS_BASE_URL} \
+ -e TRIP_TILE_PROXY_ENABLED=${TRIP_TILE_PROXY_ENABLED} \
  --net forgotten_net \
- org.pjr22/trip-weather:latest 
+ org.pjr22/trip-weather:latest

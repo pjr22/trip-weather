@@ -222,15 +222,8 @@ button.primary:hover {
     font-size: 14px;
 }
 
-.routes-message {
-    min-height: 18px;
-    margin-bottom: 8px;
-    font-size: 13px;
-    color: #6b7280;
-}
-
-.routes-message-ok  { color: #059669; }
-.routes-message-err { color: #dc2626; }
+/* Action-result feedback now uses the floating toast helper (window.Toast,
+ * shared with the main SPA). Inline .routes-message styles retired. */
 
 .routes-empty {
     background: #ffffff;
@@ -372,6 +365,88 @@ button.primary:hover {
 .admin-modal-actions button:focus-visible {
     outline: 2px solid #2563eb;
     outline-offset: 2px;
+}
+
+/* ----- Form modal (dynamically created by AdminUI.openFormModal) ------- */
+
+.admin-form-modal-card {
+    max-width: 560px;
+}
+
+.admin-form-modal-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.admin-form-modal-body label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.admin-form-modal-body label .admin-form-hint {
+    font-size: 11px;
+    font-weight: 400;
+    color: #6b7280;
+    margin-top: 2px;
+}
+
+.admin-form-modal-body input[type="text"],
+.admin-form-modal-body input[type="url"],
+.admin-form-modal-body input[type="number"],
+.admin-form-modal-body input[type="datetime-local"] {
+    padding: 6px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 400;
+    color: #111827;
+    background: #ffffff;
+}
+
+.admin-form-modal-body input:focus {
+    outline: 2px solid #2563eb;
+    outline-offset: -1px;
+    border-color: #2563eb;
+}
+
+.admin-form-modal-body .admin-form-checkbox {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    font-weight: 400;
+    font-size: 13px;
+}
+
+.admin-form-modal-body .admin-form-checkbox input {
+    margin: 0;
+}
+
+.admin-form-modal-body .admin-form-row {
+    display: flex;
+    gap: 10px;
+}
+
+.admin-form-modal-body .admin-form-row > label {
+    flex: 1 1 0;
+}
+
+.admin-form-modal-error {
+    margin: 0 20px 14px;
+    padding: 8px 12px;
+    background: #fee2e2;
+    color: #991b1b;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.admin-form-modal-error[hidden] {
+    display: none;
 }
 
 /* ----- Data / Loaders view --------------------------------------------- */
@@ -604,6 +679,35 @@ button.primary:hover {
     word-break: break-all;
 }
 
+.data-pbf-routing {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+.data-pbf-routing-active   { color: #059669; }
+.data-pbf-routing-disabled { color: #9ca3af; }
+
+/* Single-loaded-pbf banner at the top of the Pbfs card. Surfaces which
+ * pbf is currently loaded into trip-ors so admin doesn't have to scan
+ * row state. Hidden when there's only one pbf row (no ambiguity). */
+.data-pbf-banner {
+    margin: 4px 0 12px;
+    padding: 10px 14px;
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.data-pbf-banner-warn {
+    background: #fffbeb;
+    color: #92400e;
+    border-color: #fcd34d;
+}
+
 .data-pbf-actions {
     grid-area: actions;
     display: flex;
@@ -631,57 +735,3 @@ button.primary:hover {
     grid-area: error;
 }
 
-/* Edit / Add form, rendered inline in place of a row. */
-.data-pbf-editing {
-    background: #f9fafb;
-    border-radius: 4px;
-    padding: 12px;
-}
-
-.data-pbf-form {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px 16px;
-}
-
-.data-pbf-form label {
-    display: flex;
-    flex-direction: column;
-    font-size: 12px;
-    color: #4b5563;
-    gap: 3px;
-}
-
-.data-pbf-form label input[type="text"],
-.data-pbf-form label input[type="url"],
-.data-pbf-form label input[type="number"],
-.data-pbf-form label input[type="datetime-local"],
-.data-pbf-form label input:not([type]) {
-    padding: 6px 8px;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    font-size: 13px;
-    font-family: inherit;
-}
-
-.data-pbf-form label input[readonly] {
-    background: #e5e7eb;
-    color: #6b7280;
-}
-
-.data-pbf-form-checkbox {
-    flex-direction: row !important;
-    align-items: center;
-    gap: 6px !important;
-}
-
-.data-pbf-form-checkbox input {
-    width: auto;
-}
-
-.data-pbf-form-actions {
-    grid-column: 1 / -1;
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-}

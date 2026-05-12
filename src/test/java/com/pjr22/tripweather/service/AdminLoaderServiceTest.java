@@ -4,7 +4,9 @@ import com.pjr22.tripweather.dto.LoaderSummaryDto;
 import com.pjr22.tripweather.model.LoaderRun;
 import com.pjr22.tripweather.model.LoaderRun.Status;
 import com.pjr22.tripweather.model.LoaderRun.TriggerType;
+import com.pjr22.tripweather.model.PbfFile;
 import com.pjr22.tripweather.repository.LoaderRunRepository;
+import com.pjr22.tripweather.repository.PbfFileRepository;
 import com.pjr22.tripweather.routing.GeofabrikCoverageLoader;
 import com.pjr22.tripweather.scheduler.GuestRouteCleanupJob;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,13 +46,25 @@ class AdminLoaderServiceTest {
     @Mock private EvStationLoader evStationLoader;
     @Mock private GeofabrikCoverageLoader coverageLoader;
     @Mock private ObjectProvider<GeofabrikCoverageLoader> coverageLoaderProvider;
+    @Mock private PbfFileRepository pbfFileRepository;
 
     private AdminLoaderService service;
 
     @BeforeEach
     void setUp() {
         service = new AdminLoaderService(runRepository, cleanupJob, evStationLoader,
-                coverageLoaderProvider);
+                coverageLoaderProvider, pbfFileRepository);
+    }
+
+    /** Convenience: build pbf_files mocks that yield the given pbf names. */
+    private List<PbfFile> pbfRowsFor(String... names) {
+        return java.util.Arrays.stream(names)
+                .map(n -> {
+                    PbfFile p = new PbfFile();
+                    p.setPbfName(n);
+                    return p;
+                })
+                .toList();
     }
 
     private LoaderRun runFor(String name, Status status) {
@@ -70,7 +84,7 @@ class AdminLoaderServiceTest {
     @Test
     void listLoaders_includesStaticAndCoverageLoaders_inDeclarationOrder() {
         when(coverageLoaderProvider.getIfAvailable()).thenReturn(coverageLoader);
-        when(coverageLoader.getRegions()).thenReturn(List.of("colorado", "nevada"));
+        when(pbfFileRepository.findAll()).thenReturn(pbfRowsFor("colorado", "nevada"));
         // Repository: distinct names returns nothing extra (no historical-only).
         when(runRepository.findDistinctLoaderNames()).thenReturn(List.of());
         // No last-run for any of them (empty).
@@ -79,8 +93,8 @@ class AdminLoaderServiceTest {
 
         List<LoaderSummaryDto> list = service.listLoaders();
 
-        // 3 static + 2 coverage regions = 5 total, in declaration order:
-        // cleanup loaders → data loader → coverage regions.
+        // 3 static + 2 coverage pbfs = 5 total, in declaration order:
+        // cleanup loaders → data loader → coverage pbfs.
         assertThat(list).extracting(LoaderSummaryDto::getName).containsExactly(
                 GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME,
                 GuestRouteCleanupJob.EMAIL_TOKEN_CLEANUP_LOADER_NAME,
@@ -94,8 +108,8 @@ class AdminLoaderServiceTest {
     @Test
     void listLoaders_includesHistoricalNames_atTheEnd() {
         when(coverageLoaderProvider.getIfAvailable()).thenReturn(null);   // local ORS off
-        // texas was once configured; its rows linger in the table even
-        // though it's no longer in trip.routing.local-regions.
+        // texas was once configured; its rows linger in loader_runs even
+        // though its pbf row was deleted.
         when(runRepository.findDistinctLoaderNames())
                 .thenReturn(List.of("ors-coverage:texas"));
         when(runRepository.findFirstByLoaderNameOrderByStartedAtDesc(any()))
@@ -244,7 +258,7 @@ class AdminLoaderServiceTest {
     @Test
     void triggerByName_dispatchesCoverageRegion_withManualTrigger() throws InterruptedException {
         when(coverageLoaderProvider.getIfAvailable()).thenReturn(coverageLoader);
-        when(coverageLoader.getRegions()).thenReturn(List.of("colorado"));
+        when(pbfFileRepository.existsById("colorado")).thenReturn(true);
         when(runRepository.existsByLoaderNameAndStatus(
                 "ors-coverage:colorado", Status.RUNNING)).thenReturn(false);
         CountDownLatch invoked = new CountDownLatch(1);
@@ -283,19 +297,19 @@ class AdminLoaderServiceTest {
     @Test
     void triggerByName_coverage_unknownRegion_throwsIllegalArgument() {
         when(coverageLoaderProvider.getIfAvailable()).thenReturn(coverageLoader);
-        when(coverageLoader.getRegions()).thenReturn(List.of("colorado"));
+        when(pbfFileRepository.existsById("wyoming")).thenReturn(false);
         when(runRepository.existsByLoaderNameAndStatus(
                 "ors-coverage:wyoming", Status.RUNNING)).thenReturn(false);
 
         assertThatThrownBy(() -> service.triggerByName("ors-coverage:wyoming"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("not in trip.routing.local-regions");
+                .hasMessageContaining("not in pbf_files");
     }
 
     @Test
     void refreshAllCoverageRegions_iteratesEveryRegion_inOrder() throws InterruptedException {
         when(coverageLoaderProvider.getIfAvailable()).thenReturn(coverageLoader);
-        when(coverageLoader.getRegions()).thenReturn(List.of("colorado", "nevada", "utah"));
+        when(pbfFileRepository.findAll()).thenReturn(pbfRowsFor("colorado", "nevada", "utah"));
 
         // Each refresh counts down the latch when it fires; we wait for
         // all 3 to confirm sequential dispatch, then assert order.
@@ -318,7 +332,7 @@ class AdminLoaderServiceTest {
     @Test
     void refreshAllCoverageRegions_continuesAfterPerRegionFailure() throws InterruptedException {
         when(coverageLoaderProvider.getIfAvailable()).thenReturn(coverageLoader);
-        when(coverageLoader.getRegions()).thenReturn(List.of("colorado", "nevada"));
+        when(pbfFileRepository.findAll()).thenReturn(pbfRowsFor("colorado", "nevada"));
         // colorado throws; nevada must still be attempted.
         org.mockito.Mockito.doThrow(new RuntimeException("simulated"))
                 .when(coverageLoader).refresh(eq("colorado"), eq(TriggerType.MANUAL));

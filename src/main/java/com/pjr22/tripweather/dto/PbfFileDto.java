@@ -1,18 +1,22 @@
 package com.pjr22.tripweather.dto;
 
 import com.pjr22.tripweather.model.PbfFile;
+import com.pjr22.tripweather.model.RoutingCoverage;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 
 /**
  * Wire shape for {@code GET /api/admin/pbfs} and the per-row endpoints.
- * Phase 2b of ADMIN_CONSOLE.md.
+ * Phase 2b of ADMIN_CONSOLE.md, extended in Phase 2c to surface the paired
+ * {@code routing_coverage} row's dispatcher state on the same DTO (the
+ * admin UI shows one row per pbf, even though two DB tables back it).
  *
- * <p>Three derived flags are computed server-side so the admin SPA renders
- * them without having to reproduce the staleness / in-flight logic:
+ * <p>Three derived pbf flags are computed server-side so the admin SPA
+ * renders them without having to reproduce the staleness / in-flight logic:
  * <ul>
  *   <li>{@code stale} — {@code last_remote_md5} is non-null and differs
  *       from {@code last_apply_md5}. Upstream has a newer pbf than what's
@@ -23,6 +27,15 @@ import java.time.ZonedDateTime;
  *       {@code last_apply_started_at} is older than the 4 h
  *       stale-detection window. UI shows "Retry stuck apply" button when
  *       this flag is true.</li>
+ * </ul>
+ *
+ * <p>Phase 2c routing fields:
+ * <ul>
+ *   <li>{@code routingEnabled} — {@code routing_coverage.enabled}; admin's
+ *       manual dispatcher toggle.</li>
+ *   <li>{@code routingHasPolygon} — {@code routing_coverage.geom IS NOT NULL};
+ *       true once the cron has fetched at least one .poly.</li>
+ *   <li>{@code routingFetchedAt} — when the polygon was last refreshed.</li>
  * </ul>
  */
 @Data
@@ -55,12 +68,17 @@ public class PbfFileDto {
     private String lastApplyStatus;
     private String lastApplyError;
 
-    // Derived flags.
+    // Derived pbf flags.
     private boolean stale;
     private boolean applyInFlight;
     private boolean applyStuck;
 
-    public static PbfFileDto from(PbfFile entity) {
+    // Phase 2c — paired routing_coverage row state.
+    private boolean routingEnabled;
+    private boolean routingHasPolygon;
+    private LocalDateTime routingFetchedAt;
+
+    public static PbfFileDto from(PbfFile entity, RoutingCoverage routing) {
         if (entity == null) return null;
         PbfFileDto dto = new PbfFileDto();
         dto.pbfName = entity.getPbfName();
@@ -86,6 +104,12 @@ public class PbfFileDto {
         dto.applyStuck = dto.applyInFlight
                 && entity.getLastApplyStartedAt()
                         .isBefore(ZonedDateTime.now().minusHours(APPLY_STUCK_AFTER_HOURS));
+
+        if (routing != null) {
+            dto.routingEnabled = routing.isEnabled();
+            dto.routingHasPolygon = routing.getGeom() != null;
+            dto.routingFetchedAt = routing.getFetchedAt();
+        }
         return dto;
     }
 }

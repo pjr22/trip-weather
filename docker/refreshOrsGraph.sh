@@ -12,10 +12,20 @@
 #   3. Full apply, only when next_update_at is due — fetches the .md5
 #      first and SKIPS the heavy work (status = NO_CHANGE) when the md5
 #      matches last_apply_md5. Otherwise: download, verify, stop trip-ors,
-#      atomically swap the pbf, wipe the graph volume, restart, refresh
-#      coverage polygons for each region linked via routing_coverage.pbf_name.
+#      atomically swap the pbf, wipe the graph volume, restart, and refresh
+#      the coverage polygon for the single routing_coverage row whose name
+#      equals pbf_name (Phase 2c: routing_coverage is 1:1 with pbf_files).
 #   4. Auto-reschedule next_update_at after a successful apply, but ONLY
 #      if update_interval_days is set (NULL = admin schedules each apply).
+#
+# Single-loaded-pbf invariant: runOrs.sh / ors-config.yml mount and load
+# exactly one .osm.pbf at a time. After every successful apply (or
+# NO_CHANGE), enforce_single_loaded_pbf clears geom + fetched_at for every
+# OTHER routing_coverage row so the dispatcher's coversAll() (which
+# filters `enabled AND geom IS NOT NULL`) sees local coverage only for
+# the actually-loaded pbf. ADMIN_CONSOLE.md Phase 2c addendum has the
+# detail; this is the right design until the merge-multiple-pbfs follow-up
+# lands.
 #
 # Host crontab — every minute, flock-guarded so two ticks can't overlap:
 #
@@ -288,6 +298,7 @@ do_apply() {
     local geofabrik_url="$2"
     local update_interval_days="$3"
     local last_apply_md5="$4"
+    local check_interval_days="$5"
 
     echo "  [${pbf_name}] apply: fetching upstream .md5 to decide if rebuild is needed"
 
@@ -316,7 +327,7 @@ do_apply() {
     # the NO_CHANGE branch just records status and exits.
     if [ "${remote_md5}" = "${last_apply_md5}" ] && [ -n "${last_apply_md5}" ]; then
         echo "  [${pbf_name}] apply: NO_CHANGE — deployed md5 matches upstream"
-        record_apply_no_change "${pbf_name}" "${remote_md5}" "${update_interval_days}"
+        record_apply_no_change "${pbf_name}" "${remote_md5}" "${update_interval_days}" "${check_interval_days}"
         return 0
     fi
 
@@ -367,37 +378,62 @@ do_apply() {
         return 1
     fi
 
-    # Polygon refresh: every region linked to this pbf gets a fresh .poly
-    # fetch + routing_coverage upsert. After a successful pbf swap the
-    # polygons could in theory have drifted (Geofabrik re-clipping), so
-    # refresh all of them; not just the stale subset.
-    local all_regions
-    all_regions="$(psql_query "SELECT string_agg(name, ',')
-        FROM routing_coverage WHERE pbf_name = '${pbf_name}'")"
-    if [ -n "${all_regions}" ] && [ "${all_regions}" != " " ]; then
-        refresh_polygons_for_regions "${pbf_name}" "${all_regions}"
+    # Polygon refresh: Phase 2c collapsed routing_coverage to 1:1 with
+    # pbf_files (routing_coverage.name == pbf_files.pbf_name), so we either
+    # have exactly one row to refresh or none (the row should be auto-
+    # created when admin adds the pbf; absence means the migration didn't
+    # run or somebody manually deleted the row).
+    local has_row
+    has_row="$(psql_query "SELECT 1 FROM routing_coverage WHERE name = '${pbf_name}'")"
+    if [ -n "${has_row}" ] && [ "${has_row}" != " " ]; then
+        refresh_polygons_for_regions "${pbf_name}" "${pbf_name}"
     else
-        echo "  [${pbf_name}] apply: no routing_coverage rows linked to this pbf; skipping polygon refresh"
+        echo "  [${pbf_name}] apply: no routing_coverage row for this pbf; skipping polygon refresh"
     fi
 
-    record_apply_success "${pbf_name}" "${remote_md5}" "${update_interval_days}"
+    record_apply_success "${pbf_name}" "${remote_md5}" "${update_interval_days}" "${check_interval_days}"
     echo "  [${pbf_name}] apply: SUCCESS"
 }
 
 # Polygon staleness self-heal — runs every tick for every active pbf,
-# independent of the apply gate. If any routing_coverage row's
-# fetched_at is older than the pbf's last_apply_finished_at, the
-# previous apply's polygon-refresh step didn't reach that row (transient
-# network, prior column-name bug, manual re-seed, etc.) and we refresh
-# just those rows. Common case (everything in sync) is one SELECT that
-# returns nothing.
+# independent of the apply gate. If the currently-loaded pbf's polygon is
+# missing or older than its last_apply_finished_at, the previous apply's
+# polygon-refresh step didn't reach the row (transient network, prior
+# column-name bug, manual re-seed, etc.) and we refresh it.
+#
+# Important: with the single-loaded-pbf invariant (see
+# enforce_single_loaded_pbf), only ONE pbf is actually loaded into
+# trip-ors at a time. Re-fetching polygons for other pbfs would resurrect
+# stale-but-no-longer-valid local coverage — the dispatcher would then
+# route into a polygon whose underlying graph isn't loaded and fail the
+# local call before falling back. So self-heal runs only when this row IS
+# the currently-loaded pbf (the most recent successful apply).
 check_and_refresh_stale_polygons() {
     local pbf_name="$1"
+    # Most recent successful (OK or NO_CHANGE) apply across all rows is
+    # the currently-loaded pbf. If this row isn't it, leave it alone —
+    # its geom should be NULL anyway (enforced after the other pbf's
+    # successful apply) and re-fetching it would break the invariant.
+    local loaded_pbf
+    loaded_pbf="$(psql_query "SELECT pbf_name FROM pbf_files
+        WHERE last_apply_finished_at IS NOT NULL
+          AND last_apply_status IN ('OK', 'NO_CHANGE')
+        ORDER BY last_apply_finished_at DESC
+        LIMIT 1")"
+    loaded_pbf="$(echo "${loaded_pbf}" | tr -d '[:space:]')"
+
+    if [ "${loaded_pbf}" != "${pbf_name}" ]; then
+        # Either this row was never applied (skip silently) or it's an
+        # older apply that another pbf has since replaced (the
+        # enforce_single_loaded_pbf step cleared its polygon).
+        return 0
+    fi
+
     local stale_regions
     stale_regions="$(psql_query "SELECT string_agg(rc.name, ',')
         FROM routing_coverage rc
-        JOIN pbf_files pf ON pf.pbf_name = rc.pbf_name
-        WHERE rc.pbf_name = '${pbf_name}'
+        JOIN pbf_files pf ON pf.pbf_name = rc.name
+        WHERE rc.name = '${pbf_name}'
           AND pf.last_apply_finished_at IS NOT NULL
           AND (rc.fetched_at IS NULL
                OR rc.fetched_at < pf.last_apply_finished_at)")"
@@ -443,7 +479,7 @@ refresh_polygons_for_regions() {
                     echo "  [${pbf_name}] WARN [${region}]: HTTP 401 from ${TRIP_LOCAL_APP_BASE_URL} — X-Admin-Token rejected. Check that TRIP_ADMIN_REFRESH_TOKEN is set in BOTH the trip-weather environment AND this script's environment, and that they match."
                     ;;
                 404)
-                    echo "  [${pbf_name}] WARN [${region}]: HTTP 404 from ${TRIP_LOCAL_APP_BASE_URL} — region not in trip.routing.local-regions, or TRIP_LOCAL_APP_BASE_URL is wrong (nginx not routing /api/admin/* through? running on port 8091 in prod)"
+                    echo "  [${pbf_name}] WARN [${region}]: HTTP 404 from ${TRIP_LOCAL_APP_BASE_URL} — no pbf_files row named '${region}', or TRIP_LOCAL_APP_BASE_URL is wrong (nginx not routing /api/admin/* through? running on port 8091 in prod)"
                     ;;
                 *)
                     echo "  [${pbf_name}] WARN [${region}]: HTTP ${http_code} from ${TRIP_LOCAL_APP_BASE_URL}: ${body}"
@@ -458,10 +494,22 @@ refresh_polygons_for_regions() {
 
 # Sets last_apply_status = OK, records the deployed md5, auto-reschedules
 # next_update_at if update_interval_days is non-null.
+#
+# Also folds the upstream-observation columns (last_check_at,
+# last_remote_md5, next_check_at) into this UPDATE: do_apply just fetched
+# the .md5 a moment ago, so we know the current upstream value. Writing it
+# here keeps the stale-detection flag honest — without this update,
+# last_remote_md5 would still reflect whatever the previous cheap check
+# saw, which (if upstream rolled forward between then and the apply)
+# differs from last_apply_md5 and renders the row as "STALE — newer pbf
+# available" the moment after a fresh successful apply. Same reasoning
+# applies to do_cheap_check: an apply IS a check, so we reset
+# next_check_at on the same cadence.
 record_apply_success() {
     local pbf_name="$1"
     local md5="$2"
     local update_interval_days="$3"
+    local check_interval_days="$4"
 
     local next_update_clause="next_update_at = NULL"
     if [ -n "${update_interval_days}" ] && [ "${update_interval_days}" != " " ]; then
@@ -473,16 +521,25 @@ record_apply_success() {
         last_apply_md5 = lower('${md5}'),
         last_apply_status = 'OK',
         last_apply_error = NULL,
+        last_check_at = now(),
+        last_remote_md5 = lower('${md5}'),
+        next_check_at = now() + INTERVAL '${check_interval_days} days',
         ${next_update_clause}
         WHERE pbf_name = '${pbf_name}'"
+
+    enforce_single_loaded_pbf "${pbf_name}"
 }
 
 # Same as success but with status = NO_CHANGE — the apply fired but
 # upstream md5 matched what's deployed, so no actual work was done.
+# Folds in the same upstream-observation update as record_apply_success;
+# we did fetch the .md5 in the apply path, and that value now stamps
+# last_remote_md5 / last_check_at.
 record_apply_no_change() {
     local pbf_name="$1"
     local md5="$2"
     local update_interval_days="$3"
+    local check_interval_days="$4"
 
     local next_update_clause="next_update_at = NULL"
     if [ -n "${update_interval_days}" ] && [ "${update_interval_days}" != " " ]; then
@@ -493,8 +550,47 @@ record_apply_no_change() {
         last_apply_finished_at = now(),
         last_apply_status = 'NO_CHANGE',
         last_apply_error = NULL,
+        last_check_at = now(),
+        last_remote_md5 = lower('${md5}'),
+        next_check_at = now() + INTERVAL '${check_interval_days} days',
         ${next_update_clause}
         WHERE pbf_name = '${pbf_name}'"
+
+    enforce_single_loaded_pbf "${pbf_name}"
+}
+
+# Single-loaded-pbf invariant.
+#
+# The current runOrs.sh / ors-config.yml architecture loads exactly one
+# pbf at a time (one bind-mount at /home/ors/files/osm-file.osm.pbf).
+# So at the moment any apply for pbf X succeeds (or comes back NO_CHANGE),
+# X is the only locally routable extract and every other pbf row's
+# polygon — left over from a previous apply — is stale signal: the
+# dispatcher would route into the polygon, call local ORS, get no path,
+# and fall back. We clear those rows' geom + fetched_at so the
+# dispatcher's coversAll() ignores them (the filter is
+# `enabled AND geom IS NOT NULL`).
+#
+# When admin re-applies a previously-loaded pbf, its polygon is re-fetched
+# by the post-apply refresh step, so the previously-cleared geom comes
+# back. last_apply_* columns on the other rows are left untouched —
+# they're historical bookkeeping the admin can still see.
+enforce_single_loaded_pbf() {
+    local loaded_pbf_name="$1"
+    local cleared
+    cleared="$(psql_query "
+        WITH cleared AS (
+            UPDATE routing_coverage
+               SET geom = NULL,
+                   fetched_at = NULL
+             WHERE name <> '${loaded_pbf_name}'
+               AND geom IS NOT NULL
+            RETURNING name
+        )
+        SELECT string_agg(name, ', ') FROM cleared")"
+    if [ -n "${cleared}" ] && [ "${cleared}" != " " ]; then
+        echo "  [${loaded_pbf_name}] single-loaded-pbf invariant: cleared polygon(s) for: ${cleared}"
+    fi
 }
 
 # Sets last_apply_status to the failure stage + records the error message.
@@ -571,7 +667,7 @@ while IFS='|' read -r pbf_name geofabrik_url check_interval_days update_interval
         if [ "${next_update_epoch}" -gt "${NOW_EPOCH}" ]; then
             echo "    apply: scheduled but not due (next at ${next_update_at})"
         else
-            do_apply "${pbf_name}" "${geofabrik_url}" "${update_interval_days}" "${last_apply_md5}" || true
+            do_apply "${pbf_name}" "${geofabrik_url}" "${update_interval_days}" "${last_apply_md5}" "${check_interval_days}" || true
         fi
     fi
 

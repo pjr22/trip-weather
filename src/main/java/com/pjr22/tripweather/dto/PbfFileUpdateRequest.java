@@ -31,4 +31,12 @@ public class PbfFileUpdateRequest {
     private ZonedDateTime nextCheckAt;
 
     private ZonedDateTime nextUpdateAt;
+
+    /**
+     * Phase 2c: writes to {@code routing_coverage.enabled} for the paired
+     * row. The pbf and routing tables share a primary key (and a CASCADE
+     * FK) so admin sees one logical record on the Pbfs card; the service
+     * fans this field out to the second table inside the same transaction.
+     */
+    private Boolean routingEnabled;
 }

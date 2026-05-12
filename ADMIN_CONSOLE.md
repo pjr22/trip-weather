@@ -9,8 +9,8 @@ A separate `/admin` SPA, gated by a single admin credential supplied via Spring 
 | 0 — Authentication & shell | **Done** (2026-05-10). Two-chain SecurityConfig + namespaced session attribute, JSON login/logout/me, X-Admin-Token coexists on `refresh-coverage` only, login → empty shell. Smoke-tested live; 161/161 unit tests pass. |
 | 1 — Route management | **Done** (2026-05-10). `routes.deleted_at` + `@SQLRestriction`, native-SQL admin paths, two-stage cleanup (soft → grace → hard), four admin endpoints, Routes view with search / owner / show-deleted toggle, sortable paginated table. |
 | 2 — Loader & data management | **Done** (2026-05-10). `loader_runs` table + recorder + concurrency guard, manual triggers for cleanup / EV / ORS coverage, sequential refresh-all, polling Data view, legacy `refresh-coverage` endpoint records as CRON. |
-| 2b — Pbf orchestration | Not started. Pbf-file freshness observability + table-driven cron-rewrite of `docker/refreshOrsGraph.sh`. |
-| 2c — Region management | Not started. UI for adding/removing per-region rows in `routing_coverage` (tied to a pbf via `routing_coverage.pbf_name`). |
+| 2b — Pbf orchestration | **Done** (2026-05-10). `pbf_files` table + cron-rewrite of `docker/refreshOrsGraph.sh` (table-driven, per-minute, flock-guarded), Pbfs UI card replacing ORS Coverage card, JVM-side manual md5 check, retry-stuck-apply endpoint, polygon staleness self-heal independent of apply gate, migration auto-seeds from `docker/ors-data/`. Live-smoke-tested in dev. |
+| 2c — Region / pbf collapse | **Done** (2026-05-11). One `routing_coverage` row per pbf (name == pbf_name, CASCADE FK); `trip.routing.local-regions` removed; Routing column + Enable/Disable toggle on Pbfs card; `PATCH /api/admin/pbfs/{name}` extended with `routingEnabled`. Plus single-loaded-pbf invariant in the cron (one extract loaded at a time; merging multiple is the deferred follow-up), filterable region picker in a modal add/edit form, shared toast utility extracted to `/static/js/utils/Toast.js` for both SPAs. 237 tests pass. |
 | 3 — Metrics dashboard | Not started. |
 | 4 — User management | Not started. |
 | 5 — Hardening (optional) | Not started. |
@@ -343,6 +343,166 @@ Per tick:
 ### Done when
 
 - Admin opens the Data tab and the Pbfs card shows their deployed extract with a freshness state ("up to date as of HH:MM" or "**stale — new pbf available**" with a noticeable colour). They can click "Schedule now" to ask the cron to rebuild on the next minute. Adding a new pbf row creates a `pbf_files` entry that the cron picks up on its next tick.
+
+---
+
+## Phase 2c — Region / pbf collapse
+
+Phase 2b modelled `pbf_files` (orchestration) and `routing_coverage` (dispatcher polygons) as two tables joined by an FK, with one pbf driving many per-state `routing_coverage` rows seeded from the `trip.routing.local-regions` env var. In practice the operator thinks in pbfs: us-west IS the region. Phase 2c collapses to **one `routing_coverage` row per pbf, same name**, drops the env var, and surfaces dispatcher state on the existing Pbfs card — no new card.
+
+### Toggle model
+
+Two independent, manually-set toggles per pbf — the admin's mental model on the card is "this row" but two flags drive different machinery:
+
+| Flag | Table | Controls | Default on create |
+|---|---|---|---|
+| `pbf_files.active` | `pbf_files` | The cron's processing schedule. `FALSE` = cron skips this row entirely (no md5 check, no apply). | `TRUE` |
+| `routing_coverage.enabled` | `routing_coverage` | Whether the dispatcher uses local ORS for points inside this polygon. `FALSE` = dispatcher falls back to public ORS even with a current polygon. Useful for troubleshooting + local-vs-public performance comparisons. | `TRUE` |
+
+Independence is intentional: admin can pause cron auto-updates without taking local routing offline (data stays current); admin can take local routing offline without stopping cron (next cron refresh updates the polygon but doesn't flip routing back on). Polygon-refresh writes `geom` + `fetched_at` only — it never touches `enabled`.
+
+Dispatcher's `coversAll()` filters `WHERE enabled AND geom IS NOT NULL`, so all three conditions (admin enabled routing, polygon fetched at least once, pbf row exists) must hold for local dispatch.
+
+### Schema
+
+Appended to [admin-console-db-migration.sh](dev_scripts/admin-console-db-migration.sh):
+
+```sql
+-- Drop the Phase 2b per-state rows. They'll be recreated 1:1 with pbf_files
+-- (one routing_coverage row per pbf) by the seed step below, and the cron's
+-- next post-apply / staleness self-heal tick fills in the polygon.
+DELETE FROM routing_coverage;
+
+-- pbf_name was redundant the moment we collapsed to 1:1; routing_coverage.name
+-- IS the pbf name now. Same column with the existing FK constraint.
+ALTER TABLE routing_coverage DROP COLUMN pbf_name;
+
+-- Polygon and fetched_at are nullable until the cron fetches the .poly.
+-- The dispatcher's coversAll() query is updated to ignore NULL-geom rows.
+ALTER TABLE routing_coverage ALTER COLUMN geom DROP NOT NULL;
+ALTER TABLE routing_coverage ALTER COLUMN fetched_at DROP NOT NULL;
+
+-- The PK doubles as the FK back to pbf_files. Cascade so admin deleting a
+-- pbf row removes its dispatcher entry in the same statement — dispatcher
+-- immediately falls back to public ORS for that area.
+ALTER TABLE routing_coverage
+  ADD CONSTRAINT fk_routing_coverage_pbf
+  FOREIGN KEY (name) REFERENCES pbf_files(pbf_name) ON DELETE CASCADE;
+
+-- Seed: one routing_coverage row per pbf_files row. enabled=TRUE matches the
+-- "opt-out" default applied to new pbfs created via the admin UI; geom=NULL
+-- keeps the dispatcher inert until the cron's next polygon-fetch tick.
+INSERT INTO routing_coverage (name, enabled, fetched_at)
+SELECT pbf_name, TRUE, NULL FROM pbf_files
+ON CONFLICT (name) DO NOTHING;
+```
+
+Re-running the migration is safe: `DELETE FROM routing_coverage` only fires on the first run that adds the Phase 2c block (subsequent runs find no per-state rows to drop). The `DROP COLUMN`, `ALTER COLUMN`, and `ADD CONSTRAINT` statements all need `IF NOT EXISTS` / `IF EXISTS` guards — the migration script will use the `DO $$ ... $$` idempotency pattern that the file already uses for similar edits.
+
+### Configuration
+
+`trip.routing.local-regions` (env var `TRIP_ROUTING_LOCAL_REGIONS`) is **removed entirely**:
+
+- [application.properties](src/main/resources/application.properties) — delete the line.
+- [GeofabrikCoverageLoader](src/main/java/com/pjr22/tripweather/routing/GeofabrikCoverageLoader.java) — drop the `@Value("${trip.routing.local-regions:colorado}")` injection; remove `getRegions()`; remove `seedMissingRegions()` (the `@EventListener(ApplicationReadyEvent.class)` hook). Fresh installs have empty `routing_coverage`; admin adds a pbf to start covering anything.
+- [AdminLoaderService.listLoaders()](src/main/java/com/pjr22/tripweather/service/AdminLoaderService.java) — replace `coverageLoader.getRegions()` with `pbfFileRepository.findAllPbfNames()` (new tiny method) so the Loaders card surfaces one `ors-coverage:{pbfName}` row per pbf.
+- `AdminLoaderService.refreshAllCoverageRegions()` — same swap.
+- `AdminLoaderService.resolveCoverageWork()` — validate the name is a pbf, not a region.
+- `setEnvVariables.source`, `docker/startTripWeather.source`, `CLAUDE.md` env table, `DEPLOYMENT_INSTRUCTIONS.md` (dev + prod env tables) — strip the `TRIP_ROUTING_LOCAL_REGIONS` row.
+
+Polygon URL derivation. `pbf_files.geofabrik_url` ends in `-latest.osm.pbf` by Geofabrik convention; the `.poly` lives one path-level up with no `-latest` suffix. A small helper in `GeofabrikCoverageLoader`:
+
+```java
+// us-west-latest.osm.pbf → us-west.poly  (different directory, different basename)
+// north-america/us/colorado-latest.osm.pbf → north-america/us/colorado.poly
+private static URI derivePolyUrl(String pbfUrl) {
+    return URI.create(pbfUrl.replace("-latest.osm.pbf", ".poly"));
+}
+```
+
+Non-standard URLs would need an explicit `poly_url` column on `pbf_files` — deferred until a deployment hits it.
+
+### Backend
+
+- [RoutingCoverage](src/main/java/com/pjr22/tripweather/model/RoutingCoverage.java) entity: `geom` and `fetchedAt` become `@Nullable`. (Lombok `@Data` already handles the getters/setters.) Phase 2b's `pbfName` field never landed on the entity, so nothing to remove there.
+- [RoutingCoverageRepository.coversAll](src/main/java/com/pjr22/tripweather/repository/RoutingCoverageRepository.java#L26) — add `AND geom IS NOT NULL` to the inner SELECT so dispatcher ignores rows whose polygon hasn't been fetched yet. `enabled` already gates.
+- `GeofabrikCoverageLoader.refresh(String pbfName, TriggerType)` — keeps the same signature but the argument now identifies a pbf row, not a region from the config. Implementation: load the `PbfFile` row by name (404 if absent), derive the `.poly` URL via the helper above, fetch + parse, upsert `geom` + `fetched_at` only. **Does not touch `enabled`** — that's the admin's manual toggle. The existing `upsert(name, wkt, fetchedAt)` query in `RoutingCoverageRepository` is updated to write only those two columns (drop the `enabled = TRUE` clause). The `IllegalArgumentException` for "not in configured list" goes away.
+- [PbfFileService.create()](src/main/java/com/pjr22/tripweather/service/PbfFileService.java) — also inserts the paired `routing_coverage` row in the same transaction: `enabled=TRUE` (opt-out default; admin can flip via PATCH later), `geom=NULL`, `fetched_at=NULL`. Dispatcher's `geom IS NOT NULL` filter keeps it inert until the polygon arrives.
+- `PbfFileService.delete()` — no change. FK cascade handles the routing_coverage cleanup.
+- [AdminPbfController](src/main/java/com/pjr22/tripweather/controller/AdminPbfController.java) — `PATCH /api/admin/pbfs/{name}` gains an optional `routingEnabled` field. When present, the service writes to `routing_coverage.enabled` in the same transaction as the rest of the PATCH. No new endpoint. Admin's UI sees one row; the controller hides the two-table detail.
+
+### Frontend
+
+The existing Pbfs card on the Data tab becomes the single Routing card. Two display tweaks:
+
+- A new **Routing** column shows dispatcher state:
+  - `Active — polygon fetched HH:MM` (enabled=TRUE, geom present) — dispatcher uses local
+  - `Disabled — admin paused` (enabled=FALSE, geom present) — dispatcher uses public despite valid data
+  - `Awaiting first apply` (geom NULL, regardless of enabled) — no polygon yet, dispatcher uses public
+- A per-row toggle button **Disable routing** / **Enable routing** flips `routing_coverage.enabled` via the extended PATCH endpoint. Visible on every row regardless of geom state — admin can pre-disable routing on a new pbf before the polygon even arrives.
+
+The card header subtitle updates from "OSM extracts managed by docker/refreshOrsGraph.sh" to "OSM extracts and their dispatcher coverage. Adding a pbf creates the dispatcher row; the polygon is fetched after the cron's next apply." Other columns and actions (Check, Schedule, Edit, Delete, Add) stay.
+
+### Cron script ([docker/refreshOrsGraph.sh](docker/refreshOrsGraph.sh))
+
+Mechanical updates only — same flow, simpler SQL:
+
+- `do_apply` post-swap polygon-refresh (lines 374-381): the SQL was `SELECT string_agg(name, ',') FROM routing_coverage WHERE pbf_name = '${pbf_name}'`. In the 1:1 model it's `SELECT name FROM routing_coverage WHERE name = '${pbf_name}'` — single row, no comma-aggregation. The loop in `refresh_polygons_for_regions` still works with one item.
+- `check_and_refresh_stale_polygons` (lines 394-410): the JOIN `routing_coverage rc JOIN pbf_files pf ON pf.pbf_name = rc.pbf_name` becomes `ON pf.pbf_name = rc.name`. WHERE clause unchanged.
+- Error message at line 446 referencing `trip.routing.local-regions` — update to mention the pbf row instead.
+- Top-of-file comment at line 16 referencing `routing_coverage.pbf_name` — update to `routing_coverage.name = pbf_files.pbf_name`.
+
+`/api/admin/refresh-coverage/{region}` (the legacy endpoint at [AdminController.java:43](src/main/java/com/pjr22/tripweather/controller/AdminController.java#L43)) keeps the same URL — the `{region}` segment is now the pbf name. Cron continues to call it after a successful apply.
+
+### Tests
+
+- `GeofabrikCoverageLoaderTest` — refactor: `refresh("us-west", ...)` now looks up the pbf row, derives `.poly` URL, fetches, upserts `geom` + `fetched_at` only. Missing pbf row → `IllegalArgumentException` (maps to 404 at the controller). Refresh leaves `enabled` alone (test both starting states). Existing tests that depended on the configured regions list are deleted or rewritten.
+- `RoutingCoverageRepositoryTest` — add cases: rows with NULL geom are ignored by `coversAll()`; rows with `enabled=FALSE` are ignored; `upsert()` doesn't change `enabled`.
+- `PbfFileServiceTest` — creating a pbf inserts a paired routing_coverage row (`enabled=TRUE`, `geom=NULL`); deleting a pbf cascade-removes it.
+- `AdminPbfControllerTest` — PATCH with `routingEnabled=true` flips the dispatcher state; PATCH with `routingEnabled=false` flips it back. PATCH with no `routingEnabled` field leaves it alone.
+- `AdminLoaderServiceTest` — listLoaders surfaces one `ors-coverage:{pbfName}` per pbf row.
+
+### Migration considerations
+
+On an existing dev / prod deployment with Phase 2b data (us-west pbf + 11 per-state routing_coverage rows):
+
+1. Operator runs `dev_scripts/admin-console-db-migration.sh` — the Phase 2c block drops the per-state rows and creates one `us-west` row (`enabled=TRUE`, `geom=NULL`).
+2. Restart the trip-weather app. Dispatcher sees `coversAll()=false` (geom is NULL) → every routing call goes to public ORS until the polygon is fetched.
+3. On the next per-minute cron tick the polygon-staleness self-heal step finds the new row has `fetched_at IS NULL`, fetches `us-west.poly`, upserts `geom` + `fetched_at`. `enabled` was already TRUE from the seed → local routing resumes immediately.
+
+Total local-routing outage: up to ~60 seconds. The dispatcher's public-ORS fallback handles it transparently — no failed routes.
+
+### Done when
+
+- Fresh-install behaviour: empty `routing_coverage`, all routes go to public ORS. Admin adds a pbf via UI, fills in the geofabrik URL, clicks Schedule now. Cron applies the pbf, fetches the polygon, dispatcher routes locally. No env var changes needed.
+- Existing deployments: migrate → 60s of public-ORS fallback → local routing back. Admin sees the single `us-west` row on the Pbfs card with the new "Routing: Active" indicator.
+- Admin can disable routing without touching pbf processing, and vice versa.
+- Deleting a pbf row removes routing coverage immediately via cascade.
+
+### Single-loaded-pbf constraint (addendum)
+
+[runOrs.sh](docker/runOrs.sh) and [ors-config.yml](docker/ors-config.yml) load **one** `.osm.pbf` into the trip-ors container at a time — a single bind-mount at `/home/ors/files/osm-file.osm.pbf`, a single `source_file` in the ORS config. The trip-ors engine doesn't merge multiple extracts and there's no scan-a-directory mode in the official image. So at any moment, only one pbf is actually locally routable, no matter how many `pbf_files` rows exist.
+
+If admin adds `kansas` to a system that already had `us-west`, the next apply for kansas does this:
+
+1. Stops trip-ors.
+2. Wipes the `trip_ors_graph` named volume (us-west's CH data — gone).
+3. Restarts the container with kansas's pbf mounted.
+4. Builds the kansas graph from scratch.
+
+After the apply, **us-west is no longer routable locally**. The dispatcher would still see us-west's `routing_coverage` row (enabled + geom set from the earlier apply) and route US-west requests to local ORS, which would return "no path" because the engine doesn't have that data. Every such request wastes one local round-trip before the public-ORS fallback engages.
+
+**Phase 2c's contract:** after every successful apply (or `NO_CHANGE`) for pbf X, the cron clears `routing_coverage.geom` and `routing_coverage.fetched_at` for every row whose `name != X`. The dispatcher's `coversAll()` filter (`enabled AND geom IS NOT NULL`) then ignores the unloaded rows and the unloaded pbfs fall back to public ORS cleanly. The polygon-staleness self-heal step in the cron is also scoped to the currently-loaded pbf (the row with the most recent successful `last_apply_finished_at`) so it doesn't accidentally re-fetch the cleared polygons.
+
+The other `pbf_files` columns (`last_apply_md5`, `last_apply_finished_at`, etc.) stay populated on the unloaded rows so the admin can see what was there before. The frontend distinguishes three unloaded states for clarity:
+
+- `awaiting first apply` — `geom IS NULL AND last_apply_md5 IS NULL` (truly never applied)
+- `not currently loaded — another pbf is the active extract` — `geom IS NULL AND last_apply_md5 IS NOT NULL` (was loaded once; cleared after another pbf was applied)
+- `disabled — admin paused` — `geom IS NOT NULL AND enabled = FALSE` (currently loaded but admin opted out of local routing)
+
+The Pbfs card also renders a banner at the top when there are 2+ pbf rows, naming the currently-loaded one explicitly so admin doesn't have to scan rows.
+
+**Merging multiple pbfs is a planned follow-up**, not in this phase. Sketch: pre-apply step on the host runs `osmium merge` over every `pbf_files` row whose `active = TRUE` (or some explicit "include in merged graph" flag), producing a single combined `.osm.pbf` that ORS builds from. Each apply re-merges. Cost: osmium-tool dependency on the host, larger graph build, more heap. Worth doing when admin needs more than one extract live at the same time.
 
 ---
 

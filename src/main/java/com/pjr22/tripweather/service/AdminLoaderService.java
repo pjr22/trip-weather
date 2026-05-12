@@ -5,6 +5,7 @@ import com.pjr22.tripweather.dto.LoaderSummaryDto;
 import com.pjr22.tripweather.model.LoaderRun;
 import com.pjr22.tripweather.model.LoaderRun.TriggerType;
 import com.pjr22.tripweather.repository.LoaderRunRepository;
+import com.pjr22.tripweather.repository.PbfFileRepository;
 import com.pjr22.tripweather.routing.GeofabrikCoverageLoader;
 import com.pjr22.tripweather.scheduler.GuestRouteCleanupJob;
 import lombok.extern.slf4j.Slf4j;
@@ -65,15 +66,18 @@ public class AdminLoaderService {
     private final GuestRouteCleanupJob cleanupJob;
     private final EvStationLoader evStationLoader;
     private final ObjectProvider<GeofabrikCoverageLoader> coverageLoaderProvider;
+    private final PbfFileRepository pbfFileRepository;
 
     public AdminLoaderService(LoaderRunRepository runRepository,
                               GuestRouteCleanupJob cleanupJob,
                               EvStationLoader evStationLoader,
-                              ObjectProvider<GeofabrikCoverageLoader> coverageLoaderProvider) {
+                              ObjectProvider<GeofabrikCoverageLoader> coverageLoaderProvider,
+                              PbfFileRepository pbfFileRepository) {
         this.runRepository = runRepository;
         this.cleanupJob = cleanupJob;
         this.evStationLoader = evStationLoader;
         this.coverageLoaderProvider = coverageLoaderProvider;
+        this.pbfFileRepository = pbfFileRepository;
     }
 
     @Transactional(readOnly = true)
@@ -86,16 +90,18 @@ public class AdminLoaderService {
         known.put(GuestRouteCleanupJob.EMAIL_TOKEN_CLEANUP_LOADER_NAME, "cleanup");
         known.put(EvStationLoader.LOADER_NAME, "data");
 
-        GeofabrikCoverageLoader coverageLoader = coverageLoaderProvider.getIfAvailable();
-        if (coverageLoader != null) {
-            for (String region : coverageLoader.getRegions()) {
-                known.put(GeofabrikCoverageLoader.loaderName(region), "coverage");
+        // Phase 2c: one ors-coverage:* loader per pbf row, in pbf_name order.
+        // The loader bean's availability still gates whether we surface
+        // them (trip.local.ors.enabled=true → bean present → loaders shown).
+        if (coverageLoaderProvider.getIfAvailable() != null) {
+            for (String pbfName : pbfNamesSorted()) {
+                known.put(GeofabrikCoverageLoader.loaderName(pbfName), "coverage");
             }
         }
 
-        // Fold in historical-only names (e.g. ors-coverage:texas after
-        // texas was removed from trip.routing.local-regions) so their
-        // history isn't orphaned in the UI.
+        // Fold in historical-only names (e.g. ors-coverage:texas after the
+        // texas pbf row was deleted) so their history isn't orphaned in
+        // the UI.
         for (String historical : runRepository.findDistinctLoaderNames()) {
             if (!known.containsKey(historical)) {
                 known.put(historical, categoryOf(historical));
@@ -164,11 +170,16 @@ public class AdminLoaderService {
     }
 
     /**
-     * Refresh every configured ORS coverage region sequentially on a
-     * single background task. Per-region failures (network, parse) and
-     * conflicts (region already refreshing) are logged; the loop keeps
-     * going. Returns the list of regions that were enqueued so the
-     * controller's 202 body can confirm scope.
+     * Refresh every known pbf's coverage polygon sequentially on a single
+     * background task. Per-pbf failures (network, parse) and conflicts
+     * (already refreshing) are logged; the loop keeps going. Returns the
+     * list of pbf names that were enqueued so the controller's 202 body
+     * can confirm scope.
+     *
+     * <p>Phase 2c: the pbf list comes from {@code pbf_files} instead of
+     * the retired {@code trip.routing.local-regions} property. Snapshot is
+     * taken in the calling thread before the async dispatch so the loop
+     * sees a consistent set even if the admin edits the table mid-flight.
      *
      * @throws IllegalStateException if local ORS is disabled
      */
@@ -179,25 +190,22 @@ public class AdminLoaderService {
                     "Local ORS is not enabled (trip.local.ors.enabled=false); "
                   + "coverage loader is unavailable.");
         }
-        // Snapshot the regions list before dispatching so the async task
-        // doesn't race with config changes (admittedly very unlikely
-        // since trip.routing.local-regions is env-var-bound at startup).
-        List<String> regions = List.copyOf(coverageLoader.getRegions());
+        List<String> pbfNames = pbfNamesSorted();
         CompletableFuture.runAsync(() -> {
-            for (String region : regions) {
+            for (String pbfName : pbfNames) {
                 try {
-                    coverageLoader.refresh(region, TriggerType.MANUAL);
+                    coverageLoader.refresh(pbfName, TriggerType.MANUAL);
                 } catch (LoaderRunRecorder.RunInProgressException e) {
-                    log.info("Refresh-all: skipped region '{}' (already in progress)", region);
+                    log.info("Refresh-all: skipped pbf '{}' (already in progress)", pbfName);
                 } catch (Exception e) {
-                    log.warn("Refresh-all: region '{}' failed: {}",
-                            region, e.getMessage());
+                    log.warn("Refresh-all: pbf '{}' failed: {}",
+                            pbfName, e.getMessage());
                 }
             }
-            log.info("Refresh-all: completed sequential refresh of {} region(s)",
-                    regions.size());
+            log.info("Refresh-all: completed sequential refresh of {} pbf(s)",
+                    pbfNames.size());
         });
-        return regions;
+        return pbfNames;
     }
 
     private Runnable resolveWork(String loaderName) {
@@ -217,18 +225,28 @@ public class AdminLoaderService {
         throw new IllegalArgumentException("Unknown loader: " + loaderName);
     }
 
-    private Runnable resolveCoverageWork(String region) {
+    private Runnable resolveCoverageWork(String pbfName) {
         GeofabrikCoverageLoader coverageLoader = coverageLoaderProvider.getIfAvailable();
         if (coverageLoader == null) {
             throw new IllegalStateException(
                     "Local ORS is not enabled (trip.local.ors.enabled=false); "
                   + "coverage loader is unavailable.");
         }
-        if (!coverageLoader.getRegions().contains(region)) {
-            throw new IllegalArgumentException("Region '" + region
-                    + "' is not in trip.routing.local-regions");
+        // Phase 2c: the validation source is pbf_files, not a config list.
+        if (!pbfFileRepository.existsById(pbfName)) {
+            throw new IllegalArgumentException("Pbf '" + pbfName
+                    + "' is not in pbf_files");
         }
-        return () -> coverageLoader.refresh(region, TriggerType.MANUAL);
+        return () -> coverageLoader.refresh(pbfName, TriggerType.MANUAL);
+    }
+
+    /** Pbf names in {@code pbf_name} order — the canonical source for
+     *  enumerating per-pbf coverage loaders since Phase 2c. */
+    private List<String> pbfNamesSorted() {
+        return pbfFileRepository.findAll().stream()
+                .map(p -> p.getPbfName())
+                .sorted()
+                .toList();
     }
 
     private static int clampLimit(int requested) {

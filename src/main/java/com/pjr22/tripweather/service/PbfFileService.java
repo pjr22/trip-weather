@@ -4,7 +4,9 @@ import com.pjr22.tripweather.dto.PbfFileCreateRequest;
 import com.pjr22.tripweather.dto.PbfFileDto;
 import com.pjr22.tripweather.dto.PbfFileUpdateRequest;
 import com.pjr22.tripweather.model.PbfFile;
+import com.pjr22.tripweather.model.RoutingCoverage;
 import com.pjr22.tripweather.repository.PbfFileRepository;
+import com.pjr22.tripweather.repository.RoutingCoverageRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -16,7 +18,9 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -52,22 +56,33 @@ public class PbfFileService {
     private final RestClient absoluteRestClient = RestClient.builder().build();
 
     private final PbfFileRepository repository;
+    private final RoutingCoverageRepository routingRepository;
 
-    public PbfFileService(PbfFileRepository repository) {
+    public PbfFileService(PbfFileRepository repository,
+                          RoutingCoverageRepository routingRepository) {
         this.repository = repository;
+        this.routingRepository = routingRepository;
     }
 
     @Transactional(readOnly = true)
     public List<PbfFileDto> listAll() {
-        return repository.findAll().stream()
+        List<PbfFile> pbfs = repository.findAll();
+        // One round-trip for the routing rows; map by name for O(1) joins.
+        Map<String, RoutingCoverage> routingByName = new HashMap<>();
+        for (RoutingCoverage rc : routingRepository.findAll()) {
+            routingByName.put(rc.getName(), rc);
+        }
+        return pbfs.stream()
                 .sorted((a, b) -> a.getPbfName().compareTo(b.getPbfName()))
-                .map(PbfFileDto::from)
+                .map(p -> PbfFileDto.from(p, routingByName.get(p.getPbfName())))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public Optional<PbfFileDto> findOne(String pbfName) {
-        return repository.findById(pbfName).map(PbfFileDto::from);
+        return repository.findById(pbfName)
+                .map(p -> PbfFileDto.from(p,
+                        routingRepository.findById(pbfName).orElse(null)));
     }
 
     @Transactional
@@ -84,7 +99,14 @@ public class PbfFileService {
         entity.setUpdateIntervalDays(request.getUpdateIntervalDays());
         entity.setNextCheckAt(request.getNextCheckAt());
         entity.setNextUpdateAt(request.getNextUpdateAt());
-        return PbfFileDto.from(repository.save(entity));
+        PbfFile saved = repository.save(entity);
+        // Phase 2c: paired routing_coverage row. enabled=TRUE is the opt-out
+        // default (admin can flip via PATCH); geom=NULL keeps the dispatcher
+        // inert until the cron's polygon-fetch tick populates it. Must run
+        // after the pbf_files insert so the FK is satisfied.
+        repository.flush();
+        routingRepository.insertEmptyRow(saved.getPbfName());
+        return PbfFileDto.from(saved, routingRepository.findById(saved.getPbfName()).orElse(null));
     }
 
     @Transactional
@@ -109,7 +131,13 @@ public class PbfFileService {
         if (request.getNextUpdateAt() != null) {
             entity.setNextUpdateAt(request.getNextUpdateAt());
         }
-        return PbfFileDto.from(repository.save(entity));
+        PbfFile saved = repository.save(entity);
+        if (request.getRoutingEnabled() != null) {
+            // Atomic with the pbf_files update — same @Transactional scope.
+            routingRepository.updateEnabled(pbfName, request.getRoutingEnabled());
+        }
+        return PbfFileDto.from(saved,
+                routingRepository.findById(pbfName).orElse(null));
     }
 
     @Transactional
@@ -117,8 +145,9 @@ public class PbfFileService {
         if (!repository.existsById(pbfName)) {
             throw new PbfFileNotFoundException(pbfName);
         }
-        // routing_coverage.pbf_name rows pointing at this pbf go NULL via
-        // the ON DELETE SET NULL constraint declared in the migration.
+        // The Phase 2c FK on routing_coverage (ON DELETE CASCADE) drops the
+        // paired dispatcher row in the same DELETE — admin doesn't have to
+        // clean up two tables.
         repository.deleteById(pbfName);
     }
 
@@ -131,7 +160,9 @@ public class PbfFileService {
         PbfFile entity = repository.findById(pbfName)
                 .orElseThrow(() -> new PbfFileNotFoundException(pbfName));
         entity.setNextUpdateAt(ZonedDateTime.now());
-        return PbfFileDto.from(repository.save(entity));
+        PbfFile saved = repository.save(entity);
+        return PbfFileDto.from(saved,
+                routingRepository.findById(pbfName).orElse(null));
     }
 
     /**
@@ -148,7 +179,9 @@ public class PbfFileService {
                 .orElseThrow(() -> new PbfFileNotFoundException(pbfName));
         entity.setLastApplyStartedAt(null);
         entity.setNextUpdateAt(ZonedDateTime.now());
-        return PbfFileDto.from(repository.save(entity));
+        PbfFile saved = repository.save(entity);
+        return PbfFileDto.from(saved,
+                routingRepository.findById(pbfName).orElse(null));
     }
 
     /**
@@ -211,7 +244,9 @@ public class PbfFileService {
             }
         }
 
-        return PbfFileDto.from(repository.save(entity));
+        PbfFile saved = repository.save(entity);
+        return PbfFileDto.from(saved,
+                routingRepository.findById(pbfName).orElse(null));
     }
 
     // -------------------------------------------------------------------------
