@@ -194,13 +194,32 @@ export TRIP_COOKIE_SECURE=false
 # export TRIP_EMAIL_APIKEY=<mailtrap-api-token>
 # export TRIP_REMEMBER_ME_KEY="$(openssl rand -base64 48)"
 
-# 5. run
+# 5. operator console credentials (required unless you disable the console):
+export TRIP_ADMIN_USERNAME=admin
+export TRIP_ADMIN_PASSWORD="$(openssl rand -base64 24)"
+#    or, to skip the admin console entirely while iterating:
+# export TRIP_ADMIN_ENABLED=false
+
+# 6. run
 ./gradlew bootRun
 ```
 
 Then open http://localhost:8090.
 
 When `TRIP_EMAIL_ENABLED=false`, the app logs would-be email bodies (verification and password-reset links included) at INFO level instead of sending them — useful for the verify / reset flow without provisioning Mailtrap. Set `TRIP_AUTH_EMAIL_TOKEN_LIFETIME_MINUTES` to a larger value if 5 minutes feels too tight while you're testing.
+
+### Operator console
+
+The app ships with a small operator console at **`/admin/`**, separate from the public SPA. Sign in with `TRIP_ADMIN_USERNAME` / `TRIP_ADMIN_PASSWORD` (set above) and you get four tabs:
+
+- **Routes** — search, filter, sort, restore soft-deleted, hard-delete past the grace window, trigger cleanup on demand.
+- **Data** — loader-run history, manual triggers for the cleanup / NREL / pbf jobs, and the operator surface for adding / scheduling / retrying OpenStreetMap pbf extracts that feed the self-hosted ORS engine.
+- **Metrics** — live HTTP latency (p50/p95/p99), routing-dispatch counts (local vs. public vs. fallback, with per-reason breakdown), JVM heap, top URIs by request count, and cache hit ratios. Auto-refresh every 60 s, pause/resume, manual refresh.
+- **Users** — paginated list of registered accounts; enable / disable / force-verify (clears stuck signup + reset tokens) / hard-delete (cascades the user's routes).
+
+Authentication is a single shared credential held in env vars (BCrypt-hashed in memory at startup, never logged). The console lives on its own Spring Security filter chain and a namespaced session attribute, so it cannot accidentally hand a `ROLE_ADMIN` principal to user-chain endpoints.
+
+The console reads everything the same `/actuator/prometheus` endpoint would expose, so you no longer need to leave actuator publicly reachable. See the full design and phasing in [ADMIN_CONSOLE.md](ADMIN_CONSOLE.md).
 
 ### Going easier on the external APIs
 
@@ -213,7 +232,7 @@ Two optional sidecars push it further, both documented in [LOCAL_CACHING_HOSTING
 
 Both are off by default. The defaults go straight to the public APIs and need none of this to work.
 
-Developer documentation — architecture, module layout, API endpoints, WMS layer handling — lives in [HOWTO_LOCAL_MAP.md](HOWTO_LOCAL_MAP.md) and inline in the source. The user-accounts feature has its own design document in [USER_ACCOUNTS_PLAN.md](USER_ACCOUNTS_PLAN.md), and the caching / self-hosting plan is in [LOCAL_CACHING_HOSTING.md](LOCAL_CACHING_HOSTING.md). A full code review with known issues and priorities is in [CODE_REVIEW.md](CODE_REVIEW.md).
+Developer documentation — architecture, module layout, API endpoints, WMS layer handling — lives in [HOWTO_LOCAL_MAP.md](HOWTO_LOCAL_MAP.md) and inline in the source. The user-accounts feature has its own design document in [USER_ACCOUNTS_PLAN.md](USER_ACCOUNTS_PLAN.md), the caching / self-hosting plan is in [LOCAL_CACHING_HOSTING.md](LOCAL_CACHING_HOSTING.md), and the operator console is documented in [ADMIN_CONSOLE.md](ADMIN_CONSOLE.md). A full code review with known issues and priorities is in [CODE_REVIEW.md](CODE_REVIEW.md).
 
 ---
 
