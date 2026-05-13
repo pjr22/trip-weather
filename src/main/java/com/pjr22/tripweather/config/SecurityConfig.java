@@ -219,8 +219,14 @@ public class SecurityConfig {
                 // Admin endpoints have their own chain; ignoring here is a
                 // belt-and-braces no-op (this chain doesn't match /api/admin/**
                 // anyway, but a future refactor might widen the matcher).
-                // Actuator endpoints are denied at the authorize layer above;
-                // the ignore is so a misrouted POST returns 403, not 403+CSRF.
+                // Actuator endpoints are permitAll at the authorize layer
+                // below — the public boundary is haproxy's ACL block from
+                // dev_scripts/haproxy_cfg_update.md, not Spring. Ignoring
+                // CSRF here lets a Prometheus POST scrape from an internal
+                // network proceed without a token; without the ignore a
+                // state-changing actuator call (e.g. /actuator/loggers) from
+                // any non-browser client would be rejected with 403 by the
+                // CSRF filter before authorization runs.
                 .ignoringRequestMatchers("/api/admin/**", "/actuator/**")
             )
             // Force the CSRF cookie to be written on every request so the SPA can
