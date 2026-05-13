@@ -213,13 +213,13 @@ class AdminLoaderServiceTest {
             return null;
         }).when(cleanupJob).runRouteCleanup(TriggerType.MANUAL);
 
-        long callerThreadId = Thread.currentThread().threadId();
+        long callerThreadId = Thread.currentThread().getId();
         service.triggerByName(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME);
 
         assertThat(invoked.await(2, TimeUnit.SECONDS)).isTrue();
         verify(cleanupJob).runRouteCleanup(TriggerType.MANUAL);
         // Sanity — caller didn't accidentally run the work synchronously.
-        assertThat(Thread.currentThread().threadId()).isEqualTo(callerThreadId);
+        assertThat(Thread.currentThread().getId()).isEqualTo(callerThreadId);
     }
 
     @Test
