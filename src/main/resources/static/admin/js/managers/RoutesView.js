@@ -37,7 +37,7 @@
 
     function templateShell() {
         return ''
-            + '<h2>Routes</h2>'
+            + '<h2 id="routes-title">Routes</h2>'
             + '<div class="routes-toolbar">'
             +   '<input type="search" id="routes-q" placeholder="Search name or owner email…" />'
             +   '<select id="routes-owner">'
@@ -153,6 +153,16 @@
     }
 
     function renderTable(page) {
+        // Move the total count into the page title (e.g. "Routes (12)") so it
+        // isn't dangling below the table as a one-line footer. The pagination
+        // footer below still carries "Page X of Y (Z total)" when there are
+        // multiple pages — that's navigation context, not a redundant count.
+        // Mirror of the same treatment in UsersView.
+        var titleEl = document.getElementById('routes-title');
+        if (titleEl) {
+            titleEl.textContent = 'Routes (' + page.totalElements + ')';
+        }
+
         var wrap = document.getElementById('routes-table-wrap');
         if (!page.content || page.content.length === 0) {
             wrap.innerHTML = '<div class="routes-empty">No routes match the current filters.</div>';
@@ -221,12 +231,10 @@
     }
 
     function paginationHtml(page) {
+        // Single-page case has no footer at all — the count lives in the h2
+        // title now, and there are no Prev/Next controls to display.
         if (page.totalPages <= 1) {
-            return '<div class="routes-pagination">'
-                 +   '<span>' + page.totalElements + ' route'
-                 +     (page.totalElements === 1 ? '' : 's')
-                 +   '</span>'
-                 + '</div>';
+            return '';
         }
         var prevDisabled = page.page <= 0 ? ' disabled' : '';
         var nextDisabled = page.page >= page.totalPages - 1 ? ' disabled' : '';
