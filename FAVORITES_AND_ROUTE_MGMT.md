@@ -116,7 +116,7 @@ Five phases, each shippable on its own. Phases 1-2-3 deliver favorites end-to-en
 
 | Phase | Status |
 |---|---|
-| 1 — Favorites: schema + backend CRUD | Not started |
+| 1 — Favorites: schema + backend CRUD | Shipped |
 | 2 — Favorites: manager modal + entry points | Not started |
 | 3 — Favorites: heart toggle in popup + search autocomplete | Not started |
 | 4 — My Routes: backend + modal | Not started |
@@ -139,7 +139,9 @@ CREATE TABLE IF NOT EXISTS favorite_waypoints (
     id              UUID         PRIMARY KEY,
     user_id         UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     label           VARCHAR(255) NOT NULL,
-    location_name   VARCHAR(1023),
+    location_name   VARCHAR(1023) NOT NULL,     -- NOT NULL; service falls back
+                                                --   to "lat, lon" (5 decimals)
+                                                --   when the request lacks one
     latitude        DOUBLE PRECISION NOT NULL,
     longitude       DOUBLE PRECISION NOT NULL,
     elevation       DOUBLE PRECISION,           -- nullable; mirrors waypoints.elevation
@@ -265,6 +267,13 @@ CSRF tokens flow on the same cookie + header pair already used by `RoutePersiste
 - Repository test — verify `@SQLRestriction` hides soft-deleted rows.
 
 **Phase 1 ships when:** migration runs cleanly on a fresh DB and on a populated DB; `curl` against `/api/favorites/**` works with a session cookie; tests pass.
+
+#### Implementation notes (decisions made during build)
+
+- **`location_name` is `NOT NULL`** (tightened from the original draft schema). The service normalises a blank / null request `locationName` to a `"lat, lon"` string with 5-decimal precision (~1.1 m at the equator), so the column always carries something. Rationale: parity with the "no empty names for favorites or routes" principle; the rare map-click-before-reverse-geocode case is absorbed server-side without surfacing a fallback path to the rest of the UI.
+- **`FavoriteWaypointDto.created` is `ZonedDateTime`** (not `Instant` as the planning sketch showed) — matches `RouteDto` / `RouteSearchResultDto` so the SPA's existing date-rendering helpers work unchanged.
+- **`?search=` is implemented as an explicit JPQL `@Query`** rather than the planning sketch's derived-name method, because a Spring Data derived name like `findByUserIdAndLabelOrLocationNameContainingIgnoreCase…` parses as `userId=? AND label=? OR locationName ILIKE ?` — the OR escapes the userId scope and matches favorites across all users. The `@Query` enforces `userId=? AND (label ILIKE ? OR locationName ILIKE ?)` unambiguously.
+- **400 path:** in addition to the planned `FavoriteNotFoundException` (404) and `DuplicateFavoriteLabelException` (409), the service throws `InvalidFavoriteException` (400) for blank label, missing latitude/longitude, or over-length label. All three exception classes are nested in `FavoriteWaypointService` and carry `@ResponseStatus`, matching the `RoutePersistenceService` pattern.
 
 ---
 

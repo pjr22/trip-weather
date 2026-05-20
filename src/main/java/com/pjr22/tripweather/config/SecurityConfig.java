@@ -266,6 +266,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/routes/**").permitAll()
                 // Future state-changing route endpoint (Phase 3)
                 .requestMatchers(HttpMethod.DELETE, "/api/routes/**").authenticated()
+                // Favorite waypoints — account feature, auth required end-to-end
+                // (FAVORITES_AND_ROUTE_MGMT.md, decision #4). Anonymous → 401.
+                .requestMatchers("/api/favorites/**").authenticated()
                 // Everything else (static SPA, third-party proxies) stays open
                 .anyRequest().permitAll()
             )
