@@ -2276,3 +2276,162 @@ main {
         grid-template-columns: 1fr;
     }
 }
+
+/* The confirm modal can be opened from on top of another modal (e.g. the
+ * Delete action inside the favorites manager). Sibling .modal elements share
+ * z-index 1000, so DOM order alone decides who paints on top — bumping the
+ * confirm modal higher guarantees it's always visible above whatever spawned
+ * it, regardless of where it sits in the markup. */
+#confirm-modal {
+    z-index: 1100;
+}
+
+/* ============================================================================
+ * Favorites — Leaflet overlay button + manager modal
+ * (FAVORITES_AND_ROUTE_MGMT.md, Phase 2)
+ * ========================================================================== */
+
+/* Heart overlay button — stacks below the EV chargers control on .leaflet-bar */
+.favorites-control {
+    background-color: #fff;
+    width: 34px;
+    height: 34px;
+    line-height: 34px;
+    text-align: center;
+    cursor: pointer;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.favorites-control:hover {
+    background-color: #fdecea;
+}
+
+.favorites-icon {
+    width: 20px;
+    height: 20px;
+    margin-top: 5px;
+    /* Filled red heart, always — the overlay is a "manage favorites" affordance,
+       not an indicator. The popup heart (Phase 3) is what flips fill/outline. */
+    fill: #e74c3c;
+    color: #e74c3c;
+}
+
+/* Wider modal so the four-column table fits without horizontal scroll */
+.modal-content.modal-wide {
+    max-width: 880px;
+}
+
+.favorites-modal-toolbar {
+    margin-bottom: 12px;
+}
+
+.favorites-modal-status {
+    min-height: 1.2em;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #7f8c8d;
+}
+
+.favorites-modal-empty {
+    margin-top: 16px;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border: 1px dashed #bdc3c7;
+    border-radius: 4px;
+    color: #7f8c8d;
+    text-align: center;
+    font-size: 14px;
+}
+
+.favorites-table-container {
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.favorites-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.favorites-table thead th {
+    position: sticky;
+    top: 0;
+    background-color: #ecf0f1;
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #2c3e50;
+    border-bottom: 2px solid #bdc3c7;
+}
+
+.favorites-table tbody td {
+    padding: 8px 10px;
+    font-size: 14px;
+    border-bottom: 1px solid #ecf0f1;
+    vertical-align: middle;
+}
+
+.favorites-cell-label {
+    font-weight: 600;
+    color: #2c3e50;
+    width: 25%;
+}
+
+.favorites-cell-location {
+    color: #555;
+    width: 40%;
+    word-break: break-word;
+}
+
+.favorites-cell-coord {
+    white-space: nowrap;
+    width: 22%;
+}
+
+.favorites-cell-actions,
+.favorites-cell-actions-header {
+    text-align: right;
+    white-space: nowrap;
+    width: 20%;
+}
+
+.favorites-row-action {
+    background: none;
+    border: 1px solid #bdc3c7;
+    border-radius: 3px;
+    padding: 4px 10px;
+    margin-left: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #2c3e50;
+    transition: all 0.15s ease;
+}
+
+.favorites-row-action:hover {
+    background-color: #ecf0f1;
+    border-color: #95a5a6;
+}
+
+.favorites-row-action-delete-favorite:hover {
+    background-color: #fdecea;
+    border-color: #e74c3c;
+    color: #c0392b;
+}
+
+.favorites-row-action-add-to-route:hover {
+    background-color: #eafaf1;
+    border-color: #27ae60;
+    color: #1e8449;
+}
+
+.favorites-rename-input {
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid #3498db;
+    border-radius: 3px;
+    font-size: 14px;
+    box-sizing: border-box;
+}

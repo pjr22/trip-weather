@@ -117,7 +117,7 @@ Five phases, each shippable on its own. Phases 1-2-3 deliver favorites end-to-en
 | Phase | Status |
 |---|---|
 | 1 — Favorites: schema + backend CRUD | Shipped |
-| 2 — Favorites: manager modal + entry points | Not started |
+| 2 — Favorites: manager modal + entry points | Shipped |
 | 3 — Favorites: heart toggle in popup + search autocomplete | Not started |
 | 4 — My Routes: backend + modal | Not started |
 | 5 — Admin console + cleanup cron (favorites) | Not started |
@@ -332,6 +332,15 @@ Reuse the shared `Toast` utility at [static/js/utils/Toast.js](src/main/resource
 - Manual smoke: signup → log in → open modal → add a stub favorite via the admin console (or directly via `curl` until Phase 3 ships the heart toggle) → see it in the modal → add to route → rename → delete → confirm soft-deleted in DB.
 
 **Phase 2 ships when:** clicking the heart-overlay or the menu item opens the modal; favorites already in the DB render; "Add to route", Rename, Delete each function end-to-end; the overlay hides for anonymous users.
+
+#### Implementation notes (decisions made during build)
+
+- **Heart-button overlay is filled red, always**, regardless of whether the user has any favorites. The overlay is a "manage favorites" affordance, not a per-state indicator — keeping the fill/outline semantics reserved for Phase 3's per-waypoint popup heart avoids the two affordances confusing each other.
+- **"My Favorites" sits at the top of the authenticated profile menu** (above Change password / Log out / Delete account / About). Reads as "data" first, "account actions" second. Phase 4's "My Routes" will slot next to it.
+- **Phase 2's manager modal is read/rename/delete only — no inline "+ Add favorite" affordance.** Creating favorites is exclusively the popup-heart flow in Phase 3a. The empty-state message tells new users where to look: *"No favorites yet — 'heart' a waypoint from the map to add one."*
+- **Confirm modal's z-index bumped to 1100** so the Delete confirmation paints on top of the favorites manager. Generic fix — any future "nested confirm" flow gets this for free without re-parenting markup.
+- **Coordinate display uses 5 decimals** via `toFixed(5)` in `FavoritesManagerModal.formatCoord` (~1.1 m at the equator). PostgreSQL `DOUBLE PRECISION` trims trailing zeros on round-trip, so the API JSON for `40.01867` vs. `40.0150` looks ragged, but the modal normalises every row to five decimal places at render time.
+- **Modal width widened to `880px`** via a new `.modal-content.modal-wide` class so the 4-column table fits without horizontal scroll; the rest of the modal styles are reused unchanged.
 
 ---
 

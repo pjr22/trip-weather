@@ -410,6 +410,35 @@
         </div>
     </div>
 
+    <div id="favorites-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="favorites-modal-title">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h3 id="favorites-modal-title">My Favorites</h3>
+                <span class="close" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="favorites-modal-toolbar">
+                    <input type="text" id="favorites-search-input" class="search-input" placeholder="Search by label or address..." autocomplete="off">
+                </div>
+                <div id="favorites-modal-status" class="favorites-modal-status" aria-live="polite"></div>
+                <div class="favorites-table-container">
+                    <table class="favorites-table">
+                        <thead>
+                            <tr>
+                                <th>Label</th>
+                                <th>Address</th>
+                                <th>Latitude, Longitude</th>
+                                <th class="favorites-cell-actions-header">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="favorites-modal-tbody"></tbody>
+                    </table>
+                </div>
+                <p id="favorites-modal-empty" class="favorites-modal-empty" style="display:none;"></p>
+            </div>
+        </div>
+    </div>
+
     <div id="layers-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="layers-modal-title">
         <div class="modal-content">
             <div class="modal-header">
@@ -478,6 +507,7 @@
     <script src="js/services/WeatherService.js"></script>
     <script src="js/services/RoutePersistenceService.js"></script>
     <script src="js/services/EVChargingStationService.js"></script>
+    <script src="js/services/FavoritesService.js"></script>
     
     <!-- Navigation engine (depend on utils; loaded before NavigationManager) -->
     <script src="js/nav/NavigationConstants.js"></script>
@@ -498,6 +528,7 @@
     <script src="js/managers/RouteManager.js"></script>
     <script src="js/managers/LayerManager.js"></script>
     <script src="js/managers/EVChargingStationManager.js"></script>
+    <script src="js/managers/FavoritesManagerModal.js"></script>
     <script src="js/managers/NavigationManager.js"></script>
     <script src="js/managers/ExportManager.js"></script>
 

@@ -77,6 +77,7 @@ window.TripWeather.Managers.UI = {
 
         const items = user
             ? [
+                { action: 'favorites',  label: 'My Favorites' },
                 { action: 'changePwd',  label: 'Change password' },
                 { action: 'logout',     label: 'Log out' },
                 { action: 'deleteAcct', label: 'Delete account' },
@@ -182,6 +183,10 @@ window.TripWeather.Managers.UI = {
                 break;
             case 'deleteAcct':
                 if (modals) modals.showDeleteAccount();
+                break;
+            case 'favorites':
+                const favMgr = window.TripWeather.Managers.FavoritesManagerModal;
+                if (favMgr && typeof favMgr.open === 'function') favMgr.open();
                 break;
             case 'about':
                 this.showAboutDialog();
