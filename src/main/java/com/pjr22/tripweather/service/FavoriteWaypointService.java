@@ -47,6 +47,22 @@ public class FavoriteWaypointService {
     /** Server-side locationName cap. Matches {@code favorite_waypoints.location_name VARCHAR(1023)}. */
     private static final int LOCATION_NAME_MAX_LENGTH = 1023;
 
+    /**
+     * Tier 1 radius: any favorite within this distance counts as a match
+     * regardless of locationName. Sized to absorb GPS jitter on a re-acquired
+     * current-location read (typical jitter 3-10 m).
+     */
+    static final double TIER1_RADIUS_METERS = 10.0;
+
+    /**
+     * Tier 2 radius: within this distance, a match is only declared when the
+     * locationName also matches (case-insensitive, trimmed). Catches the
+     * "same address, slightly different coords" case the reverse-geocoder
+     * canonicalises, without false-positive matches across unrelated places
+     * within a 50 m radius.
+     */
+    static final double TIER2_RADIUS_METERS = 50.0;
+
     private final FavoriteWaypointRepository favoriteRepository;
     private final CurrentUserService currentUserService;
 
@@ -71,17 +87,16 @@ public class FavoriteWaypointService {
     }
 
     /**
-     * Existence check used by the popup heart-toggle's initial state on a
-     * fresh map-click. Empty present (Optional.empty()) means "this place
-     * isn't starred for the current user" — the controller maps that to a
-     * 204 so the client can distinguish it from a 404 / 401.
+     * Existence check used by the popup heart-toggle's initial state. Returns
+     * the best tiered-proximity match (see {@link #matchByProximity}). Empty
+     * means "this place isn't starred for the current user" — the controller
+     * maps that to a 204 so the client can distinguish it from a 404 / 401.
      */
     @Transactional(readOnly = true)
     public Optional<FavoriteWaypointDto> findAt(double latitude, double longitude, String locationName) {
         User user = requireCurrentUser();
-        return favoriteRepository
-                .findFirstByUserIdAndLatitudeAndLongitudeAndLocationName(
-                        user.getId(), latitude, longitude, locationName)
+        List<FavoriteWaypoint> candidates = favoriteRepository.findAllByUser(user.getId());
+        return matchByProximity(candidates, latitude, longitude, locationName)
                 .map(FavoriteWaypointService::toDto);
     }
 
@@ -120,6 +135,14 @@ public class FavoriteWaypointService {
         favorite.setLatitude(latitude);
         favorite.setLongitude(longitude);
         favorite.setElevation(req.elevation());
+        // Timezone fields are pass-through: if the caller has them, save
+        // them; null is fine. Blank-to-null so an empty-string client send
+        // doesn't pollute the column.
+        favorite.setTimezoneName(blankToNull(req.timezoneName()));
+        favorite.setTimezoneStdOffset(blankToNull(req.timezoneStdOffset()));
+        favorite.setTimezoneDstOffset(blankToNull(req.timezoneDstOffset()));
+        favorite.setTimezoneStdAbbr(blankToNull(req.timezoneStdAbbr()));
+        favorite.setTimezoneDstAbbr(blankToNull(req.timezoneDstAbbr()));
         // id + created set by @PrePersist
 
         FavoriteWaypoint saved = favoriteRepository.save(favorite);
@@ -223,7 +246,95 @@ public class FavoriteWaypointService {
                 f.getLatitude(),
                 f.getLongitude(),
                 f.getElevation(),
+                f.getTimezoneName(),
+                f.getTimezoneStdOffset(),
+                f.getTimezoneDstOffset(),
+                f.getTimezoneStdAbbr(),
+                f.getTimezoneDstAbbr(),
                 f.getCreated());
+    }
+
+    private static String blankToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
+    }
+
+    /**
+     * Tiered proximity match used by both the heart-toggle /check endpoint
+     * and the route-load favoriteId population. Two stages, plus a no-match:
+     *
+     * <ol>
+     *   <li><b>Within 10 m</b> → match regardless of locationName. Absorbs
+     *       GPS jitter when the same physical place is re-acquired from a
+     *       current-location read.</li>
+     *   <li><b>Within 50 m AND same locationName</b> (case-insensitive,
+     *       trimmed) → match. Catches the "same address canonicalised by the
+     *       reverse-geocoder, slightly different coords" case without
+     *       false-positive matches across unrelated places that happen to
+     *       be within 50 m.</li>
+     *   <li>Otherwise → no match.</li>
+     * </ol>
+     *
+     * <p>Among multiple candidates, tier 1 always beats tier 2; within the
+     * same tier, the closest wins.
+     *
+     * <p>Pure function — no DB access, no user resolution. The caller is
+     * responsible for passing only the viewer's own favorites.
+     */
+    public static Optional<FavoriteWaypoint> matchByProximity(
+            List<FavoriteWaypoint> candidates,
+            double latitude, double longitude, String locationName) {
+        if (candidates == null || candidates.isEmpty()) {
+            return Optional.empty();
+        }
+        String normalizedQueryName = normalizeForNameCompare(locationName);
+
+        FavoriteWaypoint best = null;
+        double bestDistance = Double.MAX_VALUE;
+        int bestTier = Integer.MAX_VALUE;
+
+        for (FavoriteWaypoint f : candidates) {
+            if (f.getLatitude() == null || f.getLongitude() == null) continue;
+            double d = haversineMeters(latitude, longitude, f.getLatitude(), f.getLongitude());
+
+            int tier;
+            if (d <= TIER1_RADIUS_METERS) {
+                tier = 1;
+            } else if (d <= TIER2_RADIUS_METERS
+                    && normalizedQueryName.equals(normalizeForNameCompare(f.getLocationName()))) {
+                tier = 2;
+            } else {
+                continue;
+            }
+
+            if (tier < bestTier || (tier == bestTier && d < bestDistance)) {
+                best = f;
+                bestDistance = d;
+                bestTier = tier;
+            }
+        }
+        return Optional.ofNullable(best);
+    }
+
+    private static String normalizeForNameCompare(String s) {
+        return s == null ? "" : s.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Great-circle distance in meters between two WGS84 points. Mean-radius
+     * approximation; accuracy is ±0.5 % over distances that matter for this
+     * use case (a few hundred meters at most), well inside the 10 m / 50 m
+     * tier thresholds.
+     */
+    private static double haversineMeters(double lat1, double lon1, double lat2, double lon2) {
+        final double earthRadiusMeters = 6_371_000.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double sinDLat2 = Math.sin(dLat / 2);
+        double sinDLon2 = Math.sin(dLon / 2);
+        double a = sinDLat2 * sinDLat2
+                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                 * sinDLon2 * sinDLon2;
+        return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     // ------------------------------------------------------------------------

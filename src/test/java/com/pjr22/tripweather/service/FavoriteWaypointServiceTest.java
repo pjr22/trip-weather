@@ -65,6 +65,20 @@ class FavoriteWaypointServiceTest {
         when(currentUserService.currentUser()).thenReturn(Optional.empty());
     }
 
+    /**
+     * Helper to keep the per-test call sites short and focused on the fields
+     * each test actually exercises. The five trailing nulls are the timezone
+     * fields — none of the existing tests care about timezone wiring, which
+     * is covered separately in {@link #create_passesTimezoneFieldsThrough}.
+     */
+    private static CreateFavoriteRequest createReq(String label, String locationName,
+                                                   Double latitude, Double longitude,
+                                                   Double elevation) {
+        return new CreateFavoriteRequest(
+                label, locationName, latitude, longitude, elevation,
+                null, null, null, null, null);
+    }
+
     private static FavoriteWaypoint sampleEntity(User owner, String label) {
         FavoriteWaypoint f = new FavoriteWaypoint();
         f.setId(UUID.randomUUID());
@@ -125,29 +139,121 @@ class FavoriteWaypointServiceTest {
     }
 
     // ------------------------------------------------------------------------
-    // findAt (check endpoint)
+    // findAt (check endpoint) — tiered proximity match (10 m / 50 m + name)
     // ------------------------------------------------------------------------
 
-    @Test
-    void findAt_returnsDtoWhenRepositoryFindsMatch() {
-        asAlice();
-        FavoriteWaypoint hit = sampleEntity(alice, "Home");
-        when(favoriteRepository.findFirstByUserIdAndLatitudeAndLongitudeAndLocationName(
-                alice.getId(), 40.0, -105.0, "x")).thenReturn(Optional.of(hit));
+    /**
+     * Build a favorite at a specific lat/lon/locationName, for the tier tests.
+     * Latitude is the only axis varied in the helpers because 1 degree of
+     * latitude is ~111 km, so a 0.0001 step is ~11 m — convenient for crafting
+     * "just inside tier 1" / "just outside tier 1, inside tier 2" rows.
+     */
+    private static FavoriteWaypoint favoriteAt(User owner, String label, String locationName,
+                                               double lat, double lon) {
+        FavoriteWaypoint f = new FavoriteWaypoint();
+        f.setId(UUID.randomUUID());
+        f.setUser(owner);
+        f.setLabel(label);
+        f.setLocationName(locationName);
+        f.setLatitude(lat);
+        f.setLongitude(lon);
+        f.setCreated(ZonedDateTime.now());
+        return f;
+    }
 
-        Optional<FavoriteWaypointDto> dto = service.findAt(40.0, -105.0, "x");
+    @Test
+    void findAt_tier1_within10mMatches_regardlessOfLocationName() {
+        asAlice();
+        // 0.00005° latitude ≈ 5.5 m — well inside tier 1.
+        FavoriteWaypoint home = favoriteAt(alice, "Home", "1234 Elm St", 40.00005, -105.0);
+        when(favoriteRepository.findAllByUser(alice.getId())).thenReturn(List.of(home));
+
+        // Different locationName entirely — tier 1 ignores name.
+        Optional<FavoriteWaypointDto> dto = service.findAt(40.0, -105.0, "Some other reverse-geocode");
 
         assertThat(dto).isPresent();
         assertThat(dto.get().label()).isEqualTo("Home");
     }
 
     @Test
-    void findAt_returnsEmptyWhenRepositoryFindsNothing() {
+    void findAt_tier2_within50mAndSameName_matches() {
         asAlice();
-        when(favoriteRepository.findFirstByUserIdAndLatitudeAndLongitudeAndLocationName(
-                alice.getId(), 40.0, -105.0, "")).thenReturn(Optional.empty());
+        // 0.0003° latitude ≈ 33 m — outside tier 1 (10 m), inside tier 2 (50 m).
+        FavoriteWaypoint home = favoriteAt(alice, "Home", "1234 Elm St", 40.0003, -105.0);
+        when(favoriteRepository.findAllByUser(alice.getId())).thenReturn(List.of(home));
+
+        Optional<FavoriteWaypointDto> dto = service.findAt(40.0, -105.0, "1234 Elm St");
+
+        assertThat(dto).isPresent();
+        assertThat(dto.get().label()).isEqualTo("Home");
+    }
+
+    @Test
+    void findAt_tier2_within50mButDifferentName_doesNotMatch() {
+        asAlice();
+        FavoriteWaypoint home = favoriteAt(alice, "Home", "1234 Elm St", 40.0003, -105.0);
+        when(favoriteRepository.findAllByUser(alice.getId())).thenReturn(List.of(home));
+
+        // Same coords as previous test (33 m apart) but different name → no match.
+        // Prevents false positives across unrelated places that happen to be close.
+        assertThat(service.findAt(40.0, -105.0, "Different address")).isEmpty();
+    }
+
+    @Test
+    void findAt_nameMatchIsCaseInsensitiveAndTrimmed() {
+        asAlice();
+        FavoriteWaypoint home = favoriteAt(alice, "Home", "1234 Elm St", 40.0003, -105.0);
+        when(favoriteRepository.findAllByUser(alice.getId())).thenReturn(List.of(home));
+
+        assertThat(service.findAt(40.0, -105.0, "  1234 ELM ST  ")).isPresent();
+    }
+
+    @Test
+    void findAt_outsideTier2_doesNotMatchEvenWithSameName() {
+        asAlice();
+        // 0.001° latitude ≈ 111 m — outside both tiers.
+        FavoriteWaypoint home = favoriteAt(alice, "Home", "1234 Elm St", 40.001, -105.0);
+        when(favoriteRepository.findAllByUser(alice.getId())).thenReturn(List.of(home));
+
+        assertThat(service.findAt(40.0, -105.0, "1234 Elm St")).isEmpty();
+    }
+
+    @Test
+    void findAt_returnsEmptyWhenNoFavorites() {
+        asAlice();
+        when(favoriteRepository.findAllByUser(alice.getId())).thenReturn(List.of());
 
         assertThat(service.findAt(40.0, -105.0, "")).isEmpty();
+    }
+
+    @Test
+    void findAt_tier1BeatsTier2_whenBothApply() {
+        asAlice();
+        // Tier 1 candidate: 5.5 m away, totally different name.
+        FavoriteWaypoint near = favoriteAt(alice, "Tier1", "Mismatched name", 40.00005, -105.0);
+        // Tier 2 candidate: 33 m away, exact name match.
+        FavoriteWaypoint farButNamed = favoriteAt(alice, "Tier2", "Same as query", 40.0003, -105.0);
+        when(favoriteRepository.findAllByUser(alice.getId()))
+                .thenReturn(List.of(near, farButNamed));
+
+        Optional<FavoriteWaypointDto> dto = service.findAt(40.0, -105.0, "Same as query");
+
+        assertThat(dto).isPresent();
+        assertThat(dto.get().label()).isEqualTo("Tier1");
+    }
+
+    @Test
+    void findAt_withinSameTier_closestWins() {
+        asAlice();
+        FavoriteWaypoint closer = favoriteAt(alice, "Closer", "x", 40.00002, -105.0);   // ~2 m
+        FavoriteWaypoint farther = favoriteAt(alice, "Farther", "x", 40.00008, -105.0); // ~9 m
+        when(favoriteRepository.findAllByUser(alice.getId()))
+                .thenReturn(List.of(farther, closer));
+
+        Optional<FavoriteWaypointDto> dto = service.findAt(40.0, -105.0, "x");
+
+        assertThat(dto).isPresent();
+        assertThat(dto.get().label()).isEqualTo("Closer");
     }
 
     // ------------------------------------------------------------------------
@@ -165,8 +271,8 @@ class FavoriteWaypointServiceTest {
             return f;
         });
 
-        FavoriteWaypointDto saved = service.create(new CreateFavoriteRequest(
-                "  Home  ", "1234 Elm St", 40.0, -105.0, 1655.0));
+        FavoriteWaypointDto saved = service.create(
+                createReq("  Home  ", "1234 Elm St", 40.0, -105.0, 1655.0));
 
         assertThat(saved.label()).isEqualTo("Home");
         assertThat(saved.locationName()).isEqualTo("1234 Elm St");
@@ -185,8 +291,8 @@ class FavoriteWaypointServiceTest {
         when(favoriteRepository.existsByUserIdAndLabelIgnoreCase(alice.getId(), "Home")).thenReturn(false);
         when(favoriteRepository.save(any(FavoriteWaypoint.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        FavoriteWaypointDto saved = service.create(new CreateFavoriteRequest(
-                "Home", "   ", 39.74024, -105.02340, null));
+        FavoriteWaypointDto saved = service.create(
+                createReq("Home", "   ", 39.74024, -105.02340, null));
 
         assertThat(saved.locationName()).isEqualTo("39.74024, -105.02340");
     }
@@ -197,8 +303,8 @@ class FavoriteWaypointServiceTest {
         when(favoriteRepository.existsByUserIdAndLabelIgnoreCase(alice.getId(), "Home")).thenReturn(false);
         when(favoriteRepository.save(any(FavoriteWaypoint.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        FavoriteWaypointDto saved = service.create(new CreateFavoriteRequest(
-                "Home", null, 1.0, 2.0, null));
+        FavoriteWaypointDto saved = service.create(
+                createReq("Home", null, 1.0, 2.0, null));
 
         assertThat(saved.locationName()).isEqualTo("1.00000, 2.00000");
     }
@@ -206,8 +312,8 @@ class FavoriteWaypointServiceTest {
     @Test
     void create_blankLabel_throwsInvalid() {
         asAlice();
-        assertThatThrownBy(() -> service.create(new CreateFavoriteRequest(
-                "  ", "anywhere", 40.0, -105.0, null)))
+        assertThatThrownBy(() -> service.create(
+                createReq("  ", "anywhere", 40.0, -105.0, null)))
                 .isInstanceOf(FavoriteWaypointService.InvalidFavoriteException.class)
                 .hasMessageContaining("label");
         verify(favoriteRepository, never()).save(any());
@@ -216,8 +322,8 @@ class FavoriteWaypointServiceTest {
     @Test
     void create_missingLatitude_throwsInvalid() {
         asAlice();
-        assertThatThrownBy(() -> service.create(new CreateFavoriteRequest(
-                "Home", "anywhere", null, -105.0, null)))
+        assertThatThrownBy(() -> service.create(
+                createReq("Home", "anywhere", null, -105.0, null)))
                 .isInstanceOf(FavoriteWaypointService.InvalidFavoriteException.class);
     }
 
@@ -226,8 +332,8 @@ class FavoriteWaypointServiceTest {
         asAlice();
         when(favoriteRepository.existsByUserIdAndLabelIgnoreCase(alice.getId(), "Home")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.create(new CreateFavoriteRequest(
-                "Home", "anywhere", 40.0, -105.0, null)))
+        assertThatThrownBy(() -> service.create(
+                createReq("Home", "anywhere", 40.0, -105.0, null)))
                 .isInstanceOf(FavoriteWaypointService.DuplicateFavoriteLabelException.class);
         verify(favoriteRepository, never()).save(any());
     }
@@ -235,9 +341,55 @@ class FavoriteWaypointServiceTest {
     @Test
     void create_anonymous_throwsNotFound() {
         asAnonymous();
-        assertThatThrownBy(() -> service.create(new CreateFavoriteRequest(
-                "Home", "anywhere", 40.0, -105.0, null)))
+        assertThatThrownBy(() -> service.create(
+                createReq("Home", "anywhere", 40.0, -105.0, null)))
                 .isInstanceOf(FavoriteWaypointService.FavoriteNotFoundException.class);
+    }
+
+    @Test
+    void create_passesTimezoneFieldsThrough() {
+        asAlice();
+        when(favoriteRepository.existsByUserIdAndLabelIgnoreCase(alice.getId(), "Home")).thenReturn(false);
+        when(favoriteRepository.save(any(FavoriteWaypoint.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        FavoriteWaypointDto saved = service.create(new CreateFavoriteRequest(
+                "Home", "anywhere", 40.0, -105.0, null,
+                "America/Denver", "-07:00", "-06:00", "MST", "MDT"));
+
+        ArgumentCaptor<FavoriteWaypoint> captor = ArgumentCaptor.forClass(FavoriteWaypoint.class);
+        verify(favoriteRepository).save(captor.capture());
+        FavoriteWaypoint entity = captor.getValue();
+        assertThat(entity.getTimezoneName()).isEqualTo("America/Denver");
+        assertThat(entity.getTimezoneStdOffset()).isEqualTo("-07:00");
+        assertThat(entity.getTimezoneDstOffset()).isEqualTo("-06:00");
+        assertThat(entity.getTimezoneStdAbbr()).isEqualTo("MST");
+        assertThat(entity.getTimezoneDstAbbr()).isEqualTo("MDT");
+
+        // DTO round-trip: read-side surfaces the same values.
+        assertThat(saved.timezoneName()).isEqualTo("America/Denver");
+        assertThat(saved.timezoneStdAbbr()).isEqualTo("MST");
+    }
+
+    @Test
+    void create_blankTimezoneFields_storedAsNull() {
+        // Defensive: client may send empty strings rather than omitting the
+        // field. We normalise to null so the column doesn't carry "".
+        asAlice();
+        when(favoriteRepository.existsByUserIdAndLabelIgnoreCase(alice.getId(), "Home")).thenReturn(false);
+        when(favoriteRepository.save(any(FavoriteWaypoint.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.create(new CreateFavoriteRequest(
+                "Home", "anywhere", 40.0, -105.0, null,
+                "", "  ", "", null, ""));
+
+        ArgumentCaptor<FavoriteWaypoint> captor = ArgumentCaptor.forClass(FavoriteWaypoint.class);
+        verify(favoriteRepository).save(captor.capture());
+        FavoriteWaypoint entity = captor.getValue();
+        assertThat(entity.getTimezoneName()).isNull();
+        assertThat(entity.getTimezoneStdOffset()).isNull();
+        assertThat(entity.getTimezoneDstOffset()).isNull();
+        assertThat(entity.getTimezoneStdAbbr()).isNull();
+        assertThat(entity.getTimezoneDstAbbr()).isNull();
     }
 
     // ------------------------------------------------------------------------

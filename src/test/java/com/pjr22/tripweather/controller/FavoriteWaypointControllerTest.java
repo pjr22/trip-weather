@@ -48,6 +48,7 @@ class FavoriteWaypointControllerTest {
     private static FavoriteWaypointDto sampleDto(String label) {
         return new FavoriteWaypointDto(
                 UUID.randomUUID(), label, "1234 Elm St", 40.0, -105.0, 1655.0,
+                null, null, null, null, null,  // timezone fields — not exercised by these tests
                 ZonedDateTime.now());
     }
 
@@ -109,7 +110,8 @@ class FavoriteWaypointControllerTest {
     void create_returns201WithDto() {
         FavoriteWaypointDto saved = sampleDto("Home");
         CreateFavoriteRequest req = new CreateFavoriteRequest(
-                "Home", "1234 Elm St", 40.0, -105.0, 1655.0);
+                "Home", "1234 Elm St", 40.0, -105.0, 1655.0,
+                null, null, null, null, null);
         when(service.create(req)).thenReturn(saved);
 
         ResponseEntity<FavoriteWaypointDto> response = controller.create(req);
@@ -121,7 +123,8 @@ class FavoriteWaypointControllerTest {
     @Test
     void create_propagatesDuplicateLabelException() {
         CreateFavoriteRequest req = new CreateFavoriteRequest(
-                "Home", "1234 Elm St", 40.0, -105.0, null);
+                "Home", "1234 Elm St", 40.0, -105.0, null,
+                null, null, null, null, null);
         when(service.create(req)).thenThrow(
                 new FavoriteWaypointService.DuplicateFavoriteLabelException("dup"));
 
@@ -132,7 +135,8 @@ class FavoriteWaypointControllerTest {
     @Test
     void create_propagatesInvalidFavoriteException() {
         CreateFavoriteRequest req = new CreateFavoriteRequest(
-                "", "1234 Elm St", 40.0, -105.0, null);
+                "", "1234 Elm St", 40.0, -105.0, null,
+                null, null, null, null, null);
         when(service.create(req)).thenThrow(
                 new FavoriteWaypointService.InvalidFavoriteException("bad"));
 

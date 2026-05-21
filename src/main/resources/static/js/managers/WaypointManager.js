@@ -137,6 +137,12 @@ window.TripWeather.Managers.Waypoint = {
             waypoint.time = existingWaypoint.time || '';
             waypoint.duration = existingWaypoint.duration || 0;
             waypoint.distance = existingWaypoint.distance || 0;
+            // Phase 3a: server-side match for a loaded route's waypoint against
+            // the viewer's favorites. undefined for fresh waypoints; null when
+            // checked but no match; UUID when matched.
+            if (existingWaypoint.favoriteId !== undefined) {
+                waypoint.favoriteId = existingWaypoint.favoriteId;
+            }
             
             // Copy timezone information if it exists
             if (existingWaypoint.timezoneName) {

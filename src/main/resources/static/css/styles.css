@@ -2435,3 +2435,72 @@ main {
     font-size: 14px;
     box-sizing: border-box;
 }
+
+/* Phase 3a — heart toggle on the waypoint popup. Float:right pulls the heart
+ * out of normal flow so it doesn't claim a dedicated row; the negative top
+ * margin lifts it up into the trailing-line-break space above so it sits
+ * compactly at the bottom-right of the popup without growing the popup's
+ * overall height. Companion change: updateMarkerPopup always emits a
+ * "Timezone:" line (with "unknown" as fallback) so the line above the
+ * heart's resting position is predictable. */
+.popup-favorite-heart {
+    float: right;
+    cursor: pointer;
+    color: #e74c3c;
+    line-height: 0;
+    padding: 2px;
+    margin-top: -20px;
+    border-radius: 3px;
+    transition: background-color 0.15s ease;
+}
+
+.popup-favorite-heart:hover,
+.popup-favorite-heart:focus {
+    background-color: #fdecea;
+    outline: none;
+}
+
+.popup-favorite-heart svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+/* Phase 3b — favorite rows + section headers in the location-search dropdown.
+ * Favorites appear at the top under a "Favorites" header; geocode results
+ * follow under a "Search results" header (shown only when both sections
+ * have rows). */
+.search-section-header {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #7f8c8d;
+    padding: 4px 0;
+    margin: 4px 0;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.search-result-favorite {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-right: 12px;
+}
+
+.search-result-favorite-heart {
+    flex: 0 0 auto;
+    color: #e74c3c;
+    line-height: 0;
+}
+
+.search-result-favorite-heart svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.search-result-favorite-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}

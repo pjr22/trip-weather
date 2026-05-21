@@ -118,7 +118,7 @@ Five phases, each shippable on its own. Phases 1-2-3 deliver favorites end-to-en
 |---|---|
 | 1 — Favorites: schema + backend CRUD | Shipped |
 | 2 — Favorites: manager modal + entry points | Shipped |
-| 3 — Favorites: heart toggle in popup + search autocomplete | Not started |
+| 3 — Favorites: heart toggle in popup + search autocomplete | Shipped |
 | 4 — My Routes: backend + modal | Not started |
 | 5 — Admin console + cleanup cron (favorites) | Not started |
 
@@ -148,6 +148,15 @@ CREATE TABLE IF NOT EXISTS favorite_waypoints (
     created         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     deleted_at      TIMESTAMPTZ
 );
+
+-- Phase 3 added five nullable timezone columns so the SPA doesn't have to
+-- re-resolve timezone after "Add to route" from a favorite. Same flat shape
+-- the waypoint object uses; idempotent ALTER for re-runs on populated DBs.
+ALTER TABLE favorite_waypoints ADD COLUMN IF NOT EXISTS timezone_name        VARCHAR(255);
+ALTER TABLE favorite_waypoints ADD COLUMN IF NOT EXISTS timezone_std_offset  VARCHAR(64);
+ALTER TABLE favorite_waypoints ADD COLUMN IF NOT EXISTS timezone_dst_offset  VARCHAR(64);
+ALTER TABLE favorite_waypoints ADD COLUMN IF NOT EXISTS timezone_std_abbr    VARCHAR(16);
+ALTER TABLE favorite_waypoints ADD COLUMN IF NOT EXISTS timezone_dst_abbr    VARCHAR(16);
 
 CREATE INDEX IF NOT EXISTS idx_favorite_waypoints_user
     ON favorite_waypoints (user_id) WHERE deleted_at IS NULL;
@@ -405,6 +414,15 @@ The existing waypoint search box ([LocationService.js](src/main/resources/static
 
 **Phase 3 ships when:** the popup heart toggle works on freshly-clicked waypoints and on loaded-route waypoints (using `WaypointDto.favoriteId` and the `/check` endpoint respectively); the search dropdown surfaces matching favorites at the top for authenticated users on every debounced keystroke; logout hides both affordances; no frontend favorites cache exists.
 
+#### Implementation notes (decisions made during build)
+
+- **Popup heart placement.** Floats bottom-right of the popup with `float: right` + `margin-top: -20px` on the heart `<span>` directly (no wrapper div). Companion change: the popup always emits a `Timezone:` line (falling back to `"unknown"` when missing) so the baseline above the heart is predictable. Earlier iterations using upper-right (crowded the close button) and absolute-positioning with reserved padding-bottom (wasted vertical space on mobile) were both reverted.
+- **Silent add, silent remove from the popup.** Heart-outline → POST with `label = locationName` and no inline prompt; on 409 (label collision with an existing favorite) the SPA shows a toast pointing to the manager modal rather than blocking with an error dialog. Heart-filled → DELETE with no confirm — misclicks are cheap because re-clicking re-adds. The manager modal's Delete still confirms because re-adding from there requires navigating back to the map.
+- **Click handler re-attachment.** Every popup-open wires the heart click handler; every toggle-driven rebuild re-wires it. Leaflet's `bindPopup → setContent` replaces the inner DOM, so listeners attached to the previous heart node are gone. Without explicit re-wiring after each rebuild, the first toggle worked but subsequent toggles in the same open popup did nothing. The fix lives in `WaypointRenderer.attachFavoriteHeartClickHandlers` — called from both `wireFavoriteHeart` (popup-open) and from inside `addFavoriteFromPopup` / `removeFavoriteFromPopup` (after `updateMarkerPopup`).
+- **Cross-tab freshness.** Every popup-open also fires `/api/favorites/check` once. If the server's answer differs from the painted heart state, the popup re-renders. Cheap (~10-50 ms same-origin) and absorbs any toggle made in another tab without needing a client-side cache.
+- **Tiered proximity match — implemented now (was deferred D2).** Replaces decision #8's exact `(lat, lon, locationName)` equality. Two stages: (a) within 10 m → match regardless of name (absorbs GPS jitter for current-location re-acquisition); (b) within 50 m AND same locationName (case-insensitive, trimmed) → match (catches the "same canonical address, slightly different coords" case without false positives across unrelated nearby places). Beyond 50 m → no match. Pure in-memory match via `FavoriteWaypointService.matchByProximity` using Haversine on the existing `latitude` / `longitude` columns — no PostGIS dependency added. Both `/api/favorites/check` and `RoutePersistenceService.loadRoute` (favoriteId population) use the same matcher so a place looks "favorited" identically whether the user clicks fresh or loads a saved route.
+- **Timezone fields persisted with favorites.** Added five nullable columns to `favorite_waypoints` (`timezone_name`, `timezone_std_offset`, `timezone_dst_offset`, `timezone_std_abbr`, `timezone_dst_abbr`) — the same flat shape the waypoint object uses. When the popup heart fires, all available timezone fields are sent in the POST; when a favorite becomes a waypoint via the modal or search dropdown, the same fields flow back into the new waypoint's `locationInfo`. This avoids the per-add timezone-API round-trip; pre-existing favorites stored without timezone (rows created before this change) carry NULL and fall back to runtime resolution.
+
 ---
 
 ## Phase 4 — My Routes: backend + modal
@@ -512,7 +530,7 @@ Items called out during planning that we chose not to address in v1. Revisit if 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | D1 | ~~Favorites in the waypoint search-box autocomplete.~~ | **Moved into Phase 3b.** | Resolved during plan review — favorites surface at the top of the existing search dropdown with a filled-heart prefix, auth-gated, alphabetical. |
-| D2 | **Geographic-proximity match for the heart-toggle initial state** (instead of exact equality, decision #8). | Deferred. | If users complain that re-clicking the same place doesn't show as a favorite, switch to `ST_DWithin` (~25 m) — cheap to add later, costly to roll back if it produces false-positive matches. |
+| D2 | ~~**Geographic-proximity match for the heart-toggle initial state** (instead of exact equality, decision #8).~~ | **Implemented in Phase 3.** | The current-location re-acquisition case surfaced quickly; rather than `ST_DWithin`-based PostGIS (which would have needed a schema migration), shipped an in-memory tiered match (10 m unconditional, 50 m + same name) via `FavoriteWaypointService.matchByProximity`. See Phase 3 implementation notes. |
 | D3 | **Additional sort options for the favorites manager modal** (created-date, last-used, drag-to-reorder). | Deferred. | v1 default is alphabetical by label. Drag-to-reorder would need a `display_order` column. Revisit when users ask. |
 | D4 | **Bulk delete in My Routes.** | Deferred (not v1). | Single-row delete handles the common case. Add a multi-select header checkbox + bulk-delete button only if users accumulate enough cruft to need it. |
 | D5 | **Pagination on `GET /api/routes` and `GET /api/favorites`.** | Deferred (not v1). | Skipped per decisions #9, #10. Endpoint shape can be extended with `?page=&size=` without breaking existing clients. |

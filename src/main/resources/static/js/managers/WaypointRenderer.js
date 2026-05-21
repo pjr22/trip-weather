@@ -93,12 +93,22 @@ window.TripWeather.Managers.WaypointRenderer = {
             .addTo(map);
         
         marker.waypointSequence = waypoint.sequence;
-        
+
         marker.on('click', function() {
             this.highlightTableRow(waypoint.sequence);
             this.updateMarkerPopup(marker, waypoint, orderNumber);
         }.bind(this));
-        
+
+        // Phase 3a: each popupopen wires the favorite-heart click handler and,
+        // for authenticated viewers, re-checks the favorite status against the
+        // server so cross-tab toggles are absorbed (decision in plan: the
+        // popup is the freshest view, so always re-check on open). Listener
+        // is attached once; Leaflet rebuilds the popup DOM each open, so the
+        // inner-element lookups happen inside the handler.
+        marker.on('popupopen', function() {
+            this.wireFavoriteHeart(marker, waypoint, orderNumber);
+        }.bind(this));
+
         this.updateMarkerPopup(marker, waypoint, orderNumber);
         
         // Add to waypoint manager's markers array
@@ -130,12 +140,16 @@ window.TripWeather.Managers.WaypointRenderer = {
         if (waypoint.locationName) {
             const safeLocationName = helpers.escapeHtml(waypoint.locationName);
             popupContent += `<br><strong>${safeLocationName}</strong><br>`;
-            
-            // Add timezone name after location name
-            if (waypoint.timezoneName) {
-                const safeTimezoneName = helpers.escapeHtml(waypoint.timezoneName);
-                popupContent += `<small>Timezone: ${safeTimezoneName}</small><br>`;
-            }
+
+            // Add timezone name after location name. When timezone resolution
+            // hasn't run / failed, emit "Timezone: unknown" rather than nothing
+            // so the popup keeps a consistent baseline shape — see Phase 3a
+            // notes (the absolutely-positioned heart needs a predictable last
+            // line above its reserved space).
+            const safeTimezoneName = waypoint.timezoneName
+                ? helpers.escapeHtml(waypoint.timezoneName)
+                : 'unknown';
+            popupContent += `<small>Timezone: ${safeTimezoneName}</small><br>`;
         }
         
         // Add Arrival Time
@@ -174,7 +188,15 @@ window.TripWeather.Managers.WaypointRenderer = {
             popupContent += `<br>`;
             popupContent += window.TripWeather.Services.Weather.generateWeatherPopupHtml(waypoint.weather);
         }
-        
+
+        // Phase 3a: heart toggle appears only for authenticated viewers and
+        // sits at the bottom-right of the popup (float:right + negative
+        // top margin in the CSS) so it doesn't crowd Leaflet's close button
+        // at the top and doesn't waste space at the bottom. The span carries
+        // data-waypoint-favorite-heart so wireFavoriteHeart can find it
+        // after Leaflet rebuilds the popup DOM on each open.
+        popupContent += this.buildFavoriteHeartHtml(waypoint);
+
         marker.bindPopup(popupContent);
     },
 
@@ -728,5 +750,176 @@ window.TripWeather.Managers.WaypointRenderer = {
     /**
      * Currently dragged row (for drag and drop operations)
      */
-    draggedRow: null
+    draggedRow: null,
+
+    /**
+     * Build the heart-icon HTML fragment that sits in the upper-right of the
+     * waypoint popup. Returns an empty string for anonymous viewers (no
+     * affordance) so logged-out users see the popup unchanged. Phase 3a of
+     * FAVORITES_AND_ROUTE_MGMT.md.
+     */
+    buildFavoriteHeartHtml: function(waypoint) {
+        const auth = window.TripWeather.Services.Auth;
+        if (!auth || !auth.getCurrentUser()) return '';
+        // Truthy favoriteId → already a favorite → filled red heart.
+        // null/undefined → not a favorite (or not yet checked) → outline heart.
+        const isFav = !!waypoint.favoriteId;
+        const title = isFav ? 'Remove from favorites' : 'Add to favorites';
+        // Inline SVG (matches the existing inline-icon idiom in the popup
+        // content; avoids the async IconLoader detour for a static string).
+        // The filled variant uses fill=currentColor; the outline variant
+        // uses stroke=currentColor with no fill. Same path either way.
+        const fillAttr = isFav
+            ? 'fill="currentColor"'
+            : 'fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"';
+        return ''
+            + '<span class="popup-favorite-heart' + (isFav ? ' is-favorite' : '') + '"'
+            + ' data-waypoint-favorite-heart="1"'
+            + ' role="button" tabindex="0"'
+            + ' title="' + title + '"'
+            + ' aria-label="' + title + '">'
+            + '<svg viewBox="0 0 24 24" ' + fillAttr + '>'
+            + '<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>'
+            + '</svg>'
+            + '</span>';
+    },
+
+    /**
+     * Wire the favorite-heart in an OPEN popup. Fires on every popupopen.
+     * For authenticated viewers, also fires an /api/favorites/check round-
+     * trip so cross-tab toggles are absorbed — the heart re-renders if the
+     * server's answer differs from what we painted. Phase 3a of
+     * FAVORITES_AND_ROUTE_MGMT.md.
+     *
+     * Every time we rebuild the popup content via updateMarkerPopup (either
+     * from a toggle click or from this /check response), Leaflet replaces
+     * the inner DOM and the heart node we attached the listener to is gone.
+     * So the click-attachment lives in a separate helper that's re-called
+     * after every rebuild — see attachFavoriteHeartClickHandlers.
+     */
+    wireFavoriteHeart: function(marker, waypoint, orderNumber) {
+        const auth = window.TripWeather.Services.Auth;
+        if (!auth || !auth.getCurrentUser()) return;
+
+        this.attachFavoriteHeartClickHandlers(marker, waypoint, orderNumber);
+
+        const self = this;
+        // Cross-tab freshness: re-check on every open. The call is cheap
+        // (~10-50 ms same-origin) and ensures the popup heart never lies
+        // about state for more than one open.
+        window.TripWeather.Services.Favorites.check({
+            latitude: waypoint.lat,
+            longitude: waypoint.lng,
+            locationName: waypoint.locationName || ''
+        }).then(function(match) {
+            const serverFavoriteId = match ? match.id : null;
+            if (serverFavoriteId !== (waypoint.favoriteId || null)) {
+                waypoint.favoriteId = serverFavoriteId;
+                self.updateMarkerPopup(marker, waypoint, orderNumber);
+                // Leaflet repainted the open popup with new content, which
+                // means the heart node we just wired is gone — re-wire.
+                self.attachFavoriteHeartClickHandlers(marker, waypoint, orderNumber);
+            }
+        }).catch(function(err) {
+            // 403 from a stale session is the common failure; logging keeps
+            // it diagnosable without spamming the user.
+            console.warn('Favorites check failed for waypoint', waypoint.sequence, err);
+        });
+    },
+
+    /**
+     * Attach click + keyboard handlers to the heart node currently rendered
+     * inside the open popup. Idempotent in the sense that the heart node is
+     * a fresh DOM element every time the popup content is rebuilt — so
+     * calling this multiple times across rebuilds is correct and doesn't
+     * stack handlers. Safe to call when there's no heart (anonymous viewer)
+     * or no open popup; both cases return early.
+     */
+    attachFavoriteHeartClickHandlers: function(marker, waypoint, orderNumber) {
+        const popup = marker.getPopup();
+        if (!popup) return;
+        const popupEl = popup.getElement();
+        if (!popupEl) return;
+        const heart = popupEl.querySelector('[data-waypoint-favorite-heart]');
+        if (!heart) return;
+
+        const self = this;
+        const onActivate = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (waypoint.favoriteId) {
+                self.removeFavoriteFromPopup(marker, waypoint, orderNumber);
+            } else {
+                self.addFavoriteFromPopup(marker, waypoint, orderNumber);
+            }
+        };
+        heart.addEventListener('click', onActivate);
+        heart.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') onActivate(e);
+        });
+    },
+
+    /**
+     * Heart-outline → heart-filled: POST /api/favorites with label =
+     * locationName (per user preference: silent save, no inline prompt).
+     * 409 collisions surface as a toast pointing to the manager modal.
+     */
+    addFavoriteFromPopup: function(marker, waypoint, orderNumber) {
+        const label = (waypoint.locationName && waypoint.locationName.trim()) ||
+            (Number(waypoint.lat).toFixed(5) + ', ' + Number(waypoint.lng).toFixed(5));
+        // Pass through whatever timezone data the waypoint already has, so
+        // the favorite carries enough to render times later without a fresh
+        // /api/timezone round-trip. Empty strings are normalised to null
+        // server-side.
+        window.TripWeather.Services.Favorites.add({
+            label: label,
+            locationName: waypoint.locationName || '',
+            latitude: waypoint.lat,
+            longitude: waypoint.lng,
+            elevation: waypoint.alt,
+            timezoneName: waypoint.timezoneName || null,
+            timezoneStdOffset: waypoint.timezoneStdOffset || null,
+            timezoneDstOffset: waypoint.timezoneDstOffset || null,
+            timezoneStdAbbr: waypoint.timezoneStdAbbr || null,
+            timezoneDstAbbr: waypoint.timezoneDstAbbr || null
+        }).then(function(created) {
+            waypoint.favoriteId = created.id;
+            this.updateMarkerPopup(marker, waypoint, orderNumber);
+            // Leaflet just replaced the popup's inner DOM — re-wire the heart
+            // so the next click in this same open popup still works.
+            this.attachFavoriteHeartClickHandlers(marker, waypoint, orderNumber);
+            window.Toast.show('Added "' + created.label + '" to favorites', 'success');
+        }.bind(this)).catch(function(err) {
+            if (err.code === 'DUPLICATE_FAVORITE_LABEL') {
+                window.Toast.show(
+                    'A favorite named "' + label + '" already exists. Rename it in My Favorites.',
+                    'warning');
+            } else {
+                window.Toast.show('Could not add favorite: ' + err.message, 'error');
+            }
+        });
+    },
+
+    /**
+     * Heart-filled → heart-outline: DELETE directly, no confirm. Misclicks
+     * are cheap to recover from — the user just clicks the heart back on,
+     * which re-adds the favorite (silent POST, same label). The "Delete"
+     * action in the My Favorites modal still confirms, because that one
+     * removes the favorite from a context where re-adding requires
+     * navigating back to the map.
+     */
+    removeFavoriteFromPopup: function(marker, waypoint, orderNumber) {
+        const favoriteId = waypoint.favoriteId;
+        window.TripWeather.Services.Favorites.remove(favoriteId).then(function() {
+            waypoint.favoriteId = null;
+            this.updateMarkerPopup(marker, waypoint, orderNumber);
+            // Same reasoning as addFavoriteFromPopup — re-wire the heart
+            // after Leaflet swaps the popup's inner DOM, so a follow-up
+            // click in the same open popup still works.
+            this.attachFavoriteHeartClickHandlers(marker, waypoint, orderNumber);
+            window.Toast.show('Removed from favorites', 'success');
+        }.bind(this)).catch(function(err) {
+            window.Toast.show('Could not remove favorite: ' + err.message, 'error');
+        });
+    }
 };

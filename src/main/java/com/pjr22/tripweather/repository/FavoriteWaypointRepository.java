@@ -47,15 +47,6 @@ public interface FavoriteWaypointRepository extends JpaRepository<FavoriteWaypoi
                                         @Param("q") String searchText);
 
     /**
-     * Exact-match existence check used by {@code GET /api/favorites/check}
-     * (heart-toggle initial state on a fresh map-click). Returns 0 or 1 rows;
-     * if more than one favorite at the same (lat,lon,locationName) exists
-     * with different labels, the caller takes the first.
-     */
-    Optional<FavoriteWaypoint> findFirstByUserIdAndLatitudeAndLongitudeAndLocationName(
-            UUID userId, Double latitude, Double longitude, String locationName);
-
-    /**
      * Resolve a favorite by id and verify ownership in one query. The two
      * write endpoints ({@code PUT}, {@code DELETE}) use this so a wrong-owner
      * id surfaces as 404 rather than 403 — same posture as

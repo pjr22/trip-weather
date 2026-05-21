@@ -67,6 +67,29 @@ public class FavoriteWaypoint {
     @Column(name = "elevation")
     private Double elevation;
 
+    /**
+     * IANA timezone name for this place (e.g. {@code "America/Denver"}).
+     * Nullable — if the caller didn't have timezone data when the favorite
+     * was created, this stays null and the consumer must resolve it from
+     * lat/lon on demand. When present, the four sibling columns
+     * ({@code timezone*Offset}, {@code timezone*Abbr}) should also be set
+     * so the SPA can render times without a follow-up API call.
+     */
+    @Column(name = "timezone_name", length = 255)
+    private String timezoneName;
+
+    @Column(name = "timezone_std_offset", length = 64)
+    private String timezoneStdOffset;
+
+    @Column(name = "timezone_dst_offset", length = 64)
+    private String timezoneDstOffset;
+
+    @Column(name = "timezone_std_abbr", length = 16)
+    private String timezoneStdAbbr;
+
+    @Column(name = "timezone_dst_abbr", length = 16)
+    private String timezoneDstAbbr;
+
     @Column(name = "created", nullable = false)
     private ZonedDateTime created;
 

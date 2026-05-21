@@ -112,7 +112,13 @@ window.TripWeather.Services.RoutePersistence = {
                 locationName: dto.locationName || '',
                 lat: dto.latitude,
                 lng: dto.longitude,
-                alt: dto.elevation
+                alt: dto.elevation,
+                // Phase 3a: viewer's matching-favorite UUID, populated by
+                // RoutePersistenceService.loadRoute server-side. null when the
+                // viewer is anonymous or no favorite matches; carrying it
+                // through means the popup heart can render correctly on the
+                // very first popup open without an /api/favorites/check call.
+                favoriteId: dto.favoriteId || null
             };
         });
     },

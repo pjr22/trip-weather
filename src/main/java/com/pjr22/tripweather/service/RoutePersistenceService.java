@@ -19,9 +19,11 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import com.pjr22.tripweather.dto.RouteDto;
 import com.pjr22.tripweather.dto.RouteSearchResultDto;
 import com.pjr22.tripweather.dto.WaypointDto;
+import com.pjr22.tripweather.model.FavoriteWaypoint;
 import com.pjr22.tripweather.model.Route;
 import com.pjr22.tripweather.model.User;
 import com.pjr22.tripweather.model.Waypoint;
+import com.pjr22.tripweather.repository.FavoriteWaypointRepository;
 import com.pjr22.tripweather.repository.RouteRepository;
 import com.pjr22.tripweather.security.CurrentUserService;
 
@@ -43,6 +45,9 @@ public class RoutePersistenceService {
 
     @Autowired
     private CurrentUserService currentUserService;
+
+    @Autowired
+    private FavoriteWaypointRepository favoriteWaypointRepository;
 
     /**
      * Save a route (create new or update existing). The owner is whoever is
@@ -191,6 +196,7 @@ public class RoutePersistenceService {
             }
 
             RouteDto routeDto = convertToDto(route);
+            populateFavoriteIds(routeDto);
             logger.info("=== LOAD ROUTE COMPLETED ===");
             return routeDto;
         } else {
@@ -305,6 +311,40 @@ public class RoutePersistenceService {
         waypoint.setLatitude(dto.getLatitude());
         waypoint.setLongitude(dto.getLongitude());
         // Note: ID and Route are not updated as they should remain the same
+    }
+
+    /**
+     * Patch each waypoint DTO with the viewer's matching favorite id, if any.
+     * Anonymous viewers leave every {@code favoriteId} null. The match uses
+     * the same tiered proximity rule as the heart-toggle /check endpoint —
+     * see {@link FavoriteWaypointService#matchByProximity}. Keeping the two
+     * paths on one matcher means a place looks "favorited" identically
+     * whether the user clicks a fresh waypoint or loads a saved route.
+     *
+     * <p>Implementation note: one bulk fetch of the viewer's favorites + an
+     * in-memory scan per waypoint. Favorites-per-user is bounded (tens in
+     * practice) and waypoint counts are similarly small, so the N×M
+     * comparison is cheap compared to a single round-trip.
+     */
+    private void populateFavoriteIds(RouteDto routeDto) {
+        if (routeDto == null || routeDto.getWaypoints() == null || routeDto.getWaypoints().isEmpty()) {
+            return;
+        }
+        Optional<User> viewerOpt = currentUserService.currentUser();
+        if (viewerOpt.isEmpty()) {
+            return;
+        }
+        UUID viewerId = viewerOpt.get().getId();
+        List<FavoriteWaypoint> favorites = favoriteWaypointRepository.findAllByUser(viewerId);
+        if (favorites.isEmpty()) {
+            return;
+        }
+        for (WaypointDto w : routeDto.getWaypoints()) {
+            if (w.getLatitude() == null || w.getLongitude() == null) continue;
+            FavoriteWaypointService.matchByProximity(
+                            favorites, w.getLatitude(), w.getLongitude(), w.getLocationName())
+                    .ifPresent(match -> w.setFavoriteId(match.getId()));
+        }
     }
 
     /**

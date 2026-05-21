@@ -301,10 +301,16 @@ window.TripWeather.Managers.FavoritesManagerModal = {
         }
 
         // Reuse the same shape SearchManager builds — a locationInfo object
-        // with at least locationName lets the new waypoint render with the
-        // correct address immediately (no reverse-geocode round-trip).
+        // with locationName + (optional) timezone fields lets the new
+        // waypoint render with the correct address and time formatting
+        // immediately, no reverse-geocode or timezone round-trip needed.
         const locationInfo = {
-            locationName: fav.locationName || ''
+            locationName: fav.locationName || '',
+            timezoneName: fav.timezoneName || '',
+            timezoneStdOffset: fav.timezoneStdOffset || '',
+            timezoneDstOffset: fav.timezoneDstOffset || '',
+            timezoneStdAbbr: fav.timezoneStdAbbr || '',
+            timezoneDstAbbr: fav.timezoneDstAbbr || ''
         };
         waypointMgr.addWaypoint(fav.latitude, fav.longitude, fav.elevation, locationInfo);
         window.Toast.show('Added "' + fav.label + '" to route', 'success');

@@ -117,64 +117,187 @@ window.TripWeather.Managers.Search = {
     },
 
     /**
-     * Perform location search
+     * Perform location search. Phase 3b: when the viewer is authenticated,
+     * fires a parallel /api/favorites?search=q call along the same debounce
+     * so matching favorites surface at the top of the dropdown ahead of the
+     * geocode results. Anonymous users see exactly today's geocode-only path.
+     *
+     * Uses Promise.allSettled so a transient favorites failure doesn't blank
+     * the geocode results (and vice versa).
+     *
      * @param {string} query - Search query
      */
     performSearch: function(query) {
-        window.TripWeather.Services.Location.searchLocations(query)
-            .then(function(data) {
-                window.TripWeather.Managers.Search.displaySearchResults(data);
-            })
-            .catch(function(error) {
-                console.error('Search error:', error);
-                document.getElementById('search-results').innerHTML = '<div class="search-no-results">Error performing search</div>';
-            });
+        const auth = window.TripWeather.Services.Auth;
+        const isAuthed = auth && auth.getCurrentUser();
+
+        const geocodePromise = window.TripWeather.Services.Location.searchLocations(query);
+        const favoritesPromise = isAuthed
+            ? window.TripWeather.Services.Favorites.list(query)
+            : Promise.resolve([]);
+
+        Promise.allSettled([favoritesPromise, geocodePromise]).then(function(results) {
+            const favoritesResult = results[0];
+            const geocodeResult = results[1];
+
+            const favorites = favoritesResult.status === 'fulfilled'
+                ? (favoritesResult.value || [])
+                : [];
+            const geocodeData = geocodeResult.status === 'fulfilled'
+                ? geocodeResult.value
+                : null;
+
+            if (favoritesResult.status === 'rejected') {
+                console.warn('Favorites lookup failed during search:', favoritesResult.reason);
+            }
+            if (geocodeResult.status === 'rejected') {
+                console.error('Geocode search failed:', geocodeResult.reason);
+            }
+
+            window.TripWeather.Managers.Search.displaySearchResults(favorites, geocodeData);
+        });
     },
 
     /**
-     * Display search results in modal
-     * @param {object} data - Search response data
+     * Display search results in modal. Favorites (when any) render first
+     * under a "Favorites" section header, each prefixed with a small filled-
+     * heart icon to make their provenance obvious. Geocode results follow
+     * under their existing section.
+     *
+     * @param {Array} favorites - matching favorites for the current query (may be empty)
+     * @param {object} geocodeData - GeoJSON-style response from forward geocoder (may be null)
      */
-    displaySearchResults: function(data) {
+    displaySearchResults: function(favorites, geocodeData) {
         const resultsContainer = document.getElementById('search-results');
-        
-        if (!data || !data.features || data.features.length === 0) {
+        resultsContainer.innerHTML = '';
+
+        const hasFavorites = favorites && favorites.length > 0;
+        const hasGeocode = geocodeData && geocodeData.features && geocodeData.features.length > 0;
+
+        if (!hasFavorites && !hasGeocode) {
             resultsContainer.innerHTML = '<div class="search-no-results">No results found</div>';
             return;
         }
-        
-        resultsContainer.innerHTML = '';
 
-        data.features.forEach(feature => {
-            const coordinates = feature.geometry.coordinates;
+        if (hasFavorites) {
+            const favHeader = document.createElement('div');
+            favHeader.className = 'search-section-header';
+            favHeader.textContent = 'Favorites';
+            resultsContainer.appendChild(favHeader);
 
-            // Use the LocationService to get consistent location naming
-            const displayInfo = window.TripWeather.Services.Location.formatLocationDisplay(feature);
-            const label = displayInfo.label;
-            const details = displayInfo.details;
+            favorites.forEach(function(fav) {
+                resultsContainer.appendChild(this.buildFavoriteResultItem(fav));
+            }.bind(this));
+        }
 
-            // Build result items with createElement + textContent so external strings
-            // from the geocoding API can't inject markup.
-            const resultItem = document.createElement('div');
-            resultItem.className = 'search-result-item';
+        if (hasGeocode) {
+            if (hasFavorites) {
+                const geoHeader = document.createElement('div');
+                geoHeader.className = 'search-section-header';
+                geoHeader.textContent = 'Search results';
+                resultsContainer.appendChild(geoHeader);
+            }
 
-            const labelDiv = document.createElement('div');
-            labelDiv.className = 'result-label';
-            labelDiv.textContent = label;
+            geocodeData.features.forEach(feature => {
+                const coordinates = feature.geometry.coordinates;
+                const displayInfo = window.TripWeather.Services.Location.formatLocationDisplay(feature);
+                const label = displayInfo.label;
+                const details = displayInfo.details;
 
-            const detailsDiv = document.createElement('div');
-            detailsDiv.className = 'result-details';
-            detailsDiv.textContent = details;
+                // Build result items with createElement + textContent so external strings
+                // from the geocoding API can't inject markup.
+                const resultItem = document.createElement('div');
+                resultItem.className = 'search-result-item';
 
-            resultItem.appendChild(labelDiv);
-            resultItem.appendChild(detailsDiv);
+                const labelDiv = document.createElement('div');
+                labelDiv.className = 'result-label';
+                labelDiv.textContent = label;
 
-            resultItem.addEventListener('click', function() {
-                window.TripWeather.Managers.Search.selectSearchResult(coordinates[1], coordinates[0], label, feature);
+                const detailsDiv = document.createElement('div');
+                detailsDiv.className = 'result-details';
+                detailsDiv.textContent = details;
+
+                resultItem.appendChild(labelDiv);
+                resultItem.appendChild(detailsDiv);
+
+                resultItem.addEventListener('click', function() {
+                    window.TripWeather.Managers.Search.selectSearchResult(coordinates[1], coordinates[0], label, feature);
+                });
+
+                resultsContainer.appendChild(resultItem);
             });
+        }
+    },
 
-            resultsContainer.appendChild(resultItem);
+    /**
+     * Build a search-dropdown row representing a favorite. Visually similar
+     * to a geocode result but prefixed with a small filled-red heart so the
+     * provenance is unmistakable. Clicking it appends the favorite as the
+     * next waypoint of the current route — same effect as the manager
+     * modal's Add-to-route action.
+     */
+    buildFavoriteResultItem: function(fav) {
+        const item = document.createElement('div');
+        item.className = 'search-result-item search-result-favorite';
+
+        // Inline SVG heart so we don't need an async icon load per row.
+        const heart = document.createElement('span');
+        heart.className = 'search-result-favorite-heart';
+        heart.innerHTML = ''
+            + '<svg viewBox="0 0 24 24" fill="currentColor">'
+            + '<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>'
+            + '</svg>';
+
+        const text = document.createElement('div');
+        text.className = 'search-result-favorite-text';
+
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'result-label';
+        labelDiv.textContent = fav.label;
+
+        const detailsDiv = document.createElement('div');
+        detailsDiv.className = 'result-details';
+        detailsDiv.textContent = fav.locationName || '';
+
+        text.appendChild(labelDiv);
+        text.appendChild(detailsDiv);
+
+        item.appendChild(heart);
+        item.appendChild(text);
+
+        item.addEventListener('click', function() {
+            window.TripWeather.Managers.Search._addFavoriteToRoute(fav);
         });
+
+        return item;
+    },
+
+    /**
+     * Add a favorite to the current route as the next waypoint. Same effect
+     * as the manager modal's Add-to-route action; called from the favorite-
+     * search-row click handler.
+     */
+    _addFavoriteToRoute: function(fav) {
+        this.hideModal();
+        const waypointMgr = window.TripWeather.Managers.Waypoint;
+        if (!waypointMgr || typeof waypointMgr.addWaypoint !== 'function') {
+            window.Toast.show('Waypoint manager not available', 'error');
+            return;
+        }
+        // Pass through the favorite's saved timezone fields so the new
+        // waypoint renders times correctly without a fresh /api/timezone
+        // round-trip. Missing fields stay as empty string — addWaypoint
+        // already handles that case.
+        const locationInfo = {
+            locationName: fav.locationName || '',
+            timezoneName: fav.timezoneName || '',
+            timezoneStdOffset: fav.timezoneStdOffset || '',
+            timezoneDstOffset: fav.timezoneDstOffset || '',
+            timezoneStdAbbr: fav.timezoneStdAbbr || '',
+            timezoneDstAbbr: fav.timezoneDstAbbr || ''
+        };
+        waypointMgr.addWaypoint(fav.latitude, fav.longitude, fav.elevation, locationInfo);
+        window.Toast.show('Added "' + fav.label + '" to route', 'success');
     },
 
     /**
