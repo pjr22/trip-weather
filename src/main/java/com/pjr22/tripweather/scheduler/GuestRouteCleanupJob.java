@@ -3,6 +3,7 @@ package com.pjr22.tripweather.scheduler;
 import com.pjr22.tripweather.model.LoaderRun;
 import com.pjr22.tripweather.model.LoaderRun.TriggerType;
 import com.pjr22.tripweather.repository.EmailVerificationRepository;
+import com.pjr22.tripweather.repository.FavoriteWaypointRepository;
 import com.pjr22.tripweather.repository.PasswordResetRepository;
 import com.pjr22.tripweather.repository.RouteRepository;
 import com.pjr22.tripweather.service.LoaderRunRecorder;
@@ -63,6 +64,7 @@ public class GuestRouteCleanupJob {
     public static final String EMAIL_TOKEN_CLEANUP_LOADER_NAME = "email-token-cleanup";
 
     private final RouteRepository routeRepository;
+    private final FavoriteWaypointRepository favoriteWaypointRepository;
     private final EmailVerificationRepository emailVerificationRepository;
     private final PasswordResetRepository passwordResetRepository;
     private final UserManagementService userManagementService;
@@ -78,11 +80,13 @@ public class GuestRouteCleanupJob {
     private int purgeGraceDays;
 
     public GuestRouteCleanupJob(RouteRepository routeRepository,
+                                FavoriteWaypointRepository favoriteWaypointRepository,
                                 EmailVerificationRepository emailVerificationRepository,
                                 PasswordResetRepository passwordResetRepository,
                                 UserManagementService userManagementService,
                                 LoaderRunRecorder recorder) {
         this.routeRepository = routeRepository;
+        this.favoriteWaypointRepository = favoriteWaypointRepository;
         this.emailVerificationRepository = emailVerificationRepository;
         this.passwordResetRepository = passwordResetRepository;
         this.userManagementService = userManagementService;
@@ -216,12 +220,23 @@ public class GuestRouteCleanupJob {
         }
 
         ZonedDateTime hardCutoff = now.minusDays(purgeGraceDays);
-        int hardDeleted = routeRepository.hardDeleteSoftDeletedBefore(hardCutoff);
+        int hardDeletedRoutes = routeRepository.hardDeleteSoftDeletedBefore(hardCutoff);
+
+        // Phase 5 of FAVORITES_AND_ROUTE_MGMT.md: same grace window
+        // (route.cleanup.purge-grace-days) governs favorites — the admin
+        // soft-delete promise is identical and the operator gets one knob.
+        // Stage 1 has no favorites equivalent: guest users don't own
+        // favorites (account-only feature) so there's nothing to retention-
+        // sweep against ownership; admin-driven soft-deletes are the only
+        // way a favorite enters the deleted state in the first place.
+        int hardDeletedFavorites = favoriteWaypointRepository.hardDeleteSoftDeletedBefore(hardCutoff);
 
         log.debug("Route cleanup detail: soft-deleted {} guest route(s) older than {} day(s); "
-                + "hard-deleted {} soft-deleted route(s) past the {} day grace window.",
-                softDeleted, retentionDays, hardDeleted, purgeGraceDays);
-        return (long) softDeleted + hardDeleted;
+                + "hard-deleted {} soft-deleted route(s) + {} soft-deleted favorite(s) "
+                + "past the {} day grace window.",
+                softDeleted, retentionDays,
+                hardDeletedRoutes, hardDeletedFavorites, purgeGraceDays);
+        return (long) softDeleted + hardDeletedRoutes + hardDeletedFavorites;
     }
 
     long doEmailTokenCleanup() {

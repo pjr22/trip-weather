@@ -4,6 +4,7 @@ import com.pjr22.tripweather.model.LoaderRun;
 import com.pjr22.tripweather.model.LoaderRun.TriggerType;
 import com.pjr22.tripweather.model.User;
 import com.pjr22.tripweather.repository.EmailVerificationRepository;
+import com.pjr22.tripweather.repository.FavoriteWaypointRepository;
 import com.pjr22.tripweather.repository.PasswordResetRepository;
 import com.pjr22.tripweather.repository.RouteRepository;
 import com.pjr22.tripweather.service.LoaderRunRecorder;
@@ -43,6 +44,7 @@ import static org.mockito.Mockito.when;
 class GuestRouteCleanupJobTest {
 
     @Mock private RouteRepository routeRepository;
+    @Mock private FavoriteWaypointRepository favoriteWaypointRepository;
     @Mock private EmailVerificationRepository emailVerificationRepository;
     @Mock private PasswordResetRepository passwordResetRepository;
     @Mock private UserManagementService userManagementService;
@@ -76,7 +78,7 @@ class GuestRouteCleanupJobTest {
     // -------------------- Two-stage route cleanup --------------------
 
     @Test
-    void cleanGuestRoutes_runsBothStages_andRecordsSumOfRowsAffected() {
+    void cleanGuestRoutes_runsAllStages_andRecordsSumOfRowsAffected() {
         when(recorder.start(eq(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME),
                 eq(TriggerType.CRON)))
                 .thenReturn(fakeRun(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME, TriggerType.CRON));
@@ -86,6 +88,11 @@ class GuestRouteCleanupJobTest {
                 any(ZonedDateTime.class), any(ZonedDateTime.class))).thenReturn(7);
         when(routeRepository.hardDeleteSoftDeletedBefore(any(ZonedDateTime.class)))
                 .thenReturn(3);
+        // Phase 5 of FAVORITES_AND_ROUTE_MGMT.md: aged-out soft-deleted
+        // favorites are hard-deleted in the same sweep, governed by the
+        // same purgeGraceDays env var. rowsAffected sums all three counts.
+        when(favoriteWaypointRepository.hardDeleteSoftDeletedBefore(any(ZonedDateTime.class)))
+                .thenReturn(4);
 
         ZonedDateTime nowBefore = ZonedDateTime.now();
         job.cleanGuestRoutes();
@@ -102,17 +109,22 @@ class GuestRouteCleanupJobTest {
                            nowAfter.minusDays(30).plusSeconds(1));
         assertThat(softNow.getValue()).isBetween(nowBefore.minusSeconds(1), nowAfter.plusSeconds(1));
 
-        // Stage 2 cutoff = now - 7d.
-        ArgumentCaptor<ZonedDateTime> hardCutoff = ArgumentCaptor.forClass(ZonedDateTime.class);
-        verify(routeRepository).hardDeleteSoftDeletedBefore(hardCutoff.capture());
-        assertThat(hardCutoff.getValue())
+        // Stage 2 cutoff = now - 7d, shared by routes and favorites.
+        ArgumentCaptor<ZonedDateTime> hardCutoffRoutes = ArgumentCaptor.forClass(ZonedDateTime.class);
+        verify(routeRepository).hardDeleteSoftDeletedBefore(hardCutoffRoutes.capture());
+        assertThat(hardCutoffRoutes.getValue())
+                .isBetween(nowBefore.minusDays(7).minusSeconds(1),
+                           nowAfter.minusDays(7).plusSeconds(1));
+        ArgumentCaptor<ZonedDateTime> hardCutoffFavs = ArgumentCaptor.forClass(ZonedDateTime.class);
+        verify(favoriteWaypointRepository).hardDeleteSoftDeletedBefore(hardCutoffFavs.capture());
+        assertThat(hardCutoffFavs.getValue())
                 .isBetween(nowBefore.minusDays(7).minusSeconds(1),
                            nowAfter.minusDays(7).plusSeconds(1));
 
-        // Recorder gets soft+hard summed as rowsAffected.
+        // Recorder gets soft + hard-routes + hard-favorites summed.
         ArgumentCaptor<Long> rows = ArgumentCaptor.forClass(Long.class);
         verify(recorder).success(any(LoaderRun.class), rows.capture());
-        assertThat(rows.getValue()).isEqualTo(10L);
+        assertThat(rows.getValue()).isEqualTo(14L);
     }
 
     @Test
@@ -120,13 +132,16 @@ class GuestRouteCleanupJobTest {
         // Stage 2 (hard-delete past grace) must still run when guest cleanup
         // is disabled, otherwise an admin's manual soft-deletes would never
         // age out — the disable flag is meant to gate only the auto-aging
-        // of guest routes.
+        // of guest routes. The favorites sweep is part of stage 2, so it
+        // also runs regardless of the flag.
         when(recorder.start(eq(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME),
                 eq(TriggerType.CRON)))
                 .thenReturn(fakeRun(GuestRouteCleanupJob.ROUTE_CLEANUP_LOADER_NAME, TriggerType.CRON));
         ReflectionTestUtils.setField(job, "guestRouteCleanupEnabled", false);
         when(routeRepository.hardDeleteSoftDeletedBefore(any(ZonedDateTime.class)))
                 .thenReturn(2);
+        when(favoriteWaypointRepository.hardDeleteSoftDeletedBefore(any(ZonedDateTime.class)))
+                .thenReturn(1);
 
         job.cleanGuestRoutes();
 
@@ -135,7 +150,8 @@ class GuestRouteCleanupJobTest {
                 .softDeleteGuestRoutesCreatedBefore(any(UUID.class),
                         any(ZonedDateTime.class), any(ZonedDateTime.class));
         verify(routeRepository).hardDeleteSoftDeletedBefore(any(ZonedDateTime.class));
-        verify(recorder).success(any(LoaderRun.class), eq(2L));
+        verify(favoriteWaypointRepository).hardDeleteSoftDeletedBefore(any(ZonedDateTime.class));
+        verify(recorder).success(any(LoaderRun.class), eq(3L));
     }
 
     @Test
@@ -250,6 +266,7 @@ class GuestRouteCleanupJobTest {
         verify(routeRepository, never()).softDeleteGuestRoutesCreatedBefore(
                 any(UUID.class), any(ZonedDateTime.class), any(ZonedDateTime.class));
         verify(routeRepository, never()).hardDeleteSoftDeletedBefore(any(ZonedDateTime.class));
+        verify(favoriteWaypointRepository, never()).hardDeleteSoftDeletedBefore(any(ZonedDateTime.class));
     }
 
     private User newGuest() {

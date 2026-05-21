@@ -120,7 +120,7 @@ Five phases, each shippable on its own. Phases 1-2-3 deliver favorites end-to-en
 | 2 — Favorites: manager modal + entry points | Shipped |
 | 3 — Favorites: heart toggle in popup + search autocomplete | Shipped |
 | 4 — My Routes: backend + modal | Shipped |
-| 5 — Admin console + cleanup cron (favorites) | Not started |
+| 5 — Admin console + cleanup cron (favorites) | Shipped |
 
 ---
 
@@ -529,6 +529,14 @@ Extend the existing scheduled cleanup job ([GuestRouteCleanupJob.java](src/main/
 - Cleanup test: a soft-deleted favorite older than the grace window is hard-deleted; a newer one survives.
 
 **Phase 5 ships when:** the admin console's Favorites view supports search / show-deleted / restore / soft-delete / hard-delete; the cleanup cron hard-deletes aged-out soft-deleted favorites; tests pass.
+
+#### Implementation notes (decisions made during build)
+
+- **HTTP-method split: POST for soft-delete, DELETE for hard-delete.** Deliberately diverges from `AdminRouteController`, which uses `DELETE` for soft-delete (no hard-delete endpoint exists for routes). The favorites domain has both actions, and we want the HTTP method to convey the durability of the result: `POST /api/admin/favorites/{id}/soft-delete` is a reversible state change; `DELETE /api/admin/favorites/{id}` is an immediate, irreversible purge. Keeps the verbs honest at the cost of a slight asymmetry with the routes admin surface.
+- **Per-row UI: Delete on active, Restore + Purge on deleted.** Active rows expose only the soft-delete affordance; switching the "Deleted only" filter surfaces both Restore and Purge on each row. Hard-delete is one explicit-filter-switch + one extra confirm dialog away from any active row, which keeps the safety net obvious without removing the operator's ability to immediately reclaim space when they want it.
+- **Owner-kind filter dropped (only present on the routes admin).** Routes can be owned by the shared guest user or by real accounts, so the routes admin filters by owner kind. Favorites are an account-only feature (no guest favorites possible — the public API requires authentication end-to-end), so the filter has nothing to switch on.
+- **Cleanup cron extends `doRouteCleanup`, not a new loader.** Per plan: aged-out soft-deleted favorites are hard-deleted in the same sweep as routes, governed by the same `route.cleanup.purge-grace-days` env var. One loader-runs entry (`guest-route-cleanup`) accumulates the sum of soft-deleted-routes + hard-deleted-routes + hard-deleted-favorites in its `rowsAffected`. No favorites stage-1 sweep exists because guest users don't own favorites.
+- **Native-SQL repo methods on `FavoriteWaypointRepository`.** Added `adminSoftDelete`, `adminRestore`, `adminHardDelete`, and `hardDeleteSoftDeletedBefore` — mirroring the route admin pattern so the entity-level `@SQLRestriction("deleted_at IS NULL")` is bypassed only on the admin paths.
 
 ---
 
