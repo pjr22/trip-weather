@@ -2466,6 +2466,15 @@ main {
     display: block;
 }
 
+/* Phase 4 — My Routes modal waypoint-count column. Centered + narrow so
+ * the small integer doesn't feel adrift in a left-aligned cell. */
+.my-routes-cell-count,
+.my-routes-cell-count-header {
+    text-align: center;
+    width: 10%;
+    white-space: nowrap;
+}
+
 /* Phase 3b — favorite rows + section headers in the location-search dropdown.
  * Favorites appear at the top under a "Favorites" header; geocode results
  * follow under a "Search results" header (shown only when both sections

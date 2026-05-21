@@ -410,6 +410,35 @@
         </div>
     </div>
 
+    <div id="my-routes-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="my-routes-modal-title">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h3 id="my-routes-modal-title">My Routes</h3>
+                <span class="close" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="favorites-modal-toolbar">
+                    <input type="text" id="my-routes-search-input" class="search-input" placeholder="Search by name..." autocomplete="off">
+                </div>
+                <div id="my-routes-modal-status" class="favorites-modal-status" aria-live="polite"></div>
+                <div class="favorites-table-container">
+                    <table class="favorites-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Created</th>
+                                <th class="my-routes-cell-count-header">Waypoints</th>
+                                <th class="favorites-cell-actions-header">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="my-routes-modal-tbody"></tbody>
+                    </table>
+                </div>
+                <p id="my-routes-modal-empty" class="favorites-modal-empty" style="display:none;"></p>
+            </div>
+        </div>
+    </div>
+
     <div id="favorites-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="favorites-modal-title">
         <div class="modal-content modal-wide">
             <div class="modal-header">
@@ -529,6 +558,7 @@
     <script src="js/managers/LayerManager.js"></script>
     <script src="js/managers/EVChargingStationManager.js"></script>
     <script src="js/managers/FavoritesManagerModal.js"></script>
+    <script src="js/managers/MyRoutesModal.js"></script>
     <script src="js/managers/NavigationManager.js"></script>
     <script src="js/managers/ExportManager.js"></script>
 

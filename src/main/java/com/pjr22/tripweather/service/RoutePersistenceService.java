@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
 import com.pjr22.tripweather.dto.RouteDto;
-import com.pjr22.tripweather.dto.RouteSearchResultDto;
+import com.pjr22.tripweather.dto.RouteSummaryDto;
 import com.pjr22.tripweather.dto.WaypointDto;
 import com.pjr22.tripweather.model.FavoriteWaypoint;
 import com.pjr22.tripweather.model.Route;
@@ -348,35 +348,57 @@ public class RoutePersistenceService {
     }
 
     /**
-     * Search for routes by name, scoped to the current user. Authenticated
-     * callers see only their own routes; anonymous callers see the shared
-     * guest user's routes (the existing public-bucket behaviour).
+     * List the caller's routes as {@link RouteSummaryDto} summaries, sorted
+     * by {@code created DESC}. Phase 4 of FAVORITES_AND_ROUTE_MGMT.md —
+     * replaces the legacy {@code searchRoutes} / {@code RouteSearchResultDto}
+     * shape with a per-row summary that includes the waypoint count.
+     *
+     * <p>Scope: authenticated → own routes; anonymous → the shared guest
+     * user's routes (the existing public-bucket behaviour). Optional
+     * substring filter on {@code name} (case-insensitive); blank/null →
+     * unfiltered.
      */
     @Transactional(readOnly = true)
-    public List<RouteSearchResultDto> searchRoutes(String searchText) {
-        logger.info("=== SEARCH ROUTES REQUEST ===");
-        logger.info("Search text: {}", searchText);
-
+    public List<RouteSummaryDto> listRoutes(String searchOrNull) {
         User user = currentUserService.currentUserOrGuest();
-        logger.info("Searching as user: {} (ID: {})", user.getName(), user.getId());
+        boolean filtered = (searchOrNull != null && !searchOrNull.isBlank());
+        return filtered
+                ? routeRepository.searchSummariesByUser(user.getId(), searchOrNull.trim())
+                : routeRepository.findSummariesByUser(user.getId());
+    }
 
-        List<Route> routes = routeRepository.findByUserIdAndNameContainingIgnoreCase(user.getId(), searchText);
-
-        logger.info("Found {} routes matching search criteria", routes.size());
-
-        List<RouteSearchResultDto> results = new ArrayList<>();
-        for (Route route : routes) {
-            RouteSearchResultDto dto = new RouteSearchResultDto();
-            dto.setId(route.getId());
-            dto.setName(route.getName());
-            dto.setCreated(route.getCreated());
-            dto.setUserId(route.getUser().getId());
-            results.add(dto);
-            logger.debug("Added route to results: {} (ID: {})", route.getName(), route.getId());
+    /**
+     * Rename a single route owned by the current user. Phase 4 of
+     * FAVORITES_AND_ROUTE_MGMT.md — backs {@code PATCH /api/routes/{id}}.
+     *
+     * <p>Validates the new name (non-blank, length ≤ 255) and applies the
+     * same 404-on-non-owned posture as {@link #deleteRoute(UUID)} so the
+     * response can't be used to enumerate other users' routes. Anonymous
+     * callers are blocked by the security chain.
+     */
+    @Transactional
+    public RouteSummaryDto renameRoute(UUID routeId, String newName) {
+        String trimmed = newName == null ? "" : newName.trim();
+        if (trimmed.isEmpty()) {
+            throw new InvalidRouteException("name is required");
+        }
+        if (trimmed.length() > 255) {
+            throw new InvalidRouteException("name is too long (max 255 characters)");
         }
 
-        logger.info("=== SEARCH ROUTES COMPLETED ===");
-        return results;
+        User user = currentUserService.currentUser()
+                .orElseThrow(() -> new RouteNotFoundException("Route not found"));
+
+        Route route = routeRepository.findById(routeId)
+                .filter(r -> r.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new RouteNotFoundException("Route not found"));
+
+        route.setName(trimmed);
+        Route saved = routeRepository.save(route);
+        logger.info("Route {} renamed by user {}", saved.getId(), user.getId());
+
+        long waypointCount = saved.getWaypoints() == null ? 0L : saved.getWaypoints().size();
+        return new RouteSummaryDto(saved.getId(), saved.getName(), saved.getCreated(), waypointCount);
     }
 
     /**
@@ -396,5 +418,14 @@ public class RoutePersistenceService {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public static class RouteNotFoundException extends RuntimeException {
         public RouteNotFoundException(String message) { super(message); }
+    }
+
+    /**
+     * 400 — the rename request body is missing a name or violates the
+     * length cap. Same shape as {@code FavoriteWaypointService.InvalidFavoriteException}.
+     */
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public static class InvalidRouteException extends RuntimeException {
+        public InvalidRouteException(String message) { super(message); }
     }
 }

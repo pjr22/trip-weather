@@ -10,14 +10,17 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.pjr22.tripweather.dto.RenameRouteRequest;
 import com.pjr22.tripweather.dto.RouteDto;
-import com.pjr22.tripweather.dto.RouteSearchResultDto;
+import com.pjr22.tripweather.dto.RouteSummaryDto;
 import com.pjr22.tripweather.service.RoutePersistenceService;
 import com.pjr22.tripweather.service.RoutePersistenceService.RouteNotFoundException;
 import com.pjr22.tripweather.service.RoutePersistenceService.RouteOwnershipException;
@@ -60,22 +63,18 @@ public class RoutePersistenceController {
     }
 
     /**
-     * Search for routes whose name contains searchText. Scoped to the
-     * current user when authenticated; falls back to the shared guest
-     * user's routes when anonymous.
+     * List the caller's routes as summaries. Phase 4 of
+     * FAVORITES_AND_ROUTE_MGMT.md — replaces the path-based
+     * {@code GET /api/routes/search/{searchText}} with a query-parameter
+     * filter so empty / missing search returns the full list.
+     *
+     * <p>Scope: authenticated → own routes; anonymous → the shared guest
+     * user's routes (the existing public-bucket behaviour).
      */
-    @GetMapping("/search/{searchText}")
-    public ResponseEntity<List<RouteSearchResultDto>> searchForRoutes(@PathVariable String searchText) {
-        logger.info("Searching for routes with text: {}", searchText);
-
-        try {
-            List<RouteSearchResultDto> results = routePersistenceService.searchRoutes(searchText);
-            logger.info("Found {} routes matching search text: {}", results.size(), searchText);
-            return ResponseEntity.ok(results);
-        } catch (Exception e) {
-            logger.error("Error searching for routes with text: {}", searchText, e);
-            return ResponseEntity.internalServerError().build();
-        }
+    @GetMapping
+    public List<RouteSummaryDto> listRoutes(
+            @RequestParam(name = "search", required = false) String search) {
+        return routePersistenceService.listRoutes(search);
     }
 
     /**
@@ -97,6 +96,20 @@ public class RoutePersistenceController {
             logger.error("Error loading route", e);
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    /**
+     * Rename a route. Authenticated only (enforced by SecurityConfig).
+     * Phase 4 of FAVORITES_AND_ROUTE_MGMT.md. The body carries only the
+     * new name; other route fields are immutable through this endpoint.
+     * Returns the updated summary; 404 if the route doesn't exist or
+     * belongs to a different user; 400 if the name is missing or too long.
+     */
+    @PatchMapping("/{routeUuid}")
+    public RouteSummaryDto renameRoute(@PathVariable UUID routeUuid,
+                                       @RequestBody RenameRouteRequest body) {
+        return routePersistenceService.renameRoute(
+                routeUuid, body == null ? null : body.name());
     }
 
     /**

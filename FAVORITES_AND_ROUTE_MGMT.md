@@ -119,7 +119,7 @@ Five phases, each shippable on its own. Phases 1-2-3 deliver favorites end-to-en
 | 1 — Favorites: schema + backend CRUD | Shipped |
 | 2 — Favorites: manager modal + entry points | Shipped |
 | 3 — Favorites: heart toggle in popup + search autocomplete | Shipped |
-| 4 — My Routes: backend + modal | Not started |
+| 4 — My Routes: backend + modal | Shipped |
 | 5 — Admin console + cleanup cron (favorites) | Not started |
 
 ---
@@ -488,6 +488,15 @@ The route-management half. Backend additions are small; most of the work is the 
 - Frontend manual smoke: open modal → see all saved routes → load one → re-open → rename → re-open → delete → confirm gone → confirm soft-deleted in DB. Also verify the existing Load Route UI still works after migrating to `?search=`.
 
 **Phase 4 ships when:** the My Routes menu item works; Load / Rename / Delete each function end-to-end; the modal updates in place after each action; deleted routes disappear and stay invisible after refresh.
+
+#### Implementation notes (decisions made during build)
+
+- **Distance column dropped from v1.** `Route` has no persisted total-distance field today (distance is only computed on the fly from the ORS response inside the editor), so the planned column would have rendered `—` for every row. Deferred until `Route` gains a `total_distance_meters` column with a populate-on-save path — at that point the column slots in without breaking the modal API (`RouteSummaryDto` already has room).
+- **`RouteSummaryDto` dropped `userId`.** The legacy `RouteSearchResultDto` shipped `userId` so the existing route-search modal could gate the per-row delete button against `currentUser.id === row.userId`. The new `GET /api/routes` endpoint already scopes results to the caller's own routes for authenticated viewers (and to the guest user's routes for anonymous, who can't delete anyway because `DELETE /api/routes/**` requires auth), so the per-row check collapses to "is the viewer authenticated?". `RouteSearchResultDto` was deleted along with the legacy `GET /api/routes/search/{text}` endpoint.
+- **`waypointCount` pre-counted in JPQL, not derived from a hydrated collection.** Two repository methods — `findSummariesByUser` and `searchSummariesByUser` — use a JPQL constructor expression with `COUNT(w) GROUP BY r.id` so the list endpoint never hydrates waypoint collections. `LEFT JOIN` keeps zero-waypoint routes in the result.
+- **Modal Load delegates to `SearchManager.selectRouteSearchResult`.** That method already runs the loadRoute → convert → hydrate → set-current-route → calculate-route sequence the route-search modal uses. Re-using it (rather than reimplementing the same flow inside `MyRoutesModal`) keeps both load paths on a single code-path; `hideRouteSearchModal()` inside it is a no-op when that modal isn't open.
+- **Rename + delete reach into `App.currentRoute` when affected.** When the renamed route is the one currently loaded in the editor, the modal calls `App.setCurrentRouteName(newName)` so the header's "Route: …" display stays consistent. When the deleted route is the one currently loaded, the modal calls `App.resetCurrentRoute()` + `WaypointManager.clearAllWaypoints()` so the SPA doesn't keep an orphaned route id in memory or leave waypoints on the map for a route that no longer exists.
+- **Inline rename matches the favorites modal pattern.** Same row-collapses-to-input UX, same `Enter` saves / `Escape` cancels keybindings, same shared `.favorites-rename-input` styling — so the two modals feel like the same surface.
 
 ---
 

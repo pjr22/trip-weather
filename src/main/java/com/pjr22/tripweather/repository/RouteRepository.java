@@ -1,5 +1,6 @@
 package com.pjr22.tripweather.repository;
 
+import com.pjr22.tripweather.dto.RouteSummaryDto;
 import com.pjr22.tripweather.model.Route;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -55,6 +56,37 @@ public interface RouteRepository extends JpaRepository<Route, UUID> {
      * @return List of routes matching the criteria
      */
     List<Route> findByUserIdAndNameContainingIgnoreCase(UUID userId, String searchText);
+
+    /**
+     * List a user's routes as {@link RouteSummaryDto} summaries — id, name,
+     * created, and pre-counted waypoints — sorted by {@code created DESC}.
+     * Phase 4 of FAVORITES_AND_ROUTE_MGMT.md.
+     *
+     * <p>Uses a JPQL constructor expression so we don't hydrate every
+     * route's waypoint collection just to render a list of names. LEFT JOIN
+     * + GROUP BY keeps routes with zero waypoints in the result.
+     */
+    @Query("SELECT new com.pjr22.tripweather.dto.RouteSummaryDto("
+         + "    r.id, r.name, r.created, COUNT(w)) "
+         + "FROM Route r LEFT JOIN r.waypoints w "
+         + "WHERE r.user.id = :userId "
+         + "GROUP BY r.id, r.name, r.created "
+         + "ORDER BY r.created DESC")
+    List<RouteSummaryDto> findSummariesByUser(@Param("userId") UUID userId);
+
+    /**
+     * Same as {@link #findSummariesByUser} but filtered by a case-insensitive
+     * name substring. Backs {@code GET /api/routes?search=...}.
+     */
+    @Query("SELECT new com.pjr22.tripweather.dto.RouteSummaryDto("
+         + "    r.id, r.name, r.created, COUNT(w)) "
+         + "FROM Route r LEFT JOIN r.waypoints w "
+         + "WHERE r.user.id = :userId "
+         + "  AND LOWER(r.name) LIKE LOWER(CONCAT('%', :q, '%')) "
+         + "GROUP BY r.id, r.name, r.created "
+         + "ORDER BY r.created DESC")
+    List<RouteSummaryDto> searchSummariesByUser(@Param("userId") UUID userId,
+                                                @Param("q") String searchText);
 
     // ------------------------------------------------------------------------
     // Admin / cleanup paths — native SQL to bypass the entity-level

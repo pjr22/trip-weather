@@ -124,32 +124,62 @@ window.TripWeather.Services.RoutePersistence = {
     },
     
     /**
-     * Search for routes by name. Scope is server-driven: authenticated callers
-     * see only their own routes; anonymous callers see the shared guest bucket.
-     * @param {string} searchQuery - Route name to search for
-     * @returns {Promise} Promise that resolves with search results
+     * List routes (optionally filtered by name substring). Scope is server-
+     * driven: authenticated callers see only their own routes; anonymous
+     * callers see the shared guest bucket. Phase 4 of
+     * FAVORITES_AND_ROUTE_MGMT.md — replaces the legacy
+     * {@code GET /api/routes/search/{text}} path-style endpoint with a
+     * query-parameter filter so empty / missing search returns the full
+     * list. Each returned row is a summary: {id, name, created,
+     * waypointCount}. Load the full route via {@link #loadRoute(id)}.
+     *
+     * @param {string} [searchOrNull] - optional case-insensitive name substring
+     * @returns {Promise<Array>} array of summaries
      */
-    searchRoutes: async function(searchQuery) {
-        try {
-            const url = `/api/routes/search/${encodeURIComponent(searchQuery)}`;
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            return await response.json();
-        } catch (error) {
-            console.error('Error searching routes:', error);
-            throw error;
+    listRoutes: async function(searchOrNull) {
+        let url = '/api/routes';
+        if (searchOrNull && searchOrNull.length > 0) {
+            url += '?search=' + encodeURIComponent(searchOrNull);
         }
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        });
+        if (!response.ok) {
+            const err = new Error(`HTTP ${response.status}`);
+            err.status = response.status;
+            throw err;
+        }
+        return response.json();
+    },
+
+    /**
+     * Rename a route. Authenticated only. 404 on a non-owned id (same
+     * deliberate posture as deleteRoute). Returns the updated summary.
+     * Phase 4 of FAVORITES_AND_ROUTE_MGMT.md.
+     *
+     * @param {string} routeId - UUID
+     * @param {string} newName - new route name (non-blank, ≤ 255 chars)
+     * @returns {Promise<object>} updated RouteSummaryDto
+     */
+    renameRoute: async function(routeId, newName) {
+        const response = await fetch(`/api/routes/${encodeURIComponent(routeId)}`, {
+            method: 'PATCH',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-XSRF-TOKEN': window.TripWeather.Utils.Helpers.getCsrfToken()
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ name: newName })
+        });
+        if (!response.ok) {
+            const err = new Error(`HTTP ${response.status}`);
+            err.status = response.status;
+            throw err;
+        }
+        return response.json();
     },
 
     /**

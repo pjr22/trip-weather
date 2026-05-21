@@ -1,6 +1,7 @@
 package com.pjr22.tripweather.service;
 
 import com.pjr22.tripweather.dto.RouteDto;
+import com.pjr22.tripweather.dto.RouteSummaryDto;
 import com.pjr22.tripweather.dto.WaypointDto;
 import com.pjr22.tripweather.model.FavoriteWaypoint;
 import com.pjr22.tripweather.model.Route;
@@ -20,6 +21,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -213,4 +215,117 @@ class RoutePersistenceServiceTest {
         return f;
     }
 
+    // ========================================================================
+    // Phase 4 — listRoutes + renameRoute
+    // ========================================================================
+
+    @Test
+    void listRoutes_blankSearch_callsFindSummariesByUser() {
+        User viewer = userWithId(UUID.randomUUID());
+        when(currentUserService.currentUserOrGuest()).thenReturn(viewer);
+        RouteSummaryDto a = new RouteSummaryDto(UUID.randomUUID(), "A", java.time.ZonedDateTime.now(), 2L);
+        RouteSummaryDto b = new RouteSummaryDto(UUID.randomUUID(), "B", java.time.ZonedDateTime.now(), 0L);
+        when(routeRepository.findSummariesByUser(viewer.getId())).thenReturn(List.of(a, b));
+
+        List<RouteSummaryDto> result = service.listRoutes(null);
+
+        assertThat(result).containsExactly(a, b);
+        verify(routeRepository, org.mockito.Mockito.never())
+                .searchSummariesByUser(any(UUID.class), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void listRoutes_nonBlankSearch_callsSearchSummariesByUserWithTrimmedText() {
+        User viewer = userWithId(UUID.randomUUID());
+        when(currentUserService.currentUserOrGuest()).thenReturn(viewer);
+        when(routeRepository.searchSummariesByUser(viewer.getId(), "weekend"))
+                .thenReturn(List.of());
+
+        service.listRoutes("  weekend  ");
+
+        verify(routeRepository).searchSummariesByUser(viewer.getId(), "weekend");
+        verify(routeRepository, org.mockito.Mockito.never()).findSummariesByUser(any(UUID.class));
+    }
+
+    @Test
+    void renameRoute_updatesNameAndReturnsSummary() {
+        User viewer = userWithId(UUID.randomUUID());
+        when(currentUserService.currentUser()).thenReturn(Optional.of(viewer));
+
+        Route route = new Route();
+        UUID routeId = UUID.randomUUID();
+        route.setId(routeId);
+        route.setName("Old name");
+        route.setUser(viewer);
+        route.setCreated(java.time.ZonedDateTime.now());
+        route.setWaypoints(new java.util.ArrayList<>(List.of(
+                waypoint(40.0, -105.0, "x"), waypoint(40.1, -105.1, "y"))));
+        when(routeRepository.findById(routeId)).thenReturn(Optional.of(route));
+        when(routeRepository.save(any(Route.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RouteSummaryDto result = service.renameRoute(routeId, "  New name  ");
+
+        assertThat(result.id()).isEqualTo(routeId);
+        assertThat(result.name()).isEqualTo("New name");
+        assertThat(result.waypointCount()).isEqualTo(2L);
+        assertThat(route.getName()).isEqualTo("New name");
+    }
+
+    @Test
+    void renameRoute_blankName_throwsInvalid() {
+        assertThatThrownBy(() -> service.renameRoute(UUID.randomUUID(), "   "))
+                .isInstanceOf(RoutePersistenceService.InvalidRouteException.class)
+                .hasMessageContaining("name");
+        // Should not have touched the repo or the current-user resolver
+        verify(routeRepository, org.mockito.Mockito.never()).findById(any(UUID.class));
+        verify(currentUserService, org.mockito.Mockito.never()).currentUser();
+    }
+
+    @Test
+    void renameRoute_tooLongName_throwsInvalid() {
+        String tooLong = "a".repeat(256);
+        assertThatThrownBy(() -> service.renameRoute(UUID.randomUUID(), tooLong))
+                .isInstanceOf(RoutePersistenceService.InvalidRouteException.class)
+                .hasMessageContaining("too long");
+    }
+
+    @Test
+    void renameRoute_anonymousCaller_throwsNotFound() {
+        // Defensive: SecurityConfig blocks anonymous PATCH at the chain level,
+        // but if it ever leaked through, the service surfaces 404 rather than
+        // a misleading 500 / NPE.
+        when(currentUserService.currentUser()).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.renameRoute(UUID.randomUUID(), "Anything"))
+                .isInstanceOf(RoutePersistenceService.RouteNotFoundException.class);
+    }
+
+    @Test
+    void renameRoute_routeOwnedByOtherUser_throwsNotFound() {
+        User viewer = userWithId(UUID.randomUUID());
+        User owner = userWithId(UUID.randomUUID());
+        when(currentUserService.currentUser()).thenReturn(Optional.of(viewer));
+
+        Route someoneElsesRoute = new Route();
+        UUID routeId = UUID.randomUUID();
+        someoneElsesRoute.setId(routeId);
+        someoneElsesRoute.setUser(owner);
+        when(routeRepository.findById(routeId)).thenReturn(Optional.of(someoneElsesRoute));
+
+        // 404 (not 403) so the response can't enumerate other users' routes —
+        // same posture as deleteRoute.
+        assertThatThrownBy(() -> service.renameRoute(routeId, "Hijacked"))
+                .isInstanceOf(RoutePersistenceService.RouteNotFoundException.class);
+        verify(routeRepository, org.mockito.Mockito.never()).save(any(Route.class));
+    }
+
+    @Test
+    void renameRoute_routeNotFound_throwsNotFound() {
+        User viewer = userWithId(UUID.randomUUID());
+        when(currentUserService.currentUser()).thenReturn(Optional.of(viewer));
+        UUID routeId = UUID.randomUUID();
+        when(routeRepository.findById(routeId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.renameRoute(routeId, "Anything"))
+                .isInstanceOf(RoutePersistenceService.RouteNotFoundException.class);
+    }
 }

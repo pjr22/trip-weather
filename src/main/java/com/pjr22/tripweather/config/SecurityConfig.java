@@ -266,6 +266,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/routes/**").permitAll()
                 // Future state-changing route endpoint (Phase 3)
                 .requestMatchers(HttpMethod.DELETE, "/api/routes/**").authenticated()
+                // Phase 4 of FAVORITES_AND_ROUTE_MGMT.md — rename is auth-only,
+                // since the My Routes modal is an account feature
+                .requestMatchers(HttpMethod.PATCH, "/api/routes/*").authenticated()
                 // Favorite waypoints — account feature, auth required end-to-end
                 // (FAVORITES_AND_ROUTE_MGMT.md, decision #4). Anonymous → 401.
                 .requestMatchers("/api/favorites/**").authenticated()

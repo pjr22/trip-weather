@@ -532,7 +532,12 @@ window.TripWeather.Managers.Search = {
      * @param {string} query - Search query
      */
     performRouteSearch: function(query) {
-        window.TripWeather.Services.RoutePersistence.searchRoutes(query)
+        // Phase 4 of FAVORITES_AND_ROUTE_MGMT.md: switched from the legacy
+        // GET /api/routes/search/{text} (RouteSearchResultDto) to the new
+        // GET /api/routes?search=... (RouteSummaryDto). Per-row gating no
+        // longer needs userId — the endpoint scopes results to the caller
+        // already, so any authenticated viewer can act on any returned row.
+        window.TripWeather.Services.RoutePersistence.listRoutes(query)
             .then(function(data) {
                 window.TripWeather.Managers.Search.displayRouteSearchResults(data);
             })
@@ -559,8 +564,7 @@ window.TripWeather.Managers.Search = {
         }
 
         const auth = window.TripWeather.Services.Auth;
-        const currentUser = auth ? auth.getCurrentUser() : null;
-        const currentUserId = currentUser ? currentUser.id : null;
+        const isAuthed = !!(auth && auth.getCurrentUser());
 
         resultsContainer.innerHTML = '';
 
@@ -588,7 +592,12 @@ window.TripWeather.Managers.Search = {
                 window.TripWeather.Managers.Search.selectRouteSearchResult(route.id);
             });
 
-            if (currentUserId && route.userId === currentUserId) {
+            // Phase 4 dropped userId from the row shape — the GET /api/routes
+            // endpoint already scopes results to the caller's own routes, so
+            // every row returned to an authenticated viewer is theirs to act
+            // on. Anonymous viewers can't delete (server requires auth) so the
+            // button is hidden for them.
+            if (isAuthed) {
                 // Match the waypoint-row delete button: red background +
                 // white SVG icon loaded by IconLoader.
                 const deleteBtn = document.createElement('button');
