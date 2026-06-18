@@ -16,6 +16,7 @@ class StartupConfigValidatorTest {
         env.setProperty("trip.email.enabled", "false");
         env.setProperty("trip.auth.remember-me.enabled", "false");
         env.setProperty("trip.admin.enabled", "false");
+        env.setProperty("trip.ai.assist.enabled", "false");
         return env;
     }
 
@@ -67,6 +68,46 @@ class StartupConfigValidatorTest {
         // matches the documented TRIP_ADMIN_ENABLED=false escape hatch.
         MockEnvironment env = baseValidEnv();
         env.setProperty("trip.admin.enabled", "false");
+
+        assertThatCode(() -> new StartupConfigValidator().postProcessEnvironment(env, null))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void ai_assist_enabled_requires_enc_key() {
+        MockEnvironment env = baseValidEnv();
+        env.setProperty("trip.ai.assist.enabled", "true");
+        // enc-key missing — must abort
+        assertThatThrownBy(() -> new StartupConfigValidator().postProcessEnvironment(env, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("TRIP_AI_ENC_KEY");
+    }
+
+    @Test
+    void ai_assist_enabled_with_blank_enc_key_still_fails() {
+        MockEnvironment env = baseValidEnv();
+        env.setProperty("trip.ai.assist.enabled", "true");
+        env.setProperty("trip.ai.enc-key", "   ");
+        assertThatThrownBy(() -> new StartupConfigValidator().postProcessEnvironment(env, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("TRIP_AI_ENC_KEY");
+    }
+
+    @Test
+    void ai_assist_enabled_with_enc_key_passes() {
+        MockEnvironment env = baseValidEnv();
+        env.setProperty("trip.ai.assist.enabled", "true");
+        env.setProperty("trip.ai.enc-key", "dGVzdC1rZXktbm90LXJlYWxseS0zMi1ieXRlcw==");
+
+        assertThatCode(() -> new StartupConfigValidator().postProcessEnvironment(env, null))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void ai_assist_disabled_does_not_require_enc_key() {
+        // Matches the documented TRIP_AI_ASSIST_ENABLED=false escape hatch.
+        MockEnvironment env = baseValidEnv();
+        env.setProperty("trip.ai.assist.enabled", "false");
 
         assertThatCode(() -> new StartupConfigValidator().postProcessEnvironment(env, null))
                 .doesNotThrowAnyException();

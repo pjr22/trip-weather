@@ -80,5 +80,22 @@ public class StartupConfigValidator implements EnvironmentPostProcessor {
                 );
             }
         }
+
+        boolean aiAssistEnabled = Boolean.parseBoolean(
+                environment.getProperty("trip.ai.assist.enabled", "true"));
+        if (aiAssistEnabled) {
+            String aiEncKey = environment.getProperty("trip.ai.enc-key");
+            if (aiEncKey == null || aiEncKey.isBlank()) {
+                throw new IllegalStateException(
+                        "AI assistant is enabled (trip.ai.assist.enabled=true) but "
+                      + "TRIP_AI_ENC_KEY is missing.\n"
+                      + "This server-side secret encrypts users' AI provider API keys at "
+                      + "rest (AES-256-GCM). Generate a Base64 32-byte key and set it in the "
+                      + "environment, for example:\n"
+                      + "  export TRIP_AI_ENC_KEY=\"$(openssl rand -base64 32)\"\n"
+                      + "or disable the feature locally with TRIP_AI_ASSIST_ENABLED=false."
+                );
+            }
+        }
     }
 }

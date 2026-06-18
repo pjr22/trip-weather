@@ -17,6 +17,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.authorization.AuthenticatedAuthorizationManager;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationManager;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -208,9 +212,16 @@ public class SecurityConfig {
     @Bean
     @Order(2)
     public SecurityFilterChain userSecurityChain(HttpSecurity http,
-                                                 ObjectProvider<AbstractRememberMeServices> rememberMeServicesProvider) throws Exception {
+                                                 ObjectProvider<AbstractRememberMeServices> rememberMeServicesProvider,
+                                                 @Value("${trip.ai.assist.enabled:true}") boolean aiAssistEnabled) throws Exception {
         CookieCsrfTokenRepository csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         SpaCsrfTokenRequestHandler csrfHandler = new SpaCsrfTokenRequestHandler();
+
+        // /api/ai/** access: require authentication when the assistant is
+        // enabled, otherwise deny everyone (feature off → not reachable).
+        AuthorizationManager<RequestAuthorizationContext> aiAccessManager = aiAssistEnabled
+                ? AuthenticatedAuthorizationManager.authenticated()
+                : (authentication, context) -> new AuthorizationDecision(false);
 
         http
             .csrf(csrf -> csrf
@@ -272,6 +283,11 @@ public class SecurityConfig {
                 // Favorite waypoints — account feature, auth required end-to-end
                 // (FAVORITES_AND_ROUTE_MGMT.md, decision #4). Anonymous → 401.
                 .requestMatchers("/api/favorites/**").authenticated()
+                // AI trip-planning assistant (AI_ASSIST_PLAN.md, decision #3) —
+                // account feature, auth required end-to-end. When the feature is
+                // disabled (trip.ai.assist.enabled=false), deny everyone so a
+                // turned-off feature isn't reachable; otherwise require a login.
+                .requestMatchers("/api/ai/**").access(aiAccessManager)
                 // Everything else (static SPA, third-party proxies) stays open
                 .anyRequest().permitAll()
             )

@@ -82,6 +82,27 @@ public class HttpClientConfig {
         return RestClient.builder().baseUrl(baseUrl).build();
     }
 
+    /**
+     * Client for AI provider calls (model discovery now; chat in Phase 2).
+     * AI_ASSIST_PLAN.md. No baseUrl — the provider endpoint is dynamic
+     * (per-config for Custom, server-default otherwise), so callers pass an
+     * absolute URI. Connect + read timeouts come from
+     * {@code trip.ai.request-timeout-ms} (AI calls can be slow).
+     */
+    @Bean
+    public RestClient aiRestClient(
+            @Value("${trip.ai.request-timeout-ms:30000}") long timeoutMs) {
+        java.time.Duration timeout = java.time.Duration.ofMillis(timeoutMs);
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(timeout)
+                .build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(timeout);
+        return RestClient.builder()
+                .requestFactory(factory)
+                .build();
+    }
+
     @Bean
     public RestClient nrelRestClient(
             @Value("${nrel.base.url:https://developer.nlr.gov}") String baseUrl) {
