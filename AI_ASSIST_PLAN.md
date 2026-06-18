@@ -65,7 +65,11 @@ ask the user to start it rather than working around it.
 - **Geocoding failures** — resolve each AI-returned location best-effort and
   return the successful waypoints plus a per-location `warnings[]` list. A single
   unresolvable stop does not fail the whole request; fewer than two resolved
-  waypoints returns the waypoints with a warning and no route.
+  waypoints returns the waypoints with a warning and no route. Each lookup is
+  retried on a transient failure (error *or* empty result) per
+  `TRIP_AI_GEOCODE_RETRIES` (default 1) with a `TRIP_AI_GEOCODE_RETRY_DELAY_SECONDS`
+  (default 3) pause — implemented in Phase 2 after a transient empty result dropped
+  a waypoint during testing.
 - **Safety caps** — `TRIP_AI_MAX_WAYPOINTS` (default 25) caps how many locations
   we will geocode/route from one response; `TRIP_AI_REQUEST_TIMEOUT_MS`
   (default 30000) bounds the model call.
@@ -150,6 +154,8 @@ env vars, blank default only for the secret (per config-defaults convention):
 | `TRIP_AI_REQUEST_TIMEOUT_MS` | `30000` | Connect+read timeout for model calls. |
 | `TRIP_AI_MAX_WAYPOINTS` | `25` | Cap on locations geocoded/routed from one response. |
 | `TRIP_AI_ASSIST_DEBUG` | `false` | When `true`, the assist response includes the generated prompt and raw model text — for prompt tuning during the backend phase. Keep `false` in production. |
+| `TRIP_AI_GEOCODE_RETRIES` | `1` | Retries for a per-location forward geocode that errors or returns no result (attempts = retries + 1). |
+| `TRIP_AI_GEOCODE_RETRY_DELAY_SECONDS` | `3` | Delay between geocode retry attempts. Worst-case added latency ≈ max-waypoints × retries × delay, only on failing lookups. |
 
 `setEnvVariables.source` should learn `TRIP_AI_ENC_KEY` (and optionally
 `TRIP_AI_ASSIST_ENABLED`) so a fresh dev shell is ready; documented in CLAUDE.md.
@@ -439,3 +445,29 @@ Mirrors `FavoritesManagerModal` + `FavoritesService`.
   first cut only resolves-and-checks.
 - **Encryption-key versioning** — to allow `TRIP_AI_ENC_KEY` rotation without
   invalidating stored keys; deferred.
+
+### Tuning backlog (observed during Phase 2 curl testing)
+
+Deferred per decision — note now, fix later. Observed with `dev@test.org` configs
+`local-ollama` (gemma4:latest) and `gpt-4o-mini`:
+
+- **Geocoding leaks internationally on a bad model location.** A Denver→Cody
+  prompt where the model returned `{"name":"Limon","city":"","state":"Wyoming"}`
+  (Limon is in CO, blank city) geocoded to *Limon, France*, producing a
+  Denver+France pair that ORS couldn't route. Fix candidate: constrain assist
+  geocoding to the US (Geoapify `filter=countrycode:us` / `bias`) via a path
+  separate from the shared search-box `searchLocations`, and/or a plausibility
+  check that warns when a resolved waypoint is implausibly far from its
+  neighbours. The failure degraded gracefully (warning + no route, HTTP 200).
+- **"Avoid interstates" / preference instructions aren't honoured by routing.**
+  The directions call uses default driving-car; the model can only act on such
+  hints when *choosing* waypoints. Adding ORS `avoid_features` (e.g.
+  `["highways"]`) to the directions request is a separate feature.
+- **Output quality is model-dependent.** gpt-4o-mini handled the multi-stop
+  "~100 mile intervals" prompt well (6 sensible waypoints); the small local
+  gemma4 ignored the interval count (2 stops) and got a state wrong. Prompt
+  tweaks (US-only, non-blank city/state, restate the requested stop count) help
+  marginally; small local models will still struggle.
+- **First-match geocode selection is acceptable** — confirmed with the
+  "Hilton Colorado Springs Airport" case (no exact property exists; nearest
+  Hilton-brand result is fine). Not a defect; documented so it isn't re-litigated.
