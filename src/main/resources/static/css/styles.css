@@ -2321,6 +2321,29 @@ main {
 /* Wider modal so the four-column table fits without horizontal scroll */
 .modal-content.modal-wide {
     max-width: 880px;
+    /*
+     * Keep the dialog within the viewport so a long list (favorites, routes,
+     * AI providers) never grows the overlay past the screen — which would
+     * trigger the overlay's overflow:auto scrollbar and shift the centered
+     * dialog. A flex column capped to ~viewport height, with the body
+     * scrolling internally. Margins (4vh top + 4vh bottom) + max-height (90vh)
+     * sum to 98vh, leaving headroom. The per-modal scroll regions (the 50vh
+     * .favorites-table-container in favorites/routes) still work inside this;
+     * the body scroll is the fallback that bounds everything to the viewport.
+     */
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    margin: 4vh auto;
+}
+
+.modal-content.modal-wide .modal-header {
+    flex: 0 0 auto;
+}
+
+.modal-content.modal-wide .modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
 }
 
 .favorites-modal-toolbar {

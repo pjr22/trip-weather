@@ -208,7 +208,7 @@ window.TripWeather.App = {
         // They attach to window.TripWeather.Managers namespace automatically
         
         // Verify managers are available
-        const requiredManagers = ['Map', 'Waypoint', 'WaypointRenderer', 'Search', 'UI', 'AuthModals', 'Route', 'Layer', 'EVChargingStation', 'FavoritesManagerModal', 'MyRoutesModal', 'Navigation', 'Export'];
+        const requiredManagers = ['Map', 'Waypoint', 'WaypointRenderer', 'Search', 'UI', 'AuthModals', 'Route', 'Layer', 'EVChargingStation', 'FavoritesManagerModal', 'MyRoutesModal', 'AiProvidersModal', 'Navigation', 'Export'];
         requiredManagers.forEach(function(managerName) {
             if (!window.TripWeather.Managers[managerName]) {
                 throw new Error(`Required manager ${managerName} not found`);
@@ -225,6 +225,7 @@ window.TripWeather.App = {
         window.TripWeather.Managers.EVChargingStation.initialize();
         window.TripWeather.Managers.FavoritesManagerModal.initialize();
         window.TripWeather.Managers.MyRoutesModal.initialize();
+        window.TripWeather.Managers.AiProvidersModal.initialize();
         window.TripWeather.Managers.Navigation.initialize();
         window.TripWeather.Managers.Export.initialize();
         

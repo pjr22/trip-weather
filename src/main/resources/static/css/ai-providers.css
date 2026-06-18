@@ -1,0 +1,112 @@
+/*
+ * Styles for the AI Providers manager modal (AI_ASSIST_PLAN.md Phase 3).
+ * The config list reuses the .favorites-table / .favorites-modal-* classes
+ * from styles.css; these rules cover only the add/edit form. Palette matches
+ * styles.css (#ddd borders, #3498db focus, #7f8c8d muted text).
+ */
+
+/*
+ * The viewport cap + internal body scroll for wide modals lives in styles.css
+ * (.modal-content.modal-wide), shared with favorites/routes. This modal also
+ * carries an add/edit form below the list, so the body is the single scroll
+ * region — drop the list's own 50vh cap here to avoid a nested scrollbar.
+ */
+#ai-providers-modal .favorites-table-container {
+    max-height: none;
+    overflow: visible;
+}
+
+.ai-provider-form {
+    margin-top: 16px;
+    padding: 16px;
+    background-color: #f8f9fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+}
+
+.ai-provider-form h4 {
+    margin: 0 0 12px;
+    font-size: 15px;
+    color: #2c3e50;
+}
+
+.ai-form-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.ai-form-row > label {
+    flex: 0 0 110px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #34495e;
+    text-align: right;
+}
+
+.ai-form-row > input,
+.ai-form-row > select {
+    flex: 1 1 auto;
+    padding: 8px 10px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+.ai-form-row > input:focus,
+.ai-form-row > select:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+/* Model row: dropdown + "Load models" button side by side. */
+.ai-model-row {
+    flex: 1 1 auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+}
+
+.ai-model-row > select {
+    flex: 1 1 auto;
+    padding: 8px 10px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+.ai-model-row > select:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.ai-model-row > button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.ai-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+/* Narrow viewports: stack labels above inputs. */
+@media (max-width: 600px) {
+    .ai-form-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+    }
+    .ai-form-row > label {
+        flex-basis: auto;
+        text-align: left;
+    }
+}

@@ -75,15 +75,22 @@ window.TripWeather.Managers.UI = {
         const usernameEl = document.getElementById('profile-username');
         if (!menu) return;
 
+        // Show "AI Providers" unless we've learned the assist feature is
+        // disabled (trip.ai.assist.enabled=false → /api/ai/** denies, and
+        // AiProvidersModal's probe sets assistEnabled=false, then re-renders).
+        const aiSvc = window.TripWeather.Services.AiProvider;
+        const showAiProviders = !aiSvc || aiSvc.assistEnabled !== false;
+
         const items = user
             ? [
-                { action: 'favorites',  label: 'My Favorites' },
-                { action: 'myRoutes',   label: 'My Routes' },
-                { action: 'changePwd',  label: 'Change password' },
-                { action: 'logout',     label: 'Log out' },
-                { action: 'deleteAcct', label: 'Delete account' },
-                { action: 'about',      label: 'About' }
-            ]
+                { action: 'favorites',   label: 'My Favorites' },
+                { action: 'myRoutes',    label: 'My Routes' },
+                showAiProviders ? { action: 'aiProviders', label: 'AI Providers' } : null,
+                { action: 'changePwd',   label: 'Change password' },
+                { action: 'logout',      label: 'Log out' },
+                { action: 'deleteAcct',  label: 'Delete account' },
+                { action: 'about',       label: 'About' }
+            ].filter(Boolean)
             : [
                 { action: 'signup', label: 'Sign up' },
                 { action: 'login',  label: 'Log in' },
@@ -192,6 +199,10 @@ window.TripWeather.Managers.UI = {
             case 'myRoutes':
                 const routesMgr = window.TripWeather.Managers.MyRoutesModal;
                 if (routesMgr && typeof routesMgr.open === 'function') routesMgr.open();
+                break;
+            case 'aiProviders':
+                const aiMgr = window.TripWeather.Managers.AiProvidersModal;
+                if (aiMgr && typeof aiMgr.open === 'function') aiMgr.open();
                 break;
             case 'about':
                 this.showAboutDialog();

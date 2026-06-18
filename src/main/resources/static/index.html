@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/nav.css">
     <link rel="stylesheet" href="css/auth.css">
+    <link rel="stylesheet" href="css/ai-providers.css">
 </head>
 <body>
     <div class="container">
@@ -468,6 +469,69 @@
         </div>
     </div>
 
+    <div id="ai-providers-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="ai-providers-modal-title">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h3 id="ai-providers-modal-title">AI Providers</h3>
+                <span class="close" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="favorites-modal-toolbar">
+                    <button type="button" id="ai-providers-add-btn" class="modal-btn primary small-btn">Add provider</button>
+                </div>
+                <div id="ai-providers-modal-status" class="favorites-modal-status" aria-live="polite"></div>
+                <div class="favorites-table-container">
+                    <table class="favorites-table">
+                        <thead>
+                            <tr>
+                                <th>Nickname</th>
+                                <th>Provider</th>
+                                <th>Model</th>
+                                <th>API key</th>
+                                <th class="favorites-cell-actions-header">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ai-providers-modal-tbody"></tbody>
+                    </table>
+                </div>
+                <p id="ai-providers-modal-empty" class="favorites-modal-empty" style="display:none;"></p>
+
+                <!-- Add / edit form — hidden until "Add provider" or "Edit" -->
+                <div id="ai-provider-form" class="ai-provider-form" style="display:none;">
+                    <h4 id="ai-provider-form-title">Add provider</h4>
+                    <div class="ai-form-row">
+                        <label for="ai-provider-field">Provider</label>
+                        <select id="ai-provider-field"></select>
+                    </div>
+                    <div class="ai-form-row">
+                        <label for="ai-nickname-field">Nickname</label>
+                        <input type="text" id="ai-nickname-field" maxlength="255" autocomplete="off" placeholder="e.g. my-openai">
+                    </div>
+                    <div class="ai-form-row" id="ai-apikey-row">
+                        <label for="ai-apikey-field" id="ai-apikey-label">API key</label>
+                        <input type="password" id="ai-apikey-field" autocomplete="off" placeholder="sk-…">
+                    </div>
+                    <div class="ai-form-row" id="ai-baseurl-row" style="display:none;">
+                        <label for="ai-baseurl-field">Base URL</label>
+                        <input type="text" id="ai-baseurl-field" autocomplete="off" placeholder="https://host/v1">
+                    </div>
+                    <div class="ai-form-row">
+                        <label for="ai-model-field">Model</label>
+                        <div class="ai-model-row">
+                            <select id="ai-model-field"><option value="">— load models —</option></select>
+                            <button type="button" id="ai-load-models-btn" class="modal-btn secondary small-btn">Load models</button>
+                        </div>
+                    </div>
+                    <div id="ai-provider-form-status" class="favorites-modal-status" aria-live="polite"></div>
+                    <div class="ai-form-actions">
+                        <button type="button" id="ai-provider-save-btn" class="modal-btn primary">Save</button>
+                        <button type="button" id="ai-provider-cancel-btn" class="modal-btn secondary">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="layers-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="layers-modal-title">
         <div class="modal-content">
             <div class="modal-header">
@@ -537,6 +601,7 @@
     <script src="js/services/RoutePersistenceService.js"></script>
     <script src="js/services/EVChargingStationService.js"></script>
     <script src="js/services/FavoritesService.js"></script>
+    <script src="js/services/AiProviderService.js"></script>
     
     <!-- Navigation engine (depend on utils; loaded before NavigationManager) -->
     <script src="js/nav/NavigationConstants.js"></script>
@@ -559,6 +624,7 @@
     <script src="js/managers/EVChargingStationManager.js"></script>
     <script src="js/managers/FavoritesManagerModal.js"></script>
     <script src="js/managers/MyRoutesModal.js"></script>
+    <script src="js/managers/AiProvidersModal.js"></script>
     <script src="js/managers/NavigationManager.js"></script>
     <script src="js/managers/ExportManager.js"></script>
 
