@@ -208,7 +208,7 @@ window.TripWeather.App = {
         // They attach to window.TripWeather.Managers namespace automatically
         
         // Verify managers are available
-        const requiredManagers = ['Map', 'Waypoint', 'WaypointRenderer', 'Search', 'UI', 'AuthModals', 'Route', 'Layer', 'EVChargingStation', 'FavoritesManagerModal', 'MyRoutesModal', 'AiProvidersModal', 'Navigation', 'Export'];
+        const requiredManagers = ['Map', 'Waypoint', 'WaypointRenderer', 'Search', 'UI', 'AuthModals', 'Route', 'Layer', 'EVChargingStation', 'FavoritesManagerModal', 'MyRoutesModal', 'AiProvidersModal', 'AiAssistModal', 'AiResolutionModal', 'Navigation', 'Export'];
         requiredManagers.forEach(function(managerName) {
             if (!window.TripWeather.Managers[managerName]) {
                 throw new Error(`Required manager ${managerName} not found`);
@@ -226,6 +226,8 @@ window.TripWeather.App = {
         window.TripWeather.Managers.FavoritesManagerModal.initialize();
         window.TripWeather.Managers.MyRoutesModal.initialize();
         window.TripWeather.Managers.AiProvidersModal.initialize();
+        window.TripWeather.Managers.AiAssistModal.initialize();
+        window.TripWeather.Managers.AiResolutionModal.initialize();
         window.TripWeather.Managers.Navigation.initialize();
         window.TripWeather.Managers.Export.initialize();
         
@@ -271,6 +273,59 @@ window.TripWeather.App = {
         } else {
             console.warn('New route button not found');
         }
+
+        this.initializeAiAssistButton();
+    },
+
+    /**
+     * Wire the AI Assist toolbar button: click opens the submit dialog, and
+     * its visibility tracks both auth state and whether the assist feature is
+     * enabled (the same gating the profile-menu "AI Providers" entry uses).
+     * Hidden for anonymous users and when trip.ai.assist.enabled=false.
+     */
+    initializeAiAssistButton: function() {
+        const btn = document.getElementById('ai-assist-btn');
+        if (!btn) {
+            console.warn('AI Assist button not found');
+            return;
+        }
+
+        btn.addEventListener('click', function() {
+            const modal = window.TripWeather.Managers.AiAssistModal;
+            if (modal && typeof modal.open === 'function') modal.open();
+        });
+
+        const refresh = this.refreshAiAssistButton.bind(this);
+        const auth = window.TripWeather.Services.Auth;
+        refresh(auth ? auth.getCurrentUser() : null);
+        if (auth && typeof auth.onChange === 'function') {
+            auth.onChange(refresh);
+        }
+    },
+
+    /**
+     * Show/hide the AI Assist button for the given auth state. Anonymous users
+     * never see it; authenticated users see it once the assist-enabled probe
+     * (shared via AiProviderService.assistEnabled) confirms the feature is on.
+     */
+    refreshAiAssistButton: function(user) {
+        const btn = document.getElementById('ai-assist-btn');
+        if (!btn) return;
+
+        if (!user) {
+            btn.style.display = 'none';
+            return;
+        }
+        // The assist-enabled probe lives on AiProviderService (shared tri-state
+        // with the profile-menu "AI Providers" entry).
+        const svc = window.TripWeather.Services.AiProvider;
+        if (!svc || typeof svc.refreshAssistEnabled !== 'function') {
+            btn.style.display = 'none'; // fail closed
+            return;
+        }
+        svc.refreshAssistEnabled().then(function(enabled) {
+            btn.style.display = enabled ? '' : 'none';
+        });
     },
 
     /**

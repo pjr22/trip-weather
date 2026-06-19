@@ -152,8 +152,11 @@ class AiAssistServiceTest {
         assertThat(resp.waypoints()).hasSize(2);
         assertThat(resp.waypoints().get(0).locationName()).isEqualTo("Moab, UT, USA");
         assertThat(resp.waypoints().get(0).latitude()).isEqualTo(38.57);
+        assertThat(resp.waypoints().get(0).sequence()).isZero();
         assertThat(resp.waypoints().get(1).city()).isEqualTo("Aspen");
+        assertThat(resp.waypoints().get(1).sequence()).isEqualTo(1);
         assertThat(resp.route()).isNotNull();
+        assertThat(resp.unresolved()).isEmpty();
         assertThat(resp.warnings()).isEmpty();
         assertThat(resp.debugPrompt()).isNull();
         assertThat(resp.debugRawResponse()).isNull();
@@ -192,8 +195,15 @@ class AiAssistServiceTest {
         AiAssistResponse resp = service().assist(req());
 
         assertThat(resp.waypoints()).hasSize(1);
-        // 1 resolved -> couldn't-find warning + need-at-least-2 warning, no route.
-        assertThat(resp.warnings()).anyMatch(w -> w.contains("Nowhere"));
+        assertThat(resp.waypoints().get(0).sequence()).isZero();
+        // The "Nowhere" miss is now a structured unresolved entry carrying its
+        // failed query and 0-based sequence (it was second in the AI's ordering).
+        assertThat(resp.unresolved()).hasSize(1);
+        assertThat(resp.unresolved().get(0).sequence()).isEqualTo(1);
+        assertThat(resp.unresolved().get(0).query()).isEqualTo("Nowhere");
+        // The couldn't-find line is no longer a warning; only the route-level
+        // need-at-least-2 message remains.
+        assertThat(resp.warnings()).noneMatch(w -> w.contains("Nowhere"));
         assertThat(resp.warnings()).anyMatch(w -> w.contains("at least 2"));
         assertThat(resp.route()).isNull();
     }
@@ -236,7 +246,11 @@ class AiAssistServiceTest {
 
         assertThat(resp.waypoints()).isEmpty();
         assertThat(resp.route()).isNull();
-        assertThat(resp.warnings()).anyMatch(w -> w.contains("Moab"));
+        // Both misses become unresolved entries in sequence order; warnings holds
+        // only the route-level need-at-least-2 message.
+        assertThat(resp.unresolved()).extracting(u -> u.query())
+                .containsExactly("Moab, Moab, UT", "Aspen, Aspen, CO");
+        assertThat(resp.unresolved()).extracting(u -> u.sequence()).containsExactly(0, 1);
         assertThat(resp.warnings()).anyMatch(w -> w.contains("at least 2"));
         // retries=1 -> 2 attempts per location.
         verify(locationService, times(2)).searchLocations("Moab, Moab, UT");

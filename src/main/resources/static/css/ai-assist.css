@@ -1,0 +1,190 @@
+/*
+ * Styles for the AI Assist submit dialog + resolution modal (AI_ASSIST_PLAN.md
+ * Phase 4). Both dialogs reuse the shared .modal / .modal-content.modal-wide
+ * viewport cap from styles.css; these rules cover the submit form and the
+ * per-stop resolution rows. Palette matches styles.css (#ddd borders,
+ * #3498db focus, #7f8c8d muted text).
+ */
+
+/* ---------------- submit dialog ---------------- */
+
+.ai-assist-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.ai-assist-form-row > label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #34495e;
+}
+
+.ai-assist-form-row > select,
+.ai-assist-form-row > textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.ai-assist-form-row > textarea {
+    min-height: 120px;
+    resize: vertical;
+}
+
+.ai-assist-form-row > select:focus,
+.ai-assist-form-row > textarea:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+#ai-assist-no-providers {
+    padding: 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #34495e;
+    margin-bottom: 14px;
+}
+
+#ai-assist-no-providers a {
+    color: #3498db;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.ai-assist-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+/* The AI Assist toolbar button: keep the existing primary-button look, just
+ * size the sparkle icon to match the other emoji icons. */
+#ai-assist-btn .btn-icon {
+    font-size: 1em;
+}
+
+/* ---------------- resolution modal ---------------- */
+
+.ai-resolution-intro {
+    font-size: 13px;
+    color: #34495e;
+    margin: 0 0 12px;
+}
+
+.ai-resolution-warnings {
+    padding: 10px 12px;
+    background-color: #fff8e1;
+    border: 1px solid #f0d98c;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #6b5400;
+}
+
+.ai-resolution-warnings-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.ai-resolution-warnings ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+/* The stop list scrolls inside the capped wide modal. */
+.ai-resolution-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.ai-resolution-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ai-resolution-status {
+    flex: 0 0 auto;
+    width: 20px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.ai-resolution-status-ok {
+    color: #27ae60;
+}
+
+.ai-resolution-status-bad {
+    color: #e74c3c;
+}
+
+.ai-resolution-num {
+    flex: 0 0 auto;
+    width: 22px;
+    text-align: right;
+    color: #7f8c8d;
+    font-size: 13px;
+}
+
+.ai-resolution-input {
+    flex: 1 1 auto;
+    padding: 7px 10px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+.ai-resolution-input:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+/* A row edited since it last resolved — visually flag that a Re-search is due. */
+.ai-resolution-row.dirty .ai-resolution-input {
+    border-color: #f0a30a;
+    background-color: #fffdf5;
+}
+
+.ai-resolution-delete {
+    flex: 0 0 auto;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    background-color: #e74c3c;
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.ai-resolution-delete:hover {
+    background-color: #c0392b;
+}
+
+.ai-resolution-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+#ai-resolution-use-hint {
+    flex: 1 1 auto;
+    font-size: 12px;
+    color: #7f8c8d;
+}

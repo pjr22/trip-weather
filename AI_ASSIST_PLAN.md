@@ -63,9 +63,11 @@ ask the user to start it rather than working around it.
   unreachable), the UI surfaces a clear error rather than silently offering an
   empty dropdown.
 - **Geocoding failures** — resolve each AI-returned location best-effort and
-  return the successful waypoints plus a per-location `warnings[]` list. A single
-  unresolvable stop does not fail the whole request; fewer than two resolved
-  waypoints returns the waypoints with a warning and no route. Each lookup is
+  return the successful waypoints plus the unresolvable ones as **structured,
+  editable entries** (Phase 4a `unresolved[]`) that the Phase 4 resolution modal
+  lets the user edit, re-geocode, or drop. A single unresolvable stop does not
+  fail the whole request; fewer than two resolved waypoints returns the waypoints
+  with a (route-level) warning and no route. Each lookup is
   retried on a transient failure (error *or* empty result) per
   `TRIP_AI_GEOCODE_RETRIES` (default 1) with a `TRIP_AI_GEOCODE_RETRY_DELAY_SECONDS`
   (default 3) pause — implemented in Phase 2 after a transient empty result dropped
@@ -288,6 +290,9 @@ The heart of the feature: text in → waypoints + route out.
     (the two `debug*` fields populated only when `TRIP_AI_ASSIST_DEBUG=true`).
   - `ResolvedWaypoint` shape aligns with what the frontend needs to load a
     working route (lat, lon, name/locationName, city, state, elevation if known).
+  - **Phase 4 enriches this** with `sequence` on `ResolvedWaypoint` and a
+    structured `List<UnresolvedLocation> unresolved`, moving per-location "couldn't
+    find" out of `warnings` — see Phase 4a.
 
 **Provider availability** (`GET /api/ai/providers/available`): returns the
 offerable provider list — always OpenAI/Anthropic/Custom; Ollama only when
@@ -345,24 +350,104 @@ Mirrors `FavoritesManagerModal` + `FavoritesService`.
 
 ---
 
-# Phase 4 — Frontend: AI Assist button + dialog
+# Phase 4 — Frontend: AI Assist button + dialog + resolution modal
 
-- `static/index.html` — add `#ai-assist-btn` to `.header-buttons` next to
-  *New Route*, with a sparkles / magic-wand SVG icon. Hidden when unauthenticated
-  or assist disabled.
-- `static/js/services/AiAssistService.js` — `submit({providerConfigId, prompt})`.
-- `static/js/managers/AiAssistModal.js` — dialog with:
-  - provider-config `<select>` (from `AiProviderService.list()`); if the user has
-    no configs, show a prompt + shortcut to open the AI Providers manager,
-  - free-text `<textarea>`,
-  - **Submit** (spinner / disabled while in flight) and **Cancel**.
-  - On success: load the returned waypoints + route into the **working route**
-    (reuse the same path *Load Route* / *Calculate Route* use to populate the map,
-    waypoint list, and route layer); surface any `warnings[]` via `Toast`. Result
-    is unsaved — the user keeps it via the existing *Save Route* flow.
-- `static/js/app.js` — wire `#ai-assist-btn` → open modal; apply-result via the
-  existing working-route population helpers; gate button + menu visibility via
-  `AuthService.onChange`.
+Result handling uses an interactive **resolution modal** (not a toast) whenever a
+location can't be geocoded or a route-level warning is raised. The user edits or
+drops each unfound stop, re-runs the geocode search, and — once enough stops
+resolve — applies the route (a single recalculation). They can also ignore the
+unresolved stops and route with what's left.
+
+## 4a. Backend support — structured unresolved locations
+
+The modal needs the unfound stops in editable form, so `/api/ai/assist` gets a
+small enrichment (lands first, since Phase 2 is already committed):
+
+- `ResolvedWaypoint` gains **`sequence`** (0-based index in the AI's ordering) so
+  the frontend can reconstruct travel order when mixing resolved + re-resolved
+  stops.
+- New DTO **`UnresolvedLocation { int sequence; String query; }`** — `query` is
+  the exact geocode string that failed, prefilled into that row's edit field. No
+  separate name/city/state fields: the user just edits the one query string (or
+  deletes the row).
+- `AiAssistResponse` gains **`List<UnresolvedLocation> unresolved`**. `warnings`
+  now carries only route-level messages ("too many locations, used the first N";
+  "could not calculate a route"), not the per-location "couldn't find" lines —
+  those become structured `unresolved` entries.
+- `AiAssistService.assist`: track each location's index; a resolved stop →
+  `ResolvedWaypoint(sequence, …)` (its `locationName` is the matched address the
+  modal prefills for that row); a geocode miss (after the configured retries) →
+  `UnresolvedLocation(sequence, query)`. The preview `route` is still computed
+  from the resolved set.
+- Tests: the partial-geocode-failure test asserts on `unresolved` (with sequence)
+  rather than a "couldn't find" warning.
+
+## 4b. AI Assist button + submit dialog
+
+- `static/index.html` — `#ai-assist-btn` in `.header-buttons` next to *New Route*,
+  with a sparkles / magic-wand SVG icon. Hidden when unauthenticated or assist
+  disabled (same `assistEnabled` gating the profile-menu entry uses).
+- `static/js/services/AiAssistService.js` — `submit({providerConfigId, prompt})`
+  → `POST /api/ai/assist`.
+- `static/js/managers/AiAssistModal.js` — submit dialog: provider-config
+  `<select>` (from `AiProviderService.list()`; if the user has no configs, a CTA
+  that opens the AI Providers manager), a free-text `<textarea>`, **Submit**
+  (spinner / disabled while in flight) and **Cancel**.
+
+## 4c. Result handling
+
+On the assist response:
+
+- **No `unresolved` and a route present** → load the resolved waypoints into the
+  **working route** directly (clear current route → add waypoints in `sequence`
+  order → run the existing calculate-route flow). Unsaved; kept via *Save Route*.
+- **Any `unresolved`, or a route-level warning** → open the **resolution modal**
+  (below) instead of loading directly. No toast.
+
+## 4d. Resolution modal
+
+**Trigger** is unchanged: the modal only opens when there are warnings — i.e. at
+least one `unresolved` stop (or a route-level warning). But when it does, it lists
+**every** stop, good and bad, in `sequence` order, so the user sees the whole
+route and can adjust any of it before committing.
+
+- **One row per stop**, in `sequence` order, laid out left→right:
+  1. a **status icon** — green ✓ (resolved) or red ✗ (unresolved);
+  2. the **sequence number**;
+  3. an **editable text field** — prefilled with the matched address for a
+     resolved stop, or the failed `query` for an unresolved one;
+  4. a **Delete** action (drop this stop).
+  Every row — good or bad — is editable and deletable.
+- A read-only **warnings** section for any route-level `warnings`.
+- **Re-search** — re-geocode every row that is unresolved **or** whose text was
+  edited since it last resolved (untouched resolved rows keep their coordinates —
+  no wasted lookups). Uses the SPA's existing forward-geocode (the same
+  `/api/location/search` the search box uses; first feature — the same first-match
+  rule the backend applies). Each row's icon updates from the result: a match
+  flips/keeps ✓ (carrying lat/lon + matched address), a miss shows ✗. No new
+  endpoint.
+- **Use this route** (apply) — build the final waypoint list from all currently
+  resolved (✓) rows in `sequence` order, load it into the working route, and run
+  calculate-route once. Enabled when ≥2 stops are resolved; any still-unresolved
+  rows are left out (the "ignore the warnings" path). Disabled with a hint when
+  fewer than 2 resolve.
+- **Cancel** — discard; nothing is loaded onto the map.
+
+Row state the modal tracks per entry: `{ sequence, text, status, lat, lon,
+matchedAddress, resolvedText }`. Editing the field that differs from
+`resolvedText` is what marks a row for re-geocoding on the next Re-search.
+
+Reuses existing machinery end to end: forward-geocode (`/api/location/search`),
+waypoint population (`WaypointManager`), and the existing calculate-route flow.
+The backend's preview `route` is informational — the authoritative render comes
+from the frontend calculate once the final waypoint set is known. Nothing loads
+onto the map until **Use this route**, so the modal is a clean gate.
+
+- `static/js/app.js` — wire `#ai-assist-btn` → open modal; gate button visibility
+  via `AuthService.onChange` + `assistEnabled`.
+- `static/css/ai-assist.css` (or extend `ai-providers.css`) — dialog +
+  resolution-row styling; reuse the shared `.modal-content.modal-wide` viewport
+  cap so a long stop list scrolls within the dialog.
 
 ---
 
@@ -414,18 +499,24 @@ Mirrors `FavoritesManagerModal` + `FavoritesService`.
 
 ## Phasing checklist
 
-- [ ] **Phase 1** — schema + migration; `AiProviderConfig`/`AiProvider`;
-      repository/service/controller + DTOs; `AiKeyCipher`;
-      `StartupConfigValidator` + config keys; `SecurityConfig` `/api/ai/**`;
-      tests.
-- [ ] **Phase 2** — provider clients (OpenAI-compatible + Anthropic) + dispatcher;
-      prompt builder + tolerant parser/repair; assist orchestration;
-      `/api/ai/assist` + `/api/ai/providers/available`; tests; curl tuning loop.
-- [ ] **Phase 3** — `AiProviderService.js` + `AiProvidersModal.js` + profile-menu
-      entry.
-- [ ] **Phase 4** — AI Assist button + `AiAssistModal.js` + `AiAssistService.js` +
-      app wiring + working-route apply.
-- [ ] Docs + memory.
+- [x] **Phase 1** (committed d3d3016) — schema + migration;
+      `AiProviderConfig`/`AiProvider`; repository/service/controller + DTOs;
+      `AiKeyCipher`; `StartupConfigValidator` + config keys; `SecurityConfig`
+      `/api/ai/**`; model discovery + `OutboundUrlGuard`; tests.
+- [x] **Phase 2** (committed ae497d5) — provider clients (OpenAI-compatible +
+      Anthropic) + dispatcher; prompt builder + tolerant parser/repair; assist
+      orchestration; geocode retry; `/api/ai/assist` +
+      `/api/ai/providers/available`; tests; curl tuning loop.
+- [x] **Phase 3** (committed 93c12e5) — `AiProviderService.js` +
+      `AiProvidersModal.js` + profile-menu entry; shared wide-modal viewport cap.
+- [x] **Phase 4** — 4a backend enrichment (`unresolved[]` + `sequence`); 4b AI
+      Assist button + submit dialog (`AiAssistModal.js` + `AiAssistService.js`);
+      4c direct-load when clean; 4d resolution modal (`AiResolutionModal.js` —
+      edit / delete / re-search / apply / ignore); app wiring. Suite green (435).
+- [x] Docs + memory — README.md (user-facing "Plan with AI" + operator
+      assistant section + quick-start key), DEPLOYMENT_INSTRUCTIONS.md
+      (`TRIP_AI_*` env + secret file), CLAUDE.md (env table, migration, test
+      count, project-layout pointer), memory entry updated.
 
 ---
 

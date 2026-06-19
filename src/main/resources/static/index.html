@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="css/nav.css">
     <link rel="stylesheet" href="css/auth.css">
     <link rel="stylesheet" href="css/ai-providers.css">
+    <link rel="stylesheet" href="css/ai-assist.css">
 </head>
 <body>
     <div class="container">
@@ -96,6 +97,7 @@
                     </div>
                 <div class="header-buttons" id="header-buttons">
                     <button id="new-route-btn" class="action-btn-primary header-menu-item"><span class="btn-icon">🆕</span><span class="btn-text">New <span class="btn-label-extra">Route</span></span></button>
+                    <button id="ai-assist-btn" class="action-btn-primary header-menu-item" style="display:none;"><span class="btn-icon">✨</span><span class="btn-text">AI <span class="btn-label-extra">Assist</span></span></button>
                     <button id="save-route-btn" class="action-btn-primary header-menu-item"><span class="btn-icon">💾</span><span class="btn-text">Save <span class="btn-label-extra">Route</span></span></button>
                     <button id="load-route-btn" class="action-btn-primary"><span class="btn-icon">📁</span><span class="btn-text">Load <span class="btn-label-extra">Route</span></span></button>
                     <button id="share-route-btn" class="action-btn-primary header-menu-item"><span class="btn-icon">🔗</span><span class="btn-text">Share <span class="btn-label-extra">Route</span></span></button>
@@ -532,6 +534,65 @@
         </div>
     </div>
 
+    <div id="ai-assist-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="ai-assist-modal-title">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h3 id="ai-assist-modal-title">AI Assist</h3>
+                <span class="close" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p class="ai-resolution-intro">Describe the trip and the assistant will suggest stops in order. You'll get a chance to review anything it can't find.</p>
+
+                <div id="ai-assist-no-providers" style="display:none;">
+                    You don't have any AI providers yet.
+                    <a id="ai-assist-manage-providers" role="button" tabindex="0">Add one in AI Providers</a>, then come back.
+                </div>
+
+                <div class="ai-assist-form-row" id="ai-assist-provider-row">
+                    <label for="ai-assist-provider-field">Provider</label>
+                    <select id="ai-assist-provider-field"></select>
+                </div>
+                <div class="ai-assist-form-row">
+                    <label for="ai-assist-prompt-field">Trip description</label>
+                    <textarea id="ai-assist-prompt-field" autocomplete="off"
+                              placeholder="e.g. A 3-day drive from Denver to Moab with scenic stops along the way"></textarea>
+                </div>
+
+                <div id="ai-assist-modal-status" class="favorites-modal-status" aria-live="polite"></div>
+
+                <div class="ai-assist-actions">
+                    <button type="button" id="ai-assist-submit-btn" class="modal-btn primary">Submit</button>
+                    <button type="button" id="ai-assist-cancel-btn" class="modal-btn secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="ai-resolution-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="ai-resolution-modal-title">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h3 id="ai-resolution-modal-title">Review the suggested stops</h3>
+                <span class="close" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p class="ai-resolution-intro">Edit, re-search, or delete any stop. ✓ stops are ready; ✗ stops still need a match. Use this route applies the ✓ stops in order.</p>
+
+                <div id="ai-resolution-warnings" class="ai-resolution-warnings" style="display:none;"></div>
+
+                <div id="ai-resolution-rows" class="ai-resolution-rows"></div>
+
+                <div id="ai-resolution-status" class="favorites-modal-status" aria-live="polite"></div>
+
+                <div class="ai-resolution-footer">
+                    <span id="ai-resolution-use-hint" style="display:none;">Resolve at least 2 stops to build a route.</span>
+                    <button type="button" id="ai-resolution-research-btn" class="modal-btn secondary">Re-search</button>
+                    <button type="button" id="ai-resolution-use-btn" class="modal-btn primary">Use this route</button>
+                    <button type="button" id="ai-resolution-cancel-btn" class="modal-btn secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="layers-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="layers-modal-title">
         <div class="modal-content">
             <div class="modal-header">
@@ -602,7 +663,8 @@
     <script src="js/services/EVChargingStationService.js"></script>
     <script src="js/services/FavoritesService.js"></script>
     <script src="js/services/AiProviderService.js"></script>
-    
+    <script src="js/services/AiAssistService.js"></script>
+
     <!-- Navigation engine (depend on utils; loaded before NavigationManager) -->
     <script src="js/nav/NavigationConstants.js"></script>
     <script src="js/nav/WakeLock.js"></script>
@@ -625,6 +687,8 @@
     <script src="js/managers/FavoritesManagerModal.js"></script>
     <script src="js/managers/MyRoutesModal.js"></script>
     <script src="js/managers/AiProvidersModal.js"></script>
+    <script src="js/managers/AiAssistModal.js"></script>
+    <script src="js/managers/AiResolutionModal.js"></script>
     <script src="js/managers/NavigationManager.js"></script>
     <script src="js/managers/ExportManager.js"></script>
 

@@ -46,6 +46,7 @@ Place these in the **parent directory** of the repo (not inside it — they're g
 | `../admin_refresh_token.txt` | A 32-char hex secret you generate once: `openssl rand -hex 32 > ../admin_refresh_token.txt` |
 | `../remember_me_key.txt` | A signing key you generate once: `openssl rand -base64 48 > ../remember_me_key.txt` |
 | `../admin_password.txt` | Plaintext password for the `/admin/` console. Generate once: `openssl rand -base64 24 > ../admin_password.txt` |
+| `../trip_ai_enc_key.txt` | AES-256 key that encrypts users' saved AI provider API keys (only if `TRIP_AI_ASSIST_ENABLED=true`, the default). Generate once: `openssl rand -base64 32 > ../trip_ai_enc_key.txt` |
 
 The companion script `setEnvVariables.source` reads these into env vars at the top of each dev session.
 
@@ -71,6 +72,11 @@ The companion script `setEnvVariables.source` reads these into env vars at the t
 | `TRIP_LOCAL_ORS_ENABLED` | `false` (typical dev) | Set `true` only if you've started the `trip-ors` container locally. When false, every routing call goes to public ORS. |
 | `TRIP_LOCAL_ORS_BASE_URL` | `http://localhost:8082/ors` | When local ORS is enabled, where to reach it (the host port the container publishes) |
 | `TRIP_TILE_PROXY_ENABLED` | `false` | When false (typical dev), the SPA hits OSM and weather.gov directly. Flip true only when also running the nginx sidecar. |
+| `TRIP_AI_ASSIST_ENABLED` | `true` (or `false` to skip) | Master switch for the AI trip-planning assistant. When true, `TRIP_AI_ENC_KEY` is required and `/api/ai/**` + the SPA's AI affordances are live. Set false to skip the key and hide the feature. |
+| `TRIP_AI_ENC_KEY` | `<contents of trip_ai_enc_key.txt>` | Required when assist is enabled; AES-256 key encrypting users' stored provider API keys. `openssl rand -base64 32`. |
+| `TRIP_AI_OLLAMA_URL` | `http://localhost:11434` (optional) | Offer a local Ollama endpoint as a keyless provider choice. Blank/unset hides Ollama. Operator-trusted — bypasses the SSRF guard applied to user-supplied Custom base URLs. |
+
+The hosted-provider defaults (`TRIP_AI_OPENAI_BASE_URL`, `TRIP_AI_ANTHROPIC_BASE_URL`, `TRIP_AI_ANTHROPIC_VERSION`) and the tuning knobs (`TRIP_AI_REQUEST_TIMEOUT_MS`, `TRIP_AI_MAX_WAYPOINTS`, `TRIP_AI_GEOCODE_RETRIES`, `TRIP_AI_GEOCODE_RETRY_DELAY_SECONDS`, `TRIP_AI_ASSIST_DEBUG`) rarely need overriding — see the CLAUDE.md env-var table for the full list.
 
 Local ORS coverage is managed entirely via the admin console (`/admin/` → Data tab → Pbfs card) since ADMIN_CONSOLE.md Phase 2c. Fresh installs start with an empty `routing_coverage` table; admin adds a pbf row (the modal's region picker autocompletes US Geofabrik slugs) and the cron's post-apply step fetches the matching `.poly`. **At most one pbf is loaded into trip-ors at a time** — applying a second pbf replaces the first. Merging multiple pbfs into one engine is a planned follow-up.
 
@@ -174,6 +180,11 @@ The Spring application's env, set on `docker run`:
 | `TRIP_LOCAL_ORS_BASE_URL` | `http://trip-ors:8082/ors` | Docker-network address of the routing engine |
 | `TRIP_TILE_PROXY_ENABLED` | `true` | SPA fetches tiles + weather icons through the tripnginx proxy instead of upstream public services |
 | `TRIP_TILE_PROXY_BASE_URL` | `` (empty) | Empty = relative paths (SPA traffic comes through tripnginx, so paths like `/tiles/osm/...` resolve correctly without a host prefix) |
+| `TRIP_AI_ASSIST_ENABLED` | `true` | AI trip-planning assistant. When true, `TRIP_AI_ENC_KEY` is required and `/api/ai/**` is live. Set `false` to disable the feature (no key needed). |
+| `TRIP_AI_ENC_KEY` | `<contents of trip_ai_enc_key.txt>` | Required when assist is enabled; AES-256 key encrypting users' stored provider API keys at rest. **Rotating it invalidates every stored key** — keep it stable across restarts. |
+| `TRIP_AI_OLLAMA_URL` | `` (empty) or an internal URL | Optional. Offer a self-hosted Ollama endpoint as a keyless provider; operator-trusted, bypasses the SSRF guard. Leave empty if not running Ollama. |
+
+(Other `TRIP_AI_*` knobs carry sensible defaults — see the CLAUDE.md env-var table.)
 
 ### Environment variables — host cron (running `docker/refreshOrsGraph.sh`)
 

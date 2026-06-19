@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.pjr22.tripweather.dto.AiAssistRequest;
 import com.pjr22.tripweather.dto.AiAssistResponse;
 import com.pjr22.tripweather.dto.ResolvedWaypoint;
+import com.pjr22.tripweather.dto.UnresolvedLocation;
 import com.pjr22.tripweather.model.AiProviderConfig;
 import com.pjr22.tripweather.model.RouteData;
 import com.pjr22.tripweather.model.User;
@@ -118,11 +119,12 @@ public class AiAssistService {
         }
 
         List<ResolvedWaypoint> resolved = new ArrayList<>();
-        for (AiLocation loc : locations) {
-            String query = buildQuery(loc);
-            ResolvedWaypoint waypoint = geocode(query);
+        List<UnresolvedLocation> unresolved = new ArrayList<>();
+        for (int sequence = 0; sequence < locations.size(); sequence++) {
+            String query = buildQuery(locations.get(sequence));
+            ResolvedWaypoint waypoint = geocode(query, sequence);
             if (waypoint == null) {
-                warnings.add("Couldn't find a location for \"" + query + "\".");
+                unresolved.add(new UnresolvedLocation(sequence, query));
             } else {
                 resolved.add(waypoint);
             }
@@ -138,12 +140,14 @@ public class AiAssistService {
             warnings.add("Need at least 2 locations to build a route; resolved " + resolved.size() + ".");
         }
 
-        logger.info("AI assist for user {} via config {}: {} suggested, {} resolved, {} warnings",
-                user.getId(), config.getId(), locations.size(), resolved.size(), warnings.size());
+        logger.info("AI assist for user {} via config {}: {} suggested, {} resolved, {} unresolved, {} warnings",
+                user.getId(), config.getId(), locations.size(), resolved.size(), unresolved.size(),
+                warnings.size());
 
         return new AiAssistResponse(
                 resolved,
                 route,
+                unresolved,
                 warnings,
                 debug ? ("SYSTEM:\n" + systemPrompt + "\n\nUSER:\n" + userPrompt) : null,
                 debug ? rawResponse : null);
@@ -194,13 +198,13 @@ public class AiAssistService {
      * null only after every attempt fails — the caller turns that into a warning
      * rather than failing the whole request.
      */
-    private ResolvedWaypoint geocode(String query) {
+    private ResolvedWaypoint geocode(String query, int sequence) {
         if (query.isBlank()) {
             return null;
         }
         int totalAttempts = Math.max(0, geocodeRetries) + 1;
         for (int attempt = 1; attempt <= totalAttempts; attempt++) {
-            ResolvedWaypoint waypoint = attemptGeocode(query, attempt, totalAttempts);
+            ResolvedWaypoint waypoint = attemptGeocode(query, sequence, attempt, totalAttempts);
             if (waypoint != null) {
                 return waypoint;
             }
@@ -212,7 +216,7 @@ public class AiAssistService {
     }
 
     /** One forward-geocode attempt. Returns null on error or no usable result. */
-    private ResolvedWaypoint attemptGeocode(String query, int attempt, int totalAttempts) {
+    private ResolvedWaypoint attemptGeocode(String query, int sequence, int attempt, int totalAttempts) {
         JsonNode response;
         try {
             response = locationService.searchLocations(query);
@@ -256,7 +260,7 @@ public class AiAssistService {
         String city = props.path("city").asText(null);
         String state = props.path("state_code").asText(props.path("state").asText(null));
 
-        return new ResolvedWaypoint(lat, lon, locationName, city, state, null);
+        return new ResolvedWaypoint(sequence, lat, lon, locationName, city, state, null);
     }
 
     /**

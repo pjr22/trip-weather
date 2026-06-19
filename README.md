@@ -96,6 +96,19 @@ Click the **profile icon** in the top right to access account actions:
 
 Email goes through [Mailtrap](https://mailtrap.io/). The only thing the app stores about you is your email address (lowercased, used as your login identifier), a BCrypt hash of your password, and the routes you save.
 
+### Plan with AI (optional)
+
+If the assistant is enabled on your server and you're signed in, you can describe a trip in plain language and let an AI suggest the stops for you.
+
+First, add a provider once: **profile menu → AI Providers → Add provider**. Pick OpenAI, Anthropic, a self-hosted Ollama endpoint, or any OpenAI-compatible service, paste an API key (stored encrypted, never shown again), and choose a model from the discovered list.
+
+Then click the **✨ AI Assist** button in the toolbar, pick the provider, and type something like *"a 3-day drive from Denver to Moab with scenic stops"*. The assistant returns an ordered list of stops, which the app geocodes into waypoints:
+
+- If every stop is found, the route is built and loaded onto the map straight away.
+- If a stop can't be located (or the list needs trimming), a **review** dialog opens listing every stop in order. Each row shows ✓ (found) or ✗ (not found) and is fully editable — fix the text and **Re-search**, **Delete** a stop you don't want, then **Use this route** once at least two stops resolve.
+
+The result is an unsaved working route, exactly as if you'd added the stops yourself — calculate, tweak, and **Save** it like any other. Your prompt and your stored API key are sent to whichever provider you configured; nothing AI-related happens unless you opt in by adding a provider.
+
 ### Drive it
 Once a route is calculated, **🧭 Navigate** starts a voice-guided drive. See the [Navigation section](#navigation-turn-by-turn) below — there are real web-platform limitations worth knowing before you rely on it.
 
@@ -200,7 +213,17 @@ export TRIP_ADMIN_PASSWORD="$(openssl rand -base64 24)"
 #    or, to skip the admin console entirely while iterating:
 # export TRIP_ADMIN_ENABLED=false
 
-# 6. run
+# 6. AI trip-planning assistant (on by default) — pick one path:
+#
+#    a) Enable it: set the key that encrypts users' saved provider API keys.
+export TRIP_AI_ENC_KEY="$(openssl rand -base64 32)"
+#    (optional) offer a local Ollama endpoint as a provider choice:
+# export TRIP_AI_OLLAMA_URL=http://localhost:11434
+#
+#    b) Or skip it entirely (no enc-key needed, AI affordances hidden):
+# export TRIP_AI_ASSIST_ENABLED=false
+
+# 7. run
 ./gradlew bootRun
 ```
 
@@ -221,6 +244,12 @@ Authentication is a single shared credential held in env vars (BCrypt-hashed in 
 
 The console reads everything the same `/actuator/prometheus` endpoint would expose, so you no longer need to leave actuator publicly reachable. See the full design and phasing in [ADMIN_CONSOLE.md](ADMIN_CONSOLE.md).
 
+### AI trip-planning assistant
+
+The optional AI assistant (the **✨ AI Assist** button, [described above](#plan-with-ai-optional)) is **on by default** but needs one secret: `TRIP_AI_ENC_KEY`, a Base64 32-byte key that encrypts each user's saved provider API keys at rest. Generate it once with `openssl rand -base64 32`; the app fails fast at startup if the feature is enabled and the key is missing. Rotating the key invalidates every stored API key. To run without the feature, set `TRIP_AI_ASSIST_ENABLED=false` and no key is required — the front-end hides the button and the AI Providers menu entry.
+
+Users bring their own provider credentials (OpenAI, Anthropic, or any OpenAI-compatible endpoint); the key never leaves the server except on the outbound call to that provider, and is never returned by the API. Set `TRIP_AI_OLLAMA_URL` to offer a self-hosted Ollama endpoint as a keyless provider choice — that operator-set URL is trusted and bypasses the SSRF guard that vets user-supplied Custom base URLs (which must resolve to a public IP). See [AI_ASSIST_PLAN.md](AI_ASSIST_PLAN.md) for the design, the full env-var list, and the security model.
+
 ### Going easier on the external APIs
 
 Out of the box the app caches aggressively in Postgres — weather forecasts, NWS gridpoint lookups, reverse-geocodes, and OpenRouteService responses — so repeat clicks on the same waypoints, share-link reloads, and returning users mostly hit cache instead of upstream. NREL EV-station data is pulled into a local mirror once a week and served from there.
@@ -232,7 +261,7 @@ Two optional sidecars push it further, both documented in [LOCAL_CACHING_HOSTING
 
 Both are off by default. The defaults go straight to the public APIs and need none of this to work.
 
-Developer documentation — architecture, module layout, API endpoints, WMS layer handling — lives in [HOWTO_LOCAL_MAP.md](HOWTO_LOCAL_MAP.md) and inline in the source. The user-accounts feature has its own design document in [USER_ACCOUNTS_PLAN.md](USER_ACCOUNTS_PLAN.md), the caching / self-hosting plan is in [LOCAL_CACHING_HOSTING.md](LOCAL_CACHING_HOSTING.md), and the operator console is documented in [ADMIN_CONSOLE.md](ADMIN_CONSOLE.md). A full code review with known issues and priorities is in [CODE_REVIEW.md](CODE_REVIEW.md).
+Developer documentation — architecture, module layout, API endpoints, WMS layer handling — lives in [HOWTO_LOCAL_MAP.md](HOWTO_LOCAL_MAP.md) and inline in the source. The user-accounts feature has its own design document in [USER_ACCOUNTS_PLAN.md](USER_ACCOUNTS_PLAN.md), the caching / self-hosting plan is in [LOCAL_CACHING_HOSTING.md](LOCAL_CACHING_HOSTING.md), the operator console is documented in [ADMIN_CONSOLE.md](ADMIN_CONSOLE.md), and the AI trip-planning assistant is in [AI_ASSIST_PLAN.md](AI_ASSIST_PLAN.md). A full code review with known issues and priorities is in [CODE_REVIEW.md](CODE_REVIEW.md).
 
 ---
 
