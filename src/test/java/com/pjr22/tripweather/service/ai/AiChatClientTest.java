@@ -57,13 +57,17 @@ class AiChatClientTest {
                 .andExpect(jsonPath("$.messages[0].content").value("sys"))
                 .andExpect(jsonPath("$.messages[1].role").value("user"))
                 .andExpect(jsonPath("$.messages[1].content").value("usr"))
-                .andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"HELLO\"}}]}",
+                .andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"HELLO\"}}],"
+                                + "\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":22,\"total_tokens\":33}}",
                         MediaType.APPLICATION_JSON));
 
-        String out = openAi.complete(new AiChatCall(
+        AiChatResult out = openAi.complete(new AiChatCall(
                 "https://api.openai.test/v1", "gpt-4o-mini", "sk-x", "sys", "usr", true));
 
-        assertThat(out).isEqualTo("HELLO");
+        assertThat(out.content()).isEqualTo("HELLO");
+        assertThat(out.promptTokens()).isEqualTo(11);
+        assertThat(out.completionTokens()).isEqualTo(22);
+        assertThat(out.totalTokens()).isEqualTo(33);
         server.verify();
     }
 
@@ -74,10 +78,12 @@ class AiChatClientTest {
                 .andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"X\"}}]}",
                         MediaType.APPLICATION_JSON));
 
-        String out = openAi.complete(new AiChatCall(
+        AiChatResult out = openAi.complete(new AiChatCall(
                 "https://api.openai.test/v1", "m", "sk-x", "sys", "usr", false));
 
-        assertThat(out).isEqualTo("X");
+        assertThat(out.content()).isEqualTo("X");
+        // No usage block in this response — token figures stay null.
+        assertThat(out.totalTokens()).isNull();
         server.verify();
     }
 
@@ -114,13 +120,18 @@ class AiChatClientTest {
                 .andExpect(jsonPath("$.system").value("sys"))
                 .andExpect(jsonPath("$.messages[0].role").value("user"))
                 .andExpect(jsonPath("$.messages[0].content").value("usr"))
-                .andRespond(withSuccess("{\"content\":[{\"type\":\"text\",\"text\":\"HI\"}]}",
+                .andRespond(withSuccess("{\"content\":[{\"type\":\"text\",\"text\":\"HI\"}],"
+                                + "\"usage\":{\"input_tokens\":7,\"output_tokens\":5}}",
                         MediaType.APPLICATION_JSON));
 
-        String out = anthropic.complete(new AiChatCall(
+        AiChatResult out = anthropic.complete(new AiChatCall(
                 "https://api.anthropic.test", "claude-opus-4-8", "sk-ant", "sys", "usr", false));
 
-        assertThat(out).isEqualTo("HI");
+        assertThat(out.content()).isEqualTo("HI");
+        assertThat(out.promptTokens()).isEqualTo(7);
+        assertThat(out.completionTokens()).isEqualTo(5);
+        // total = input + output.
+        assertThat(out.totalTokens()).isEqualTo(12);
         server.verify();
     }
 

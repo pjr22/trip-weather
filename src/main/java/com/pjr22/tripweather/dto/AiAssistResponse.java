@@ -16,15 +16,13 @@ import com.pjr22.tripweather.model.RouteData;
  * @param warnings   route-level notes only (e.g. "too many locations, used the
  *                   first N"; "could not calculate a route"). Per-location
  *                   "couldn't find" misses live in {@code unresolved} instead.
- * @param debugPrompt       the prompt sent to the model — populated only when
- *                          {@code trip.ai.assist-debug=true} (prompt tuning)
- * @param debugRawResponse  the raw model text — populated only when debug is on
+ * @param details    always-on run detail (model, raw response, token usage,
+ *                   elapsed time) the UI surfaces on demand (Phase 4)
  */
 public record AiAssistResponse(
         List<ResolvedWaypoint> waypoints,
         RouteData route,
         List<UnresolvedLocation> unresolved,
         List<String> warnings,
-        String debugPrompt,
-        String debugRawResponse) {
+        AiAssistDetails details) {
 }

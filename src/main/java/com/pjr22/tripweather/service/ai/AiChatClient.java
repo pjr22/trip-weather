@@ -14,12 +14,26 @@ import org.springframework.web.server.ResponseStatusException;
 public interface AiChatClient {
 
     /**
-     * Run the completion and return the assistant's text content.
+     * Run the completion and return the assistant's text content plus any
+     * reported token usage.
      *
      * @throws ResponseStatusException 400 on auth failure (bad key), 502 on any
      *         other provider error or unreachable provider
      */
-    String complete(AiChatCall call);
+    AiChatResult complete(AiChatCall call);
+
+    /**
+     * Trim an upstream error body / raw model output for logging — keep enough to
+     * diagnose (provider error JSON, malformed completion) without flooding the
+     * log on a pathological response. Null becomes a stable placeholder.
+     */
+    static String truncate(String s) {
+        if (s == null) {
+            return "(none)";
+        }
+        String t = s.strip();
+        return t.length() <= 2000 ? t : t.substring(0, 2000) + "…(truncated)";
+    }
 
     /**
      * Shared provider-error mapping for implementations: 401/403 → 400 ("check

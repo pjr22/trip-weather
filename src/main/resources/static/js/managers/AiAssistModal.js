@@ -24,6 +24,8 @@ window.TripWeather.Managers.AiAssistModal = {
     initialized: false,
     configs: [],       // provider-config summaries for the current dialog session
     submitting: false,
+    lastResult: null,  // most recent assist response (for the on-demand details panel)
+    buttonMode: 'assist', // 'assist' (submit dialog) | 'results' (details panel)
 
     initialize: function() {
         if (this.initialized) return;
@@ -146,20 +148,26 @@ window.TripWeather.Managers.AiAssistModal = {
         if (submitBtn) submitBtn.disabled = !hasConfigs;
     },
 
-    /** Toggle the in-flight state: spinner label + disabled controls. */
+    /** Toggle the in-flight state: spinner + label + disabled controls. */
     setSubmitting: function(busy) {
         this.submitting = busy;
         const submitBtn = document.getElementById('ai-assist-submit-btn');
         const cancelBtn = document.getElementById('ai-assist-cancel-btn');
         const sel = document.getElementById('ai-assist-provider-field');
         const promptField = document.getElementById('ai-assist-prompt-field');
+        const spinner = document.getElementById('ai-assist-spinner');
         if (submitBtn) {
             submitBtn.disabled = busy || this.configs.length === 0;
             submitBtn.textContent = busy ? 'Working…' : 'Submit';
         }
+        // Cancel + inputs lock during the call. (Cancel stays disabled because
+        // the fetch isn't abortable yet — letting it dismiss mid-flight would
+        // race the in-flight response onto the map. Abortable cancel is a
+        // possible follow-up.)
         if (cancelBtn) cancelBtn.disabled = busy;
         if (sel) sel.disabled = busy;
         if (promptField) promptField.disabled = busy;
+        if (spinner) spinner.style.display = busy ? 'inline-block' : 'none';
     },
 
     // ---------------- submit ----------------
@@ -181,12 +189,16 @@ window.TripWeather.Managers.AiAssistModal = {
             return;
         }
 
-        this.setStatus('Asking the assistant — this can take a few seconds…');
+        this.setStatus('Asking the assistant — this can take up to a minute or two for reasoning models…');
         this.setSubmitting(true);
 
         window.TripWeather.Services.AiAssist.submit({ providerConfigId: providerConfigId, prompt: prompt })
             .then(function(response) {
                 this.setSubmitting(false);
+                // Carry the user's freeform route description along with the
+                // response so the AI Results panel can show it (the server
+                // doesn't echo it back).
+                if (response) response.promptText = prompt;
                 this.handleResponse(response);
             }.bind(this))
             .catch(function(err) {
@@ -200,6 +212,7 @@ window.TripWeather.Managers.AiAssistModal = {
      * route-level warning → resolution modal. No toast for warnings.
      */
     handleResponse: function(response) {
+        this.lastResult = response;
         const unresolved = (response && response.unresolved) || [];
         const warnings = (response && response.warnings) || [];
         const route = response && response.route;
@@ -265,5 +278,51 @@ window.TripWeather.Managers.AiAssistModal = {
 
         routeMgr.calculateRoute();
         window.Toast.show('Loaded ' + waypoints.length + ' stops from the assistant.', 'success');
+        this.enterResultsMode();
+    },
+
+    // ---------------- toolbar button mode ----------------
+    //
+    // The single #ai-assist-btn toggles between two states:
+    //   - 'assist'  (blue "AI Assist")  → opens the submit dialog
+    //   - 'results' (green "AI Results") → opens the details panel for the last run
+    // It flips to 'results' once a route is loaded from an assist run, and back
+    // to 'assist' when the working route is cleared (New Route / Load Route — see
+    // app.js resetCurrentRoute + SearchManager.selectRouteSearchResult).
+
+    handleButtonClick: function() {
+        if (this.buttonMode === 'results' && this.lastResult) {
+            const details = window.TripWeather.Managers.AiDetailsModal;
+            if (details && typeof details.open === 'function') {
+                details.open(this.lastResult);
+                return;
+            }
+        }
+        this.open();
+    },
+
+    /** Flip the toolbar button to the green "AI Results" state. No-op without a
+     *  result to show. */
+    enterResultsMode: function() {
+        if (!this.lastResult) return;
+        this.buttonMode = 'results';
+        this.refreshButton();
+    },
+
+    /** Restore the toolbar button to the blue "AI Assist" state. Called when the
+     *  working route is cleared. */
+    enterAssistMode: function() {
+        this.buttonMode = 'assist';
+        this.refreshButton();
+    },
+
+    refreshButton: function() {
+        const btn = document.getElementById('ai-assist-btn');
+        if (!btn) return;
+        const results = this.buttonMode === 'results';
+        const extra = btn.querySelector('.btn-label-extra');
+        if (extra) extra.textContent = results ? 'Results' : 'Assist';
+        btn.classList.toggle('ai-results-mode', results);
+        btn.title = results ? 'View the last AI Assist results' : 'Plan a route with AI';
     }
 };

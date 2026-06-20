@@ -83,21 +83,28 @@ public class HttpClientConfig {
     }
 
     /**
-     * Client for AI provider calls (model discovery now; chat in Phase 2).
-     * AI_ASSIST_PLAN.md. No baseUrl — the provider endpoint is dynamic
-     * (per-config for Custom, server-default otherwise), so callers pass an
-     * absolute URI. Connect + read timeouts come from
-     * {@code trip.ai.request-timeout-ms} (AI calls can be slow).
+     * Client for AI provider calls (model discovery + chat). AI_ASSIST_PLAN.md.
+     * No baseUrl — the provider endpoint is dynamic (per-config for Custom,
+     * server-default otherwise), so callers pass an absolute URI.
+     *
+     * <p>Connect and response timeouts are deliberately separate. A TCP connect
+     * should fail fast when a provider is unreachable, but the response can take
+     * a long time: reasoning models (e.g. gpt-5.x, the o-series) routinely
+     * generate for well over 30s, and a short read timeout cancels the request
+     * <em>after</em> the model has already produced — and billed — the tokens,
+     * surfacing as an intermittent 502. So {@code trip.ai.request-timeout-ms}
+     * (the response window) defaults generous; bump it higher still for slow
+     * reasoning models. {@code trip.ai.connect-timeout-ms} stays short.
      */
     @Bean
     public RestClient aiRestClient(
-            @Value("${trip.ai.request-timeout-ms:30000}") long timeoutMs) {
-        java.time.Duration timeout = java.time.Duration.ofMillis(timeoutMs);
+            @Value("${trip.ai.connect-timeout-ms:10000}") long connectTimeoutMs,
+            @Value("${trip.ai.request-timeout-ms:120000}") long requestTimeoutMs) {
         HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(timeout)
+                .connectTimeout(java.time.Duration.ofMillis(connectTimeoutMs))
                 .build();
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
-        factory.setReadTimeout(timeout);
+        factory.setReadTimeout(java.time.Duration.ofMillis(requestTimeoutMs));
         return RestClient.builder()
                 .requestFactory(factory)
                 .build();

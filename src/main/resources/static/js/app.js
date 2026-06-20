@@ -208,7 +208,7 @@ window.TripWeather.App = {
         // They attach to window.TripWeather.Managers namespace automatically
         
         // Verify managers are available
-        const requiredManagers = ['Map', 'Waypoint', 'WaypointRenderer', 'Search', 'UI', 'AuthModals', 'Route', 'Layer', 'EVChargingStation', 'FavoritesManagerModal', 'MyRoutesModal', 'AiProvidersModal', 'AiAssistModal', 'AiResolutionModal', 'Navigation', 'Export'];
+        const requiredManagers = ['Map', 'Waypoint', 'WaypointRenderer', 'Search', 'UI', 'AuthModals', 'Route', 'Layer', 'EVChargingStation', 'FavoritesManagerModal', 'MyRoutesModal', 'AiProvidersModal', 'AiAssistModal', 'AiResolutionModal', 'AiDetailsModal', 'Navigation', 'Export'];
         requiredManagers.forEach(function(managerName) {
             if (!window.TripWeather.Managers[managerName]) {
                 throw new Error(`Required manager ${managerName} not found`);
@@ -228,6 +228,7 @@ window.TripWeather.App = {
         window.TripWeather.Managers.AiProvidersModal.initialize();
         window.TripWeather.Managers.AiAssistModal.initialize();
         window.TripWeather.Managers.AiResolutionModal.initialize();
+        window.TripWeather.Managers.AiDetailsModal.initialize();
         window.TripWeather.Managers.Navigation.initialize();
         window.TripWeather.Managers.Export.initialize();
         
@@ -292,7 +293,9 @@ window.TripWeather.App = {
 
         btn.addEventListener('click', function() {
             const modal = window.TripWeather.Managers.AiAssistModal;
-            if (modal && typeof modal.open === 'function') modal.open();
+            // The button toggles between "AI Assist" (submit dialog) and
+            // "AI Results" (details panel) — handleButtonClick picks the action.
+            if (modal && typeof modal.handleButtonClick === 'function') modal.handleButtonClick();
         });
 
         const refresh = this.refreshAiAssistButton.bind(this);
@@ -411,6 +414,13 @@ window.TripWeather.App = {
         window.TripWeather.Managers.Waypoint.clearAllWaypoints();
         window.TripWeather.Managers.Route.clearRoute();
         this.updateCurrentRouteDisplay();
+
+        // Clearing the working route invalidates any loaded AI result, so the
+        // toolbar button reverts from "AI Results" back to "AI Assist".
+        const aiModal = window.TripWeather.Managers.AiAssistModal;
+        if (aiModal && typeof aiModal.enterAssistMode === 'function') {
+            aiModal.enterAssistMode();
+        }
     },
 
     /**

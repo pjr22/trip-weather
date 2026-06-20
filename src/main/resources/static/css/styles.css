@@ -918,7 +918,7 @@ main {
     color: #fff;
 }
 
-.modal-btn.primary:hover {
+.modal-btn.primary:not(:disabled):hover {
     background-color: #2980b9;
 }
 
@@ -927,7 +927,7 @@ main {
     color: #2c3e50;
 }
 
-.modal-btn.secondary:hover {
+.modal-btn.secondary:not(:disabled):hover {
     background-color: #dfe6e9;
 }
 
@@ -936,13 +936,19 @@ main {
     color: #fff;
 }
 
-.modal-btn.danger:hover {
+.modal-btn.danger:not(:disabled):hover {
     background-color: #c0392b;
 }
 
 .modal-btn:focus {
     outline: 2px solid #3498db;
     outline-offset: 2px;
+}
+
+.modal-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .search-input {

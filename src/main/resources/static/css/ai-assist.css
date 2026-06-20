@@ -61,15 +61,40 @@
 
 .ai-assist-actions {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
     gap: 8px;
     margin-top: 8px;
+}
+
+/* In-flight spinner shown next to the (disabled) Submit button. Reuses the
+ * @keyframes spin defined in styles.css. */
+.ai-assist-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: auto; /* push the spinner to the left, buttons stay right */
+    border: 3px solid #cfe0ee;
+    border-top-color: #3498db;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
 }
 
 /* The AI Assist toolbar button: keep the existing primary-button look, just
  * size the sparkle icon to match the other emoji icons. */
 #ai-assist-btn .btn-icon {
     font-size: 1em;
+}
+
+/* "AI Results" state — same green as the Calculate/route buttons (#27ae60),
+ * overriding the default action-btn-primary blue. The id+class selector
+ * outranks the .action-btn-primary class rule. */
+#ai-assist-btn.ai-results-mode {
+    background-color: #27ae60;
+}
+
+#ai-assist-btn.ai-results-mode:hover {
+    background-color: #229954;
 }
 
 /* ---------------- resolution modal ---------------- */
@@ -187,4 +212,88 @@
     flex: 1 1 auto;
     font-size: 12px;
     color: #7f8c8d;
+}
+
+/* ---------------- details panel ---------------- */
+
+.ai-details-description-text {
+    font-size: 14px;
+    color: #2c3e50;
+    background-color: #f8f9fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.ai-details-summary {
+    margin-bottom: 14px;
+}
+
+.ai-details-summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 4px 0;
+    font-size: 13px;
+    border-bottom: 1px solid #eee;
+}
+
+.ai-details-summary-key {
+    color: #7f8c8d;
+}
+
+.ai-details-summary-val {
+    color: #2c3e50;
+    font-weight: 600;
+    text-align: right;
+}
+
+.ai-details-heading {
+    margin: 14px 0 6px;
+    font-size: 13px;
+    color: #34495e;
+}
+
+.ai-details-stops {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.ai-details-stop {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+
+.ai-details-stop-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.ai-details-empty {
+    font-size: 13px;
+    color: #7f8c8d;
+}
+
+/* Fallback raw-text block, shown only when the model response isn't the
+ * expected location JSON (an error / refusal / prose). The normal case renders
+ * a readable .ai-details-stops list instead. */
+.ai-details-raw-pre {
+    margin: 0;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 320px;
+    overflow-y: auto;
 }

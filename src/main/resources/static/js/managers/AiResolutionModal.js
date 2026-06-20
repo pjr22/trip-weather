@@ -23,6 +23,7 @@ window.TripWeather.Managers.AiResolutionModal = {
     initialized: false,
     rows: [],            // row state for the modal's lifetime
     warnings: [],        // route-level warnings (read-only display)
+    response: null,      // the assist response that opened this modal (for the details panel)
     searching: false,
 
     initialize: function() {
@@ -53,13 +54,27 @@ window.TripWeather.Managers.AiResolutionModal = {
             if (event.target === modal) this.close();
         }.bind(this));
         document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape' && modal.style.display === 'block') this.close();
+            // Don't close when the details panel is layered on top — Escape
+            // there should dismiss only the details modal.
+            const details = document.getElementById('ai-details-modal');
+            const detailsOpen = details && details.style.display === 'block';
+            if (event.key === 'Escape' && modal.style.display === 'block' && !detailsOpen) {
+                this.close();
+            }
         }.bind(this));
     },
 
     setupControls: function() {
         const researchBtn = document.getElementById('ai-resolution-research-btn');
         if (researchBtn) researchBtn.addEventListener('click', this.research.bind(this));
+
+        const detailsBtn = document.getElementById('ai-resolution-details-btn');
+        if (detailsBtn) {
+            detailsBtn.addEventListener('click', function() {
+                const details = window.TripWeather.Managers.AiDetailsModal;
+                if (details && this.response) details.open(this.response);
+            }.bind(this));
+        }
 
         const useBtn = document.getElementById('ai-resolution-use-btn');
         if (useBtn) useBtn.addEventListener('click', this.useRoute.bind(this));
@@ -78,6 +93,7 @@ window.TripWeather.Managers.AiResolutionModal = {
         const modal = document.getElementById('ai-resolution-modal');
         if (!modal) return;
 
+        this.response = response;
         const resolved = (response && response.waypoints) || [];
         const unresolved = (response && response.unresolved) || [];
         this.warnings = (response && response.warnings) || [];
@@ -121,6 +137,7 @@ window.TripWeather.Managers.AiResolutionModal = {
         if (modal) modal.style.display = 'none';
         this.rows = [];
         this.warnings = [];
+        this.response = null;
         this.searching = false;
     },
 

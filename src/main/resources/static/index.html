@@ -561,6 +561,7 @@
                 <div id="ai-assist-modal-status" class="favorites-modal-status" aria-live="polite"></div>
 
                 <div class="ai-assist-actions">
+                    <span id="ai-assist-spinner" class="ai-assist-spinner" style="display:none;" aria-hidden="true"></span>
                     <button type="button" id="ai-assist-submit-btn" class="modal-btn primary">Submit</button>
                     <button type="button" id="ai-assist-cancel-btn" class="modal-btn secondary">Cancel</button>
                 </div>
@@ -585,10 +586,31 @@
 
                 <div class="ai-resolution-footer">
                     <span id="ai-resolution-use-hint" style="display:none;">Resolve at least 2 stops to build a route.</span>
+                    <button type="button" id="ai-resolution-details-btn" class="modal-btn secondary">Details</button>
                     <button type="button" id="ai-resolution-research-btn" class="modal-btn secondary">Re-search</button>
                     <button type="button" id="ai-resolution-use-btn" class="modal-btn primary">Use this route</button>
                     <button type="button" id="ai-resolution-cancel-btn" class="modal-btn secondary">Cancel</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="ai-details-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="ai-details-modal-title">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h3 id="ai-details-modal-title">AI Results</h3>
+                <span class="close" aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="ai-details-description-section">
+                    <h4 class="ai-details-heading">Route Description</h4>
+                    <div id="ai-details-description" class="ai-details-description-text"></div>
+                </div>
+                <div id="ai-details-summary" class="ai-details-summary"></div>
+                <h4 class="ai-details-heading">Suggested stops</h4>
+                <div id="ai-details-stops" class="ai-details-stops"></div>
+                <h4 class="ai-details-heading">Model response</h4>
+                <div id="ai-details-raw" class="ai-details-raw"></div>
             </div>
         </div>
     </div>
@@ -689,6 +711,7 @@
     <script src="js/managers/AiProvidersModal.js"></script>
     <script src="js/managers/AiAssistModal.js"></script>
     <script src="js/managers/AiResolutionModal.js"></script>
+    <script src="js/managers/AiDetailsModal.js"></script>
     <script src="js/managers/NavigationManager.js"></script>
     <script src="js/managers/ExportManager.js"></script>
 

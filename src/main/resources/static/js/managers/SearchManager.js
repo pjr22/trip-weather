@@ -688,7 +688,14 @@ window.TripWeather.Managers.Search = {
                     
                     // Clear existing waypoints and add loaded ones
                     window.TripWeather.Managers.Waypoint.clearAllWaypoints();
-                    
+
+                    // Loading a route replaces any AI-loaded one, so revert the
+                    // toolbar button from "AI Results" back to "AI Assist".
+                    const aiModal = window.TripWeather.Managers.AiAssistModal;
+                    if (aiModal && typeof aiModal.enterAssistMode === 'function') {
+                        aiModal.enterAssistMode();
+                    }
+
                     waypoints.forEach(waypoint => {
                         window.TripWeather.Managers.Waypoint.addWaypoint(
                             waypoint.lat,

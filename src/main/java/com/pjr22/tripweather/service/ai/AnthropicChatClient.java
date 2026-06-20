@@ -5,12 +5,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -25,6 +28,8 @@ import com.fasterxml.jackson.databind.JsonNode;
  */
 @Component
 public class AnthropicChatClient implements AiChatClient {
+
+    private static final Logger logger = LoggerFactory.getLogger(AnthropicChatClient.class);
 
     /**
      * Output cap. The assistant returns a short JSON list of locations, so a few
@@ -42,7 +47,7 @@ public class AnthropicChatClient implements AiChatClient {
     }
 
     @Override
-    public String complete(AiChatCall call) {
+    public AiChatResult complete(AiChatCall call) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", call.model());
         body.put("max_tokens", MAX_TOKENS);
@@ -62,17 +67,41 @@ public class AnthropicChatClient implements AiChatClient {
                     .body(body)
                     .retrieve()
                     .body(JsonNode.class);
+        } catch (RestClientResponseException http) {
+            logger.warn("AI chat call failed: endpoint={} model={} -> HTTP {} body={}",
+                    call.baseUrl(), call.model(), http.getStatusCode().value(),
+                    AiChatClient.truncate(http.getResponseBodyAsString()));
+            throw AiChatClient.mapError(http);
         } catch (RestClientException e) {
+            logger.warn("AI chat call failed: endpoint={} model={} -> {}",
+                    call.baseUrl(), call.model(), e.toString());
             throw AiChatClient.mapError(e);
         }
 
         String content = (response == null) ? null
                 : response.path("content").path(0).path("text").asText(null);
         if (content == null || content.isBlank()) {
+            String stopReason = (response == null) ? null
+                    : response.path("stop_reason").asText(null);
+            logger.warn("AI chat returned an empty completion: endpoint={} model={} stop_reason={}",
+                    call.baseUrl(), call.model(), stopReason);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "The AI provider returned an empty completion.");
         }
-        return content;
+
+        // Anthropic usage block: {input_tokens, output_tokens}. Map to the same
+        // prompt/completion/total shape; total is the sum when both are present.
+        JsonNode usage = response.path("usage");
+        Integer inputTokens = intOrNull(usage, "input_tokens");
+        Integer outputTokens = intOrNull(usage, "output_tokens");
+        Integer totalTokens = (inputTokens != null && outputTokens != null)
+                ? inputTokens + outputTokens : null;
+        return new AiChatResult(content, inputTokens, outputTokens, totalTokens);
+    }
+
+    private static Integer intOrNull(JsonNode node, String field) {
+        JsonNode v = node.path(field);
+        return v.isNumber() ? v.asInt() : null;
     }
 
     private static String join(String base, String path) {

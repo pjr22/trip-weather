@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.pjr22.tripweather.dto.AiAssistDetails;
 import com.pjr22.tripweather.dto.AiAssistRequest;
 import com.pjr22.tripweather.dto.AiAssistResponse;
 import com.pjr22.tripweather.dto.ResolvedWaypoint;
@@ -104,11 +105,10 @@ public class AiAssistService {
         String systemPrompt = promptBuilder.systemPrompt();
         String userPrompt = promptBuilder.userPrompt(request.prompt());
 
-        String rawResponse = chatService.complete(
-                config.getProvider(), config.getModel(), apiKey, config.getBaseUrl(),
-                systemPrompt, userPrompt);
-
-        List<AiLocation> locations = parseWithRepair(config, apiKey, rawResponse);
+        long startNanos = System.nanoTime();
+        ModelRun run = runModel(config, apiKey, systemPrompt, userPrompt);
+        long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+        List<AiLocation> locations = run.locations();
 
         List<String> warnings = new ArrayList<>();
 
@@ -140,39 +140,88 @@ public class AiAssistService {
             warnings.add("Need at least 2 locations to build a route; resolved " + resolved.size() + ".");
         }
 
-        logger.info("AI assist for user {} via config {}: {} suggested, {} resolved, {} unresolved, {} warnings",
+        logger.info("AI assist for user {} via config {}: {} suggested, {} resolved, {} unresolved, "
+                        + "{} warnings, {} ms, {} tokens",
                 user.getId(), config.getId(), locations.size(), resolved.size(), unresolved.size(),
-                warnings.size());
+                warnings.size(), elapsedMs, run.totalTokens());
 
-        return new AiAssistResponse(
-                resolved,
-                route,
-                unresolved,
-                warnings,
-                debug ? ("SYSTEM:\n" + systemPrompt + "\n\nUSER:\n" + userPrompt) : null,
-                debug ? rawResponse : null);
+        // The debug flag now controls server-side logging only — the prompt and
+        // raw output are verbose and app-internal, so they're logged (not
+        // returned). The user-facing detail (model, raw response, tokens, time)
+        // is always returned below.
+        if (debug) {
+            logger.info("AI assist debug (config {}): model={} elapsedMs={} tokens(prompt/completion/total)={}/{}/{}"
+                            + "\n--- system prompt ---\n{}\n--- user prompt ---\n{}\n--- raw response ---\n{}",
+                    config.getId(), config.getModel(), elapsedMs,
+                    run.promptTokens(), run.completionTokens(), run.totalTokens(),
+                    systemPrompt, userPrompt, run.rawText());
+        }
+
+        AiAssistDetails details = new AiAssistDetails(
+                config.getModel(), run.rawText(),
+                run.promptTokens(), run.completionTokens(), run.totalTokens(), elapsedMs);
+
+        return new AiAssistResponse(resolved, route, unresolved, warnings, details);
     }
 
     // ------------------------------------------------------------------------
     // Internals
     // ------------------------------------------------------------------------
 
-    private List<AiLocation> parseWithRepair(AiProviderConfig config, String apiKey, String rawResponse) {
+    /** Outcome of the model interaction: parsed locations, the raw text they
+     *  came from, and token usage summed across the initial + any repair call. */
+    private record ModelRun(List<AiLocation> locations, String rawText,
+                            Integer promptTokens, Integer completionTokens, Integer totalTokens) {
+    }
+
+    /**
+     * Run the model and parse its output, with one repair re-ask if the first
+     * output isn't parseable. Token usage is accumulated across both calls; the
+     * returned {@code rawText} is whichever output actually parsed.
+     */
+    private ModelRun runModel(AiProviderConfig config, String apiKey, String systemPrompt, String userPrompt) {
+        AiChatResult first = chatService.complete(
+                config.getProvider(), config.getModel(), apiKey, config.getBaseUrl(),
+                systemPrompt, userPrompt);
         try {
-            return parser.parse(rawResponse);
-        } catch (LocationParseException first) {
+            return new ModelRun(parser.parse(first.content()), first.content(),
+                    first.promptTokens(), first.completionTokens(), first.totalTokens());
+        } catch (LocationParseException firstFail) {
             logger.info("AI assist: first parse failed ({}); attempting one repair re-ask",
-                    first.getMessage());
-            String repaired = chatService.complete(
+                    firstFail.getMessage());
+            AiChatResult repaired = chatService.complete(
                     config.getProvider(), config.getModel(), apiKey, config.getBaseUrl(),
-                    promptBuilder.repairSystemPrompt(), rawResponse);
+                    promptBuilder.repairSystemPrompt(), first.content());
+            Integer promptTokens = addNullable(first.promptTokens(), repaired.promptTokens());
+            Integer completionTokens = addNullable(first.completionTokens(), repaired.completionTokens());
+            Integer totalTokens = addNullable(first.totalTokens(), repaired.totalTokens());
             try {
-                return parser.parse(repaired);
-            } catch (LocationParseException second) {
+                return new ModelRun(parser.parse(repaired.content()), repaired.content(),
+                        promptTokens, completionTokens, totalTokens);
+            } catch (LocationParseException secondFail) {
+                // Both attempts failed — dump what the model actually returned so
+                // the operator can see whether it's prose, a wrong-shaped JSON, a
+                // refusal, or a truncated body. This is the only window into a
+                // "could not be parsed" 502.
+                logger.warn("AI assist: model output unparseable after repair re-ask "
+                                + "(first='{}', second='{}'). Raw output: {} | repaired: {}",
+                        firstFail.getMessage(), secondFail.getMessage(),
+                        AiChatClient.truncate(first.content()), AiChatClient.truncate(repaired.content()));
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                         "The AI response could not be parsed into a list of locations.");
             }
         }
+    }
+
+    /** Sum two nullable token counts, treating null as "unknown" (not zero). */
+    private static Integer addNullable(Integer a, Integer b) {
+        if (a == null) {
+            return b;
+        }
+        if (b == null) {
+            return a;
+        }
+        return a + b;
     }
 
     private static String buildQuery(AiLocation loc) {

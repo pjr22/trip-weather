@@ -41,9 +41,9 @@ public class AiChatService {
      *
      * @param customBaseUrl the config's base URL — used (and SSRF-guarded) only
      *                      for {@link AiProvider#CUSTOM}; ignored otherwise.
-     * @return the model's text content
+     * @return the model's text content plus any reported token usage
      */
-    public String complete(AiProvider provider, String model, String apiKey, String customBaseUrl,
+    public AiChatResult complete(AiProvider provider, String model, String apiKey, String customBaseUrl,
                            String systemPrompt, String userPrompt) {
         return switch (provider) {
             case OPENAI -> openAiClient.complete(new AiChatCall(

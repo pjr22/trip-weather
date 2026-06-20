@@ -130,6 +130,11 @@ class AiAssistServiceTest {
         return new AiAssistRequest(configId, "drive from A to B");
     }
 
+    /** Wrap model text as a chat result with no token usage reported. */
+    private static AiChatResult chat(String content) {
+        return new AiChatResult(content, null, null, null);
+    }
+
     // ------------------------------------------------------------------------
 
     @Test
@@ -137,7 +142,7 @@ class AiAssistServiceTest {
         asAlice();
         stubPrompts();
         when(chatService.complete(eq(AiProvider.OPENAI), eq("gpt-4o-mini"), eq("sk-real"),
-                eq(null), eq(SYS), eq(USER))).thenReturn(RAW);
+                eq(null), eq(SYS), eq(USER))).thenReturn(new AiChatResult(RAW, 11, 22, 33));
         when(parser.parse(RAW)).thenReturn(List.of(
                 new AiLocation("Moab", "Moab", "UT"),
                 new AiLocation("Aspen", "Aspen", "CO")));
@@ -158,15 +163,19 @@ class AiAssistServiceTest {
         assertThat(resp.route()).isNotNull();
         assertThat(resp.unresolved()).isEmpty();
         assertThat(resp.warnings()).isEmpty();
-        assertThat(resp.debugPrompt()).isNull();
-        assertThat(resp.debugRawResponse()).isNull();
+        assertThat(resp.details()).isNotNull();
+        assertThat(resp.details().rawResponse()).isEqualTo(RAW);
+        assertThat(resp.details().promptTokens()).isEqualTo(11);
+        assertThat(resp.details().completionTokens()).isEqualTo(22);
+        assertThat(resp.details().totalTokens()).isEqualTo(33);
     }
 
     @Test
-    void debugMode_includesPromptAndRawResponse() {
+    void details_alwaysReturned_withRawResponseModelAndTiming() {
         asAlice();
         stubPrompts();
-        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(RAW);
+        // debug=false — details are always populated, not gated behind debug.
+        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(chat(RAW));
         when(parser.parse(RAW)).thenReturn(List.of(
                 new AiLocation("Moab", "Moab", "UT"),
                 new AiLocation("Aspen", "Aspen", "CO")));
@@ -174,17 +183,19 @@ class AiAssistServiceTest {
                 .thenReturn(geo(38.57, -109.55, "x", "Moab", "UT"));
         when(routeService.calculateRoute(any(), any(), any())).thenReturn(routeWithGeometry());
 
-        AiAssistResponse resp = service(25, true).assist(req());
+        AiAssistResponse resp = service(25, false).assist(req());
 
-        assertThat(resp.debugPrompt()).contains(SYS).contains(USER);
-        assertThat(resp.debugRawResponse()).isEqualTo(RAW);
+        assertThat(resp.details()).isNotNull();
+        assertThat(resp.details().model()).isEqualTo("gpt-4o-mini");
+        assertThat(resp.details().rawResponse()).isEqualTo(RAW);
+        assertThat(resp.details().elapsedMs()).isGreaterThanOrEqualTo(0L);
     }
 
     @Test
     void partialGeocodeFailure_warnsAndOmits() {
         asAlice();
         stubPrompts();
-        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(RAW);
+        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(chat(RAW));
         when(parser.parse(RAW)).thenReturn(List.of(
                 new AiLocation("Moab", "Moab", "UT"),
                 new AiLocation("Nowhere", "", "")));
@@ -212,7 +223,7 @@ class AiAssistServiceTest {
     void geocode_retriesOnTransientFailure_thenSucceeds() {
         asAlice();
         stubPrompts();
-        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(RAW);
+        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(chat(RAW));
         when(parser.parse(RAW)).thenReturn(List.of(
                 new AiLocation("Moab", "Moab", "UT"),
                 new AiLocation("Aspen", "Aspen", "CO")));
@@ -236,7 +247,7 @@ class AiAssistServiceTest {
     void geocode_persistentFailure_retriesThenWarns() {
         asAlice();
         stubPrompts();
-        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(RAW);
+        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(chat(RAW));
         when(parser.parse(RAW)).thenReturn(List.of(
                 new AiLocation("Moab", "Moab", "UT"),
                 new AiLocation("Aspen", "Aspen", "CO")));
@@ -261,7 +272,7 @@ class AiAssistServiceTest {
     void geocode_noRetry_whenRetriesZero() {
         asAlice();
         stubPrompts();
-        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(RAW);
+        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(chat(RAW));
         when(parser.parse(RAW)).thenReturn(List.of(new AiLocation("Moab", "Moab", "UT")));
         when(locationService.searchLocations("Moab, Moab, UT")).thenReturn(null);
 
@@ -275,7 +286,7 @@ class AiAssistServiceTest {
     void maxWaypointsCap_trimsAndWarns() {
         asAlice();
         stubPrompts();
-        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(RAW);
+        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(chat(RAW));
         when(parser.parse(RAW)).thenReturn(List.of(
                 new AiLocation("A", "A", "CO"),
                 new AiLocation("B", "B", "CO"),
@@ -295,8 +306,8 @@ class AiAssistServiceTest {
         asAlice();
         stubPrompts();
         when(promptBuilder.repairSystemPrompt()).thenReturn(REPAIR);
-        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(RAW);
-        when(chatService.complete(any(), any(), any(), any(), eq(REPAIR), eq(RAW))).thenReturn("repaired");
+        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(chat(RAW));
+        when(chatService.complete(any(), any(), any(), any(), eq(REPAIR), eq(RAW))).thenReturn(chat("repaired"));
         when(parser.parse(RAW)).thenThrow(new LocationParseException("bad"));
         when(parser.parse("repaired")).thenReturn(List.of(
                 new AiLocation("Moab", "Moab", "UT"),
@@ -315,8 +326,8 @@ class AiAssistServiceTest {
         asAlice();
         stubPrompts();
         when(promptBuilder.repairSystemPrompt()).thenReturn(REPAIR);
-        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(RAW);
-        when(chatService.complete(any(), any(), any(), any(), eq(REPAIR), eq(RAW))).thenReturn("still-bad");
+        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(chat(RAW));
+        when(chatService.complete(any(), any(), any(), any(), eq(REPAIR), eq(RAW))).thenReturn(chat("still-bad"));
         when(parser.parse(RAW)).thenThrow(new LocationParseException("bad"));
         when(parser.parse("still-bad")).thenThrow(new LocationParseException("bad again"));
 
