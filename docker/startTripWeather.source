@@ -9,12 +9,17 @@ TRIP_EMAIL_FROM_NAME="Trip Weather"
 TRIP_APP_BASE_URL=https://tripweather.pjr22.com
 TRIP_DB_PASSWORD=`cat ../trip_db_password.txt`
 TRIP_REMEMBER_ME_KEY=`cat ../remember_me_key.txt`
-TRIP_ADMIN_USERNAME=admin
-TRIP_ADMIN_PASSWORD=`cat ../admin_password.txt`
+TRIP_ADMIN_USERNAME=`cat ../trip_admin_username.txt`
+TRIP_ADMIN_PASSWORD=`cat ../trip_admin_password.txt`
 TRIP_ADMIN_REFRESH_TOKEN=`cat ../admin_refresh_token.txt`
 TRIP_LOCAL_ORS_ENABLED=true
 TRIP_LOCAL_ORS_BASE_URL=http://trip-ors:8082/ors
 TRIP_TILE_PROXY_ENABLED=true
+TRIP_AI_ENC_KEY=`cat ../trip_ai_enc_key.txt`
+TRIP_AI_ASSIST_ENABLED=true
+TRIP_AI_OLLAMA_URL=""
+OPENAI_API_KEY=`cat ../openai_api_key.txt`
+TRIP_AI_ASSIST_DEBUG=false
 
 echo "Using OpenRouteService API key: $OPENROUTESERVICE_API_KEY"
 echo "Using GeoApify API key: $GEOAPIFY_API_KEY"
@@ -42,5 +47,10 @@ docker run --name trip-weather \
  -e TRIP_LOCAL_ORS_ENABLED=${TRIP_LOCAL_ORS_ENABLED} \
  -e TRIP_LOCAL_ORS_BASE_URL=${TRIP_LOCAL_ORS_BASE_URL} \
  -e TRIP_TILE_PROXY_ENABLED=${TRIP_TILE_PROXY_ENABLED} \
+ -e TRIP_AI_ENC_KEY=${TRIP_AI_ENC_KEY} \
+ -e TRIP_AI_ASSIST_ENABLED=${TRIP_AI_ASSIST_ENABLED} \
+ -e TRIP_AI_OLLAMA_URL=${TRIP_AI_OLLAMA_URL} \
+ -e OPENAI_API_KEY=${OPENAI_API_KEY} \
+ -e TRIP_AI_ASSIST_DEBUG=${TRIP_AI_ASSIST_DEBUG} \
  --net forgotten_net \
  org.pjr22/trip-weather:latest
