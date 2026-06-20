@@ -109,6 +109,8 @@ Then click the **✨ AI Assist** button in the toolbar, pick the provider, and t
 
 The result is an unsaved working route, exactly as if you'd added the stops yourself — calculate, tweak, and **Save** it like any other. Your prompt and your stored API key are sent to whichever provider you configured; nothing AI-related happens unless you opt in by adding a provider.
 
+Once a route loads, the toolbar button turns green and becomes **AI Results** — click it any time to review what the assistant did: the description you typed, the model used, token usage (handy since you pay per request), how long it took, and the list of stops it suggested. Starting a **New Route** (or loading another) switches it back to **AI Assist**. Reasoning models can take a minute or more to answer, so the button shows a spinner while it works.
+
 ### Drive it
 Once a route is calculated, **🧭 Navigate** starts a voice-guided drive. See the [Navigation section](#navigation-turn-by-turn) below — there are real web-platform limitations worth knowing before you rely on it.
 
@@ -249,6 +251,8 @@ The console reads everything the same `/actuator/prometheus` endpoint would expo
 The optional AI assistant (the **✨ AI Assist** button, [described above](#plan-with-ai-optional)) is **on by default** but needs one secret: `TRIP_AI_ENC_KEY`, a Base64 32-byte key that encrypts each user's saved provider API keys at rest. Generate it once with `openssl rand -base64 32`; the app fails fast at startup if the feature is enabled and the key is missing. Rotating the key invalidates every stored API key. To run without the feature, set `TRIP_AI_ASSIST_ENABLED=false` and no key is required — the front-end hides the button and the AI Providers menu entry.
 
 Users bring their own provider credentials (OpenAI, Anthropic, or any OpenAI-compatible endpoint); the key never leaves the server except on the outbound call to that provider, and is never returned by the API. Set `TRIP_AI_OLLAMA_URL` to offer a self-hosted Ollama endpoint as a keyless provider choice — that operator-set URL is trusted and bypasses the SSRF guard that vets user-supplied Custom base URLs (which must resolve to a public IP). See [AI_ASSIST_PLAN.md](AI_ASSIST_PLAN.md) for the design, the full env-var list, and the security model.
+
+Reasoning models (GPT-5 / o-series and the like) routinely generate for a minute or more, so the outbound call defaults to a generous response timeout — `TRIP_AI_REQUEST_TIMEOUT_MS` (240s); raise it for especially slow models. **Mind any reverse proxy in front of the app:** a shorter proxy timeout returns a 504 while the backend is still working (and the model is still billing tokens). The bundled nginx sidecar already gives `/api/ai/` a long timeout; behind an additional terminator (e.g. haproxy) raise that layer's server/client timeout for the AI path to match.
 
 ### Going easier on the external APIs
 
