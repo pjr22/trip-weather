@@ -19,7 +19,16 @@ public class RouteData {
     
     @JsonProperty("waypoints")
     private List<WaypointCoordinates> waypoints;
-    
+
+    /**
+     * Human-readable failure reason, set only on an error route (empty
+     * geometry). Null on success. Lets the API and UI explain WHY a route
+     * couldn't be calculated (e.g. the OpenRouteService "point not found" /
+     * "distance exceeded" message) instead of a bare failure.
+     */
+    @JsonProperty("error")
+    private String error;
+
     public RouteData() {}
     
     public RouteData(List<List<Double>> geometry, Double distance, Double duration) {
@@ -60,6 +69,14 @@ public class RouteData {
         this.segments = segments;
     }
     
+    public String getError() {
+        return error;
+    }
+
+    public void setError(String error) {
+        this.error = error;
+    }
+
     public List<WaypointCoordinates> getWaypoints() {
         return waypoints;
     }

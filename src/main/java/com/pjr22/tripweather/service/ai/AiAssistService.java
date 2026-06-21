@@ -174,7 +174,16 @@ public class AiAssistService {
         if (resolved.size() >= 2) {
             route = routeService.calculateRoute(toRoutingWaypoints(resolved), ZonedDateTime.now(), null);
             if (route == null || route.getGeometry() == null || route.getGeometry().isEmpty()) {
-                warnings.add("Could not calculate a route for the resolved locations.");
+                // Surface the routing reason (e.g. ORS "point not found") so the
+                // resolution dialog explains why, rather than showing all-green
+                // stops with no note. A stop in the wrong place geocodes fine
+                // (✓) but can still be unroutable.
+                String reason = (route != null && route.getError() != null && !route.getError().isBlank())
+                        ? " " + route.getError()
+                        : "";
+                warnings.add("Could not calculate a route for the resolved locations —"
+                        + " one or more stops may be unreachable by road or in the wrong place."
+                        + reason);
             }
         } else {
             warnings.add("Need at least 2 locations to build a route; resolved " + resolved.size() + ".");

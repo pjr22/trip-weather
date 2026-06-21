@@ -18,6 +18,7 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientResponseException;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -291,9 +292,25 @@ public class RouteService {
                () -> dispatcher.dispatch(CACHE_KIND_DIRECTIONS, coords,
                      client -> client.post(DIRECTIONS_ENDPOINT, body)));
       } catch (Exception e) {
+         // The OpenRouteService error body carries the actual reason (e.g. a
+         // "point not found" or "distance exceeded" code + the offending
+         // coordinate). It was previously swallowed — log it, and surface a
+         // human reason on the error route so the API/UI can explain the failure.
+         RestClientResponseException http = findResponseException(e);
+         if (http != null) {
+            log.warn("Route calculation failed: ORS HTTP {} for waypoints {} — {}",
+                  http.getStatusCode().value(), coordsSummary(waypoints),
+                  truncate(http.getResponseBodyAsString()));
+            return createErrorRoute(orsReason(http.getResponseBodyAsString(),
+                  "Routing failed (HTTP " + http.getStatusCode().value() + ")"));
+         }
+         log.warn("Route calculation failed for waypoints {}: {}",
+               coordsSummary(waypoints), e.getMessage(), e);
          return createErrorRoute("Failed to calculate route: " + e.getMessage());
       }
       if (response == null) {
+         log.warn("Route calculation got no directions response for waypoints {}",
+               coordsSummary(waypoints));
          return createErrorRoute("No directions response");
       }
 
@@ -739,7 +756,57 @@ public class RouteService {
       errorRoute.setGeometry(new ArrayList<>());
       errorRoute.setDistance(0.0);
       errorRoute.setDuration(0.0);
+      errorRoute.setError(errorMessage);
       return errorRoute;
+   }
+
+   /** First {@link RestClientResponseException} in the cause chain, or null. */
+   private static RestClientResponseException findResponseException(Throwable t) {
+      while (t != null) {
+         if (t instanceof RestClientResponseException rcre) {
+            return rcre;
+         }
+         t = t.getCause();
+      }
+      return null;
+   }
+
+   /** Pull OpenRouteService's human message ({@code error.message}) from its
+    *  error body, falling back to the supplied default. */
+   private String orsReason(String body, String fallback) {
+      if (body == null || body.isBlank()) {
+         return fallback;
+      }
+      try {
+         JsonNode message = objectMapper.readTree(body).path("error").path("message");
+         if (message.isTextual() && !message.asText().isBlank()) {
+            return message.asText();
+         }
+      } catch (Exception ignore) {
+         // Not JSON / unexpected shape — use the fallback.
+      }
+      return fallback;
+   }
+
+   /** Compact "[(lon,lat), …]" summary of the request coordinates for logs. */
+   private static String coordsSummary(List<RouteRequest.Waypoint> waypoints) {
+      StringBuilder sb = new StringBuilder("[");
+      for (int i = 0; i < waypoints.size(); i++) {
+         RouteRequest.Waypoint w = waypoints.get(i);
+         if (i > 0) {
+            sb.append(", ");
+         }
+         sb.append(String.format(Locale.ROOT, "(%.5f,%.5f)", w.getLongitude(), w.getLatitude()));
+      }
+      return sb.append(']').toString();
+   }
+
+   private static String truncate(String s) {
+      if (s == null) {
+         return "(none)";
+      }
+      String t = s.strip();
+      return t.length() <= 1000 ? t : t.substring(0, 1000) + "…(truncated)";
    }
 
    /**

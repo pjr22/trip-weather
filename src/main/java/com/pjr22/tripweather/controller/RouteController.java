@@ -94,7 +94,9 @@ public class RouteController {
             if (routeData.getGeometry() != null && !routeData.getGeometry().isEmpty()) {
                 return ResponseEntity.ok(routeData);
             } else {
-                // Return empty route with error status
+                // Empty geometry = the route couldn't be built (RouteService logs
+                // the upstream ORS detail). Surface the reason in the 400 body.
+                log.warn("Route calculation returned no geometry: {}", routeData.getError());
                 return ResponseEntity.badRequest().body(routeData);
             }
 

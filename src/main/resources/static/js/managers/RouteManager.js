@@ -84,7 +84,12 @@ window.TripWeather.Managers.Route = {
             })
             .catch(function(error) {
                 console.error('Route calculation error:', error);
-                window.TripWeather.Managers.UI.showToast('Failed to calculate route: ' + error.message, 'error');
+                // Prefer the server's reason (RouteData.error, e.g. the ORS
+                // "point not found" message) over the bare "HTTP 400".
+                var reason = (error && error.body && error.body.error)
+                    ? error.body.error : (error && error.message);
+                window.TripWeather.Managers.UI.showToast(
+                    'Failed to calculate route: ' + reason, 'error');
                 window.TripWeather.Managers.Route.clearRoute();
             })
             .finally(function() {
