@@ -46,7 +46,7 @@ window.TripWeather.Managers.AiDetailsModal = {
         if (!modal || !response) return;
 
         this.renderDescription(response.promptText || '');
-        this.renderSummary(response.details || {});
+        this.renderSummary(response.details || {}, response.clientTotalMs);
         this.renderStops(response.waypoints || [], response.unresolved || []);
         this.renderRaw((response.details && response.details.rawResponse) || '');
 
@@ -73,23 +73,33 @@ window.TripWeather.Managers.AiDetailsModal = {
         body.textContent = text; // user-supplied text
     },
 
-    renderSummary: function(details) {
+    renderSummary: function(details, clientTotalMs) {
         const el = document.getElementById('ai-details-summary');
         if (!el) return;
         el.innerHTML = '';
 
         const tok = function(n) { return (n == null) ? '—' : String(n); };
-        const seconds = details.elapsedMs != null
-            ? (details.elapsedMs / 1000).toFixed(1) + ' s'
-            : '—';
+        const secs = function(ms) { return (ms == null) ? '—' : (ms / 1000).toFixed(1) + ' s'; };
+        const aiMs = details.elapsedMs;
 
         const rows = [
             ['Model', details.model || '—'],
             ['Tokens (prompt / completion / total)',
                 tok(details.promptTokens) + ' / ' + tok(details.completionTokens)
                 + ' / ' + tok(details.totalTokens)],
-            ['Response time', seconds]
+            ['AI response time', secs(aiMs)]
         ];
+
+        // The rest of the wait (Submit → this dialog appeared): backend geocoding
+        // + routing + network. Weather/route render happen after, off this clock.
+        if (clientTotalMs != null && aiMs != null) {
+            rows.push(['Geocoding & routing time', secs(Math.max(0, clientTotalMs - aiMs))]);
+        }
+
+        // Estimated cost — only when the provider config has per-token prices.
+        if (details.totalCost != null) {
+            rows.push(['Estimated cost', this.formatCost(details)]);
+        }
 
         rows.forEach(function(pair) {
             const row = document.createElement('div');
@@ -104,6 +114,17 @@ window.TripWeather.Managers.AiDetailsModal = {
             row.appendChild(v);
             el.appendChild(row);
         });
+    },
+
+    /** "$0.0234 (in $0.0100 · out $0.0134)" — total plus any per-part breakdown. */
+    formatCost: function(details) {
+        const money = function(v) { return '$' + Number(v).toFixed(4); };
+        let text = money(details.totalCost);
+        const parts = [];
+        if (details.inputCost != null) parts.push('in ' + money(details.inputCost));
+        if (details.outputCost != null) parts.push('out ' + money(details.outputCost));
+        if (parts.length) text += ' (' + parts.join(' · ') + ')';
+        return text;
     },
 
     renderStops: function(waypoints, unresolved) {

@@ -130,6 +130,8 @@ public class AiProviderConfigService {
         config.setModel(model);
         config.setBaseUrl(baseUrl);
         config.setApiKeyEncrypted(apiKey == null ? null : keyCipher.encrypt(apiKey));
+        config.setInputCostPerMtok(normalizeCost(req.inputCostPerMtok(), "input cost per million tokens"));
+        config.setOutputCostPerMtok(normalizeCost(req.outputCostPerMtok(), "output cost per million tokens"));
         // id + created set by @PrePersist
 
         AiProviderConfig saved = repository.save(config);
@@ -181,6 +183,8 @@ public class AiProviderConfigService {
         config.setModel(model);
         config.setBaseUrl(baseUrl);
         config.setApiKeyEncrypted(effectiveEncrypted);
+        config.setInputCostPerMtok(normalizeCost(req.inputCostPerMtok(), "input cost per million tokens"));
+        config.setOutputCostPerMtok(normalizeCost(req.outputCostPerMtok(), "output cost per million tokens"));
 
         AiProviderConfig saved = repository.save(config);
         logger.info("AI provider config {} updated by user {}", saved.getId(), user.getId());
@@ -311,7 +315,21 @@ public class AiProviderConfigService {
                 c.getModel(),
                 c.getBaseUrl(),
                 apiKeySet,
+                c.getInputCostPerMtok(),
+                c.getOutputCostPerMtok(),
                 c.getCreated());
+    }
+
+    /** Validate an optional per-million-tokens price: null stays null; a present
+     *  value must be finite and ≥ 0. */
+    private static Double normalizeCost(Double value, String label) {
+        if (value == null) {
+            return null;
+        }
+        if (value.isNaN() || value.isInfinite() || value < 0) {
+            throw new InvalidProviderConfigException(label + " must be a number ≥ 0");
+        }
+        return value;
     }
 
     // ------------------------------------------------------------------------

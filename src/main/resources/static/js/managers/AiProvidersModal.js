@@ -19,12 +19,19 @@ window.TripWeather.Managers.AiProvidersModal = {
     providers: null,     // available provider types (cached per modal session)
     editingId: null,     // config id being edited, or null when adding
     editingConfig: null, // the summary being edited (for apiKeySet / current model)
+    models: [],          // full sorted model list for the current form (filter source)
 
     PROVIDER_LABELS: {
         OPENAI: 'OpenAI',
         ANTHROPIC: 'Anthropic',
         CUSTOM: 'Custom (OpenAI-compatible)',
         OLLAMA: 'Ollama'
+    },
+
+    // Public pricing pages — only the hosted providers have a canonical one.
+    PRICING_URLS: {
+        OPENAI: 'https://openai.com/api/pricing/',
+        ANTHROPIC: 'https://www.anthropic.com/pricing'
     },
 
     initialize: function() {
@@ -103,6 +110,13 @@ window.TripWeather.Managers.AiProvidersModal = {
 
         const loadBtn = document.getElementById('ai-load-models-btn');
         if (loadBtn) loadBtn.addEventListener('click', this.loadModels.bind(this));
+
+        const modelFilter = document.getElementById('ai-model-filter');
+        if (modelFilter) {
+            modelFilter.addEventListener('input', function() {
+                this.renderModelOptions(modelFilter.value);
+            }.bind(this));
+        }
 
         const saveBtn = document.getElementById('ai-provider-save-btn');
         if (saveBtn) saveBtn.addEventListener('click', this.save.bind(this));
@@ -270,18 +284,22 @@ window.TripWeather.Managers.AiProvidersModal = {
             // Base URL (Custom only)
             document.getElementById('ai-baseurl-field').value = (cfg && cfg.baseUrl) ? cfg.baseUrl : '';
 
+            // Optional per-million-token costs.
+            document.getElementById('ai-input-cost-field').value =
+                (cfg && cfg.inputCostPerMtok != null) ? cfg.inputCostPerMtok : '';
+            document.getElementById('ai-output-cost-field').value =
+                (cfg && cfg.outputCostPerMtok != null) ? cfg.outputCostPerMtok : '';
+
             this.updateFieldVisibility();
 
             // Model dropdown — seed with the stored model so it shows before a
-            // discovery run; "Load models" repopulates from the provider.
+            // discovery run; "Load models" repopulates (sorted) from the provider.
             this.resetModelOptions();
             if (cfg && cfg.model) {
+                this.models = [cfg.model];
+                this.renderModelOptions('');
                 const modelSel = document.getElementById('ai-model-field');
-                const opt = document.createElement('option');
-                opt.value = cfg.model;
-                opt.textContent = cfg.model;
-                opt.selected = true;
-                modelSel.appendChild(opt);
+                if (modelSel) modelSel.value = cfg.model;
             }
 
             this.setFormStatus('');
@@ -325,9 +343,19 @@ window.TripWeather.Managers.AiProvidersModal = {
         if (keyRow) keyRow.style.display = this.showsKey(provider) ? '' : 'none';
         if (keyLabel) keyLabel.textContent = this.needsKey(provider) ? 'API key' : 'API key (optional)';
         if (baseRow) baseRow.style.display = this.needsBaseUrl(provider) ? '' : 'none';
+
+        // Pricing link only for the hosted providers that publish one.
+        const pricingUrl = this.PRICING_URLS[provider];
+        const pricingRow = document.getElementById('ai-pricing-link-row');
+        const pricingLink = document.getElementById('ai-pricing-link');
+        if (pricingRow) pricingRow.style.display = pricingUrl ? '' : 'none';
+        if (pricingLink && pricingUrl) pricingLink.href = pricingUrl;
     },
 
     resetModelOptions: function() {
+        this.models = [];
+        const filter = document.getElementById('ai-model-filter');
+        if (filter) filter.value = '';
         const modelSel = document.getElementById('ai-model-field');
         if (!modelSel) return;
         modelSel.innerHTML = '';
@@ -371,10 +399,10 @@ window.TripWeather.Managers.AiProvidersModal = {
     populateModels: function(models) {
         const modelSel = document.getElementById('ai-model-field');
         if (!modelSel) return;
-        const previous = modelSel.value;
 
-        modelSel.innerHTML = '';
         if (!models || models.length === 0) {
+            this.models = [];
+            modelSel.innerHTML = '';
             const opt = document.createElement('option');
             opt.value = '';
             opt.textContent = '— no models returned —';
@@ -382,17 +410,57 @@ window.TripWeather.Managers.AiProvidersModal = {
             this.setFormStatus('The provider returned no models.');
             return;
         }
-        models.forEach(function(m) {
+
+        // Sort alphabetically (case-insensitive) and stash the full list so the
+        // filter box can narrow it without re-fetching.
+        this.models = models.slice().sort(function(a, b) {
+            return String(a).toLowerCase().localeCompare(String(b).toLowerCase());
+        });
+        const filter = document.getElementById('ai-model-filter');
+        if (filter) filter.value = '';
+        this.renderModelOptions('');
+        this.setFormStatus(this.models.length + ' model' + (this.models.length === 1 ? '' : 's')
+            + ' loaded. Type to filter.');
+    },
+
+    /**
+     * Rebuild the model dropdown from {@link models}, narrowed to the filter
+     * text (case-insensitive substring). Preserves the current selection when it
+     * still matches; pins it as an option even when filtered out so typing can't
+     * silently drop a chosen model.
+     */
+    renderModelOptions: function(filterText) {
+        const modelSel = document.getElementById('ai-model-field');
+        if (!modelSel) return;
+        const selected = modelSel.value;
+        const needle = (filterText || '').trim().toLowerCase();
+
+        const matches = needle
+            ? this.models.filter(function(m) { return m.toLowerCase().indexOf(needle) !== -1; })
+            : this.models.slice();
+
+        // Keep the current selection reachable even if it doesn't match the filter.
+        if (selected && this.models.indexOf(selected) !== -1 && matches.indexOf(selected) === -1) {
+            matches.unshift(selected);
+        }
+
+        modelSel.innerHTML = '';
+        if (matches.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = '— no models match —';
+            modelSel.appendChild(opt);
+            return;
+        }
+        matches.forEach(function(m) {
             const opt = document.createElement('option');
             opt.value = m;
             opt.textContent = m;
             modelSel.appendChild(opt);
         });
-        // Preserve the prior selection (e.g. the stored model) if still offered.
-        if (previous && models.indexOf(previous) !== -1) {
-            modelSel.value = previous;
+        if (selected && matches.indexOf(selected) !== -1) {
+            modelSel.value = selected;
         }
-        this.setFormStatus(models.length + ' model' + (models.length === 1 ? '' : 's') + ' loaded.');
     },
 
     // ---------------- save / delete ----------------
@@ -417,9 +485,21 @@ window.TripWeather.Managers.AiProvidersModal = {
             return;
         }
 
+        // Optional per-million-token costs. Blank → null (omitted from estimate);
+        // any present value must be a non-negative number.
+        const inputCost = this.parseCost(document.getElementById('ai-input-cost-field').value);
+        const outputCost = this.parseCost(document.getElementById('ai-output-cost-field').value);
+        if (inputCost === false || outputCost === false) {
+            this.setFormStatus('Costs must be non-negative numbers (or left blank).');
+            return;
+        }
+
         const body = { provider: provider, nickname: nickname, model: model };
         if (apiKey) body.apiKey = apiKey;
         if (this.needsBaseUrl(provider)) body.baseUrl = baseUrl;
+        // Always send the cost fields (null clears a previously-stored value).
+        body.inputCostPerMtok = inputCost;
+        body.outputCostPerMtok = outputCost;
 
         const svc = window.TripWeather.Services.AiProvider;
         const op = this.editingId ? svc.update(this.editingId, body) : svc.create(body);
@@ -438,6 +518,18 @@ window.TripWeather.Managers.AiProvidersModal = {
                     this.setFormStatus('Save failed: ' + err.message);
                 }
             }.bind(this));
+    },
+
+    /**
+     * Parse an optional cost input. Returns null for blank, a non-negative
+     * number for a valid value, or false to signal an invalid entry.
+     */
+    parseCost: function(raw) {
+        const trimmed = (raw == null ? '' : String(raw)).trim();
+        if (trimmed === '') return null;
+        const n = Number(trimmed);
+        if (!isFinite(n) || n < 0) return false;
+        return n;
     },
 
     handleDelete: function(cfg) {

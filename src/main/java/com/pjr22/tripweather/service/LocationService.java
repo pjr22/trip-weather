@@ -51,6 +51,7 @@ public class LocationService {
     private final GeocodeReverseCacheRepository reverseCacheRepository;
     private final Cache<String, JsonNode> forwardCache;
     private final DbCacheMetrics cacheMetrics;
+    private final GeoapifyRateLimiter rateLimiter;
     private final Clock clock;
     private final double reverseRadiusMeters;
     private final long reverseRefreshDays;
@@ -63,6 +64,7 @@ public class LocationService {
             GeocodeReverseCacheRepository reverseCacheRepository,
             Cache<String, JsonNode> forwardGeocodeCache,
             DbCacheMetrics cacheMetrics,
+            GeoapifyRateLimiter rateLimiter,
             Clock clock,
             @Value("${trip.geocode.reverse-radius-meters:15}") double reverseRadiusMeters,
             @Value("${trip.geocode.reverse-refresh-days:365}") long reverseRefreshDays
@@ -74,6 +76,7 @@ public class LocationService {
         this.reverseCacheRepository = reverseCacheRepository;
         this.forwardCache = forwardGeocodeCache;
         this.cacheMetrics = cacheMetrics;
+        this.rateLimiter = rateLimiter;
         this.clock = clock;
         this.reverseRadiusMeters = reverseRadiusMeters;
         this.reverseRefreshDays = reverseRefreshDays;
@@ -99,6 +102,7 @@ public class LocationService {
         }
 
         try {
+            rateLimiter.acquire(); // global Geoapify pacing (shared budget)
             String responseBody = restClient.get()
                     .uri(String.format(Locale.ROOT,
                             "/geocode/reverse?lat=%.6f&lon=%.6f&apiKey=%s",
@@ -146,6 +150,7 @@ public class LocationService {
         if (cached != null) {
             return cached;
         }
+        rateLimiter.acquire(); // global Geoapify pacing (shared budget)
         JsonNode response = restClient.get()
                 .uri(String.format("/geocode/search?apiKey=%s&text=%s", apiKey, searchText))
                 .retrieve()

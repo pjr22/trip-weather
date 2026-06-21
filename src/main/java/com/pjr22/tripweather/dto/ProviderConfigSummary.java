@@ -16,6 +16,10 @@ import com.pjr22.tripweather.model.AiProvider;
  *
  * <p>{@code baseUrl} is populated only for {@link AiProvider#CUSTOM}; null for
  * the other providers.
+ *
+ * <p>{@code inputCostPerMtok} / {@code outputCostPerMtok} (USD per 1,000,000
+ * tokens) are echoed back so the edit form can repopulate them; null when not
+ * configured.
  */
 public record ProviderConfigSummary(
         UUID id,
@@ -24,5 +28,7 @@ public record ProviderConfigSummary(
         String model,
         String baseUrl,
         boolean apiKeySet,
+        Double inputCostPerMtok,
+        Double outputCostPerMtok,
         ZonedDateTime created) {
 }

@@ -192,13 +192,21 @@ window.TripWeather.Managers.AiAssistModal = {
         this.setStatus('Asking the assistant — this can take up to a minute or two for reasoning models…');
         this.setSubmitting(true);
 
+        // Total AI Assist response time = Submit click → this dialog closes (which
+        // handleResponse does the moment the response arrives, before any routing
+        // or weather). So this round-trip is exactly the window the user waits on.
+        const startedAt = this.nowMs();
+
         window.TripWeather.Services.AiAssist.submit({ providerConfigId: providerConfigId, prompt: prompt })
             .then(function(response) {
                 this.setSubmitting(false);
-                // Carry the user's freeform route description along with the
-                // response so the AI Results panel can show it (the server
-                // doesn't echo it back).
-                if (response) response.promptText = prompt;
+                if (response) {
+                    // Carry the user's freeform route description along with the
+                    // response (the server doesn't echo it back), plus the measured
+                    // round-trip so the AI Results panel can break down the wait.
+                    response.promptText = prompt;
+                    response.clientTotalMs = Math.round(this.nowMs() - startedAt);
+                }
                 this.handleResponse(response);
             }.bind(this))
             .catch(function(err) {
@@ -289,6 +297,12 @@ window.TripWeather.Managers.AiAssistModal = {
     // It flips to 'results' once a route is loaded from an assist run, and back
     // to 'assist' when the working route is cleared (New Route / Load Route — see
     // app.js resetCurrentRoute + SearchManager.selectRouteSearchResult).
+
+    /** Monotonic-ish millisecond clock for timing the request round-trip. */
+    nowMs: function() {
+        return (window.performance && typeof performance.now === 'function')
+            ? performance.now() : Date.now();
+    },
 
     handleButtonClick: function() {
         if (this.buttonMode === 'results' && this.lastResult) {

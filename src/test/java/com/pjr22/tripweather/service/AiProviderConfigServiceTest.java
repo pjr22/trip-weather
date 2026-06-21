@@ -88,7 +88,7 @@ class AiProviderConfigServiceTest {
 
     private static CreateProviderConfigRequest createReq(AiProvider provider, String nickname,
                                                          String model, String apiKey, String baseUrl) {
-        return new CreateProviderConfigRequest(provider, nickname, model, apiKey, baseUrl);
+        return new CreateProviderConfigRequest(provider, nickname, model, apiKey, baseUrl, null, null);
     }
 
     private AiProviderConfig entity(AiProvider provider, String nickname, String model,
@@ -294,7 +294,7 @@ class AiProviderConfigServiceTest {
 
     private UpdateProviderConfigRequest updateReq(AiProvider provider, String nickname,
                                                   String model, String apiKey, String baseUrl) {
-        return new UpdateProviderConfigRequest(provider, nickname, model, apiKey, baseUrl);
+        return new UpdateProviderConfigRequest(provider, nickname, model, apiKey, baseUrl, null, null);
     }
 
     @Test

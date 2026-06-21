@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pjr22.tripweather.dto.AiAssistRequest;
 import com.pjr22.tripweather.dto.AiAssistResponse;
+import com.pjr22.tripweather.dto.ResolvedWaypoint;
 import com.pjr22.tripweather.model.AiProvider;
 import com.pjr22.tripweather.model.AiProviderConfig;
 import com.pjr22.tripweather.model.RouteData;
@@ -27,6 +28,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -84,9 +86,11 @@ class AiAssistServiceTest {
     }
 
     private AiAssistService service(int maxWaypoints, boolean debug, int retries, int delaySeconds) {
+        // geocodeConcurrency=4 exercises the parallel fan-out; locationService is
+        // mocked so calls return instantly and ordering is asserted by sequence.
         return new AiAssistService(repository, currentUserService, keyCipher, chatService,
                 promptBuilder, parser, locationService, routeService, maxWaypoints, debug,
-                retries, delaySeconds);
+                retries, delaySeconds, 4);
     }
 
     private AiAssistService service() {
@@ -141,6 +145,9 @@ class AiAssistServiceTest {
     void happyPath_resolvesWaypoints_andCalculatesRoute() {
         asAlice();
         stubPrompts();
+        // Per-million-token prices → the response reports an estimated cost.
+        config.setInputCostPerMtok(2.0);
+        config.setOutputCostPerMtok(10.0);
         when(chatService.complete(eq(AiProvider.OPENAI), eq("gpt-4o-mini"), eq("sk-real"),
                 eq(null), eq(SYS), eq(USER))).thenReturn(new AiChatResult(RAW, 11, 22, 33));
         when(parser.parse(RAW)).thenReturn(List.of(
@@ -168,6 +175,11 @@ class AiAssistServiceTest {
         assertThat(resp.details().promptTokens()).isEqualTo(11);
         assertThat(resp.details().completionTokens()).isEqualTo(22);
         assertThat(resp.details().totalTokens()).isEqualTo(33);
+        // 11 tok * $2/M = $0.000022 in; 22 tok * $10/M = $0.00022 out.
+        assertThat(resp.details().inputCost()).isCloseTo(11.0 / 1_000_000.0 * 2.0, within(1e-12));
+        assertThat(resp.details().outputCost()).isCloseTo(22.0 / 1_000_000.0 * 10.0, within(1e-12));
+        assertThat(resp.details().totalCost())
+                .isCloseTo(resp.details().inputCost() + resp.details().outputCost(), within(1e-12));
     }
 
     @Test
@@ -189,6 +201,8 @@ class AiAssistServiceTest {
         assertThat(resp.details().model()).isEqualTo("gpt-4o-mini");
         assertThat(resp.details().rawResponse()).isEqualTo(RAW);
         assertThat(resp.details().elapsedMs()).isGreaterThanOrEqualTo(0L);
+        // No prices configured → no cost estimate.
+        assertThat(resp.details().totalCost()).isNull();
     }
 
     @Test
@@ -217,6 +231,64 @@ class AiAssistServiceTest {
         assertThat(resp.warnings()).noneMatch(w -> w.contains("Nowhere"));
         assertThat(resp.warnings()).anyMatch(w -> w.contains("at least 2"));
         assertThat(resp.route()).isNull();
+    }
+
+    @Test
+    void geocode_prefersNameMatch_overGenericCity() throws Exception {
+        asAlice();
+        stubPrompts();
+        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(chat(RAW));
+        when(parser.parse(RAW)).thenReturn(List.of(
+                new AiLocation("Castlewood Canyon State Park", "Franktown", "CO"),
+                new AiLocation("Aspen", "Aspen", "CO")));
+        // Geoapify ranks the generic city (Franktown) first; the actual park is
+        // the second feature. The name-match heuristic should pick the park.
+        String parkResults = "{\"features\":["
+                + "{\"properties\":{\"name\":\"\",\"formatted\":\"Franktown, Colorado, United States\","
+                +   "\"lat\":39.39,\"lon\":-104.75,\"city\":\"Franktown\",\"state_code\":\"CO\"}},"
+                + "{\"properties\":{\"name\":\"Castlewood Canyon State Park\","
+                +   "\"formatted\":\"Castlewood Canyon State Park, Colorado, United States\","
+                +   "\"lat\":39.33,\"lon\":-104.74,\"city\":\"\",\"state_code\":\"CO\"}}"
+                + "]}";
+        when(locationService.searchLocations("Castlewood Canyon State Park, Franktown, CO"))
+                .thenReturn(mapper.readTree(parkResults));
+        when(locationService.searchLocations("Aspen, Aspen, CO"))
+                .thenReturn(geo(39.19, -106.82, "Aspen, CO", "Aspen", "CO"));
+        when(routeService.calculateRoute(any(), any(), any())).thenReturn(routeWithGeometry());
+
+        AiAssistResponse resp = service().assist(req());
+
+        assertThat(resp.waypoints()).hasSize(2);
+        ResolvedWaypoint park = resp.waypoints().get(0);
+        assertThat(park.latitude()).isEqualTo(39.33);   // the park, not Franktown's 39.39
+        assertThat(park.locationName()).contains("Castlewood Canyon State Park");
+        assertThat(resp.unresolved()).isEmpty();
+    }
+
+    @Test
+    void geocode_outsideUS_isUnresolved_andWarns() throws Exception {
+        asAlice();
+        stubPrompts();
+        when(chatService.complete(any(), any(), any(), any(), eq(SYS), any())).thenReturn(chat(RAW));
+        when(parser.parse(RAW)).thenReturn(List.of(
+                new AiLocation("Paris", "Paris", "France"),
+                new AiLocation("Moab", "Moab", "UT")));
+        // A French match must be flagged out-of-area (not routed); Moab resolves.
+        String parisFr = "{\"features\":[{\"properties\":{\"name\":\"Paris\","
+                + "\"formatted\":\"Paris, France\",\"lat\":48.85,\"lon\":2.35,"
+                + "\"country_code\":\"fr\",\"country\":\"France\"}}]}";
+        when(locationService.searchLocations("Paris, Paris, France"))
+                .thenReturn(mapper.readTree(parisFr));
+        when(locationService.searchLocations("Moab, Moab, UT"))
+                .thenReturn(geo(38.57, -109.55, "Moab, UT", "Moab", "UT"));
+
+        AiAssistResponse resp = service().assist(req());
+
+        assertThat(resp.waypoints()).extracting(w -> w.locationName()).containsExactly("Moab, UT");
+        assertThat(resp.unresolved()).extracting(u -> u.query()).contains("Paris, Paris, France");
+        assertThat(resp.warnings()).anyMatch(w -> w.contains("outside the United States"));
+        // Out-of-area is a definitive result — not retried like a transient miss.
+        verify(locationService, times(1)).searchLocations("Paris, Paris, France");
     }
 
     @Test

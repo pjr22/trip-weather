@@ -21,7 +21,7 @@ export TRIP_AI_ENC_KEY=`cat trip_ai_enc_key.txt`
 export TRIP_AI_ASSIST_ENABLED=true
 export TRIP_AI_OLLAMA_URL=http://localhost:11434
 export OPENAI_API_KEY=`cat openai_api_key.txt`
-export TRIP_AI_ASSIST_DEBUG=true
+export TRIP_AI_ASSIST_DEBUG=false
 
 echo "TRIP_EMAIL_ENABLED=$TRIP_EMAIL_ENABLED"
 echo "TRIP_EMAIL_URL=$TRIP_EMAIL_URL"

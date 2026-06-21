@@ -519,10 +519,25 @@
                     </div>
                     <div class="ai-form-row">
                         <label for="ai-model-field">Model</label>
-                        <div class="ai-model-row">
+                        <div class="ai-model-col">
+                            <div class="ai-model-controls">
+                                <input type="text" id="ai-model-filter" class="ai-model-filter" placeholder="Filter models…" autocomplete="off">
+                                <button type="button" id="ai-load-models-btn" class="modal-btn secondary small-btn">Load models</button>
+                            </div>
                             <select id="ai-model-field"><option value="">— load models —</option></select>
-                            <button type="button" id="ai-load-models-btn" class="modal-btn secondary small-btn">Load models</button>
                         </div>
+                    </div>
+                    <div class="ai-form-row">
+                        <label for="ai-input-cost-field">Input $ / M tokens</label>
+                        <input type="number" id="ai-input-cost-field" min="0" step="0.01" autocomplete="off" placeholder="optional, e.g. 2.50">
+                    </div>
+                    <div class="ai-form-row">
+                        <label for="ai-output-cost-field">Output $ / M tokens</label>
+                        <input type="number" id="ai-output-cost-field" min="0" step="0.01" autocomplete="off" placeholder="optional, e.g. 10.00">
+                    </div>
+                    <div class="ai-form-row" id="ai-pricing-link-row" style="display:none;">
+                        <label></label>
+                        <a id="ai-pricing-link" href="#" target="_blank" rel="noopener noreferrer" class="ai-pricing-link">View provider pricing ↗</a>
                     </div>
                     <div id="ai-provider-form-status" class="favorites-modal-status" aria-live="polite"></div>
                     <div class="ai-form-actions">

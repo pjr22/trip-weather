@@ -82,6 +82,19 @@ public class AiProviderConfig {
     @Column(name = "base_url", length = 1023)
     private String baseUrl;
 
+    /**
+     * Optional user-supplied price, in USD per 1,000,000 input (prompt) tokens,
+     * used to estimate the dollar cost of an assist run. Null = not configured
+     * (no cost shown). There's no provider API for unit prices, so the user
+     * copies these from the provider's pricing page.
+     */
+    @Column(name = "input_cost_per_mtok")
+    private Double inputCostPerMtok;
+
+    /** Optional price in USD per 1,000,000 output (completion) tokens. See {@link #inputCostPerMtok}. */
+    @Column(name = "output_cost_per_mtok")
+    private Double outputCostPerMtok;
+
     @Column(name = "created", nullable = false)
     private ZonedDateTime created;
 

@@ -8,8 +8,9 @@
  * Each row tracks: { sequence, text, status, lat, lon, matchedAddress,
  * resolvedText }. A row is "dirty" (needs re-geocoding) when it's unresolved or
  * when its text differs from resolvedText. Re-search re-geocodes only the dirty
- * rows via the SPA's existing forward-geocode (/api/location/search, first
- * feature — the same first-match rule the backend applies). "Use this route"
+ * rows via the SPA's existing forward-geocode (/api/location/search), picking
+ * the feature that best matches the place name — the same name-match heuristic
+ * the backend applies. "Use this route"
  * applies the resolved (✓) rows in sequence order via
  * AiAssistModal.applyWaypoints; still-unresolved rows are simply left out.
  *
@@ -296,9 +297,11 @@ window.TripWeather.Managers.AiResolutionModal = {
     },
 
     /**
-     * Geocode one row's current text, taking the first feature (the same
-     * first-match rule the backend uses). Resolves the promise either way —
-     * the row's status reflects the outcome.
+     * Geocode one row's current text and pick the feature that best matches the
+     * place name (the same name-match heuristic the backend uses), rather than
+     * blindly the first — Geoapify sometimes ranks a generic city above the
+     * actual place when the text carries the city. Resolves the promise either
+     * way — the row's status reflects the outcome.
      */
     geocodeRow: function(row) {
         const query = (row.text || '').trim();
@@ -311,8 +314,11 @@ window.TripWeather.Managers.AiResolutionModal = {
         }
         return window.TripWeather.Services.Location.searchLocations(query)
             .then(function(data) {
-                const feature = data && data.features && data.features[0];
-                const point = feature ? this.extractPoint(feature) : null;
+                const feature = this.chooseBestFeature(data && data.features, query);
+                // Reject matches outside the US service area — keep the row ✗ so
+                // it can't be routed (mirrors the backend's out-of-area rule).
+                const usable = feature && this.isInServiceArea(feature);
+                const point = usable ? this.extractPoint(feature) : null;
                 if (point) {
                     row.status = 'resolved';
                     row.lat = point.lat;
@@ -334,6 +340,59 @@ window.TripWeather.Managers.AiResolutionModal = {
                 row.matchedAddress = null;
                 row.resolvedText = null;
             });
+    },
+
+    /**
+     * Pick the geocode feature best matching the place name (the part of the
+     * query before the first comma), mirroring the backend's heuristic. Scores
+     * the top candidates by place-name token overlap; falls back to the
+     * geocoder's first result when nothing meaningfully matches.
+     */
+    chooseBestFeature: function(features, query) {
+        if (!features || !features.length) return null;
+        const tokens = this.nameTokensFor((query || '').split(',')[0]);
+        if (!tokens.length) return features[0];
+        const limit = Math.min(features.length, 5);
+        let best = features[0];
+        let bestScore = -1;
+        for (let i = 0; i < limit; i++) {
+            const score = this.nameOverlap(features[i], tokens);
+            if (score > bestScore) { // strictly greater → ties keep the earlier feature
+                bestScore = score;
+                best = features[i];
+            }
+        }
+        return bestScore >= 0.34 ? best : features[0];
+    },
+
+    nameTokensFor: function(name) {
+        return (name || '').toLowerCase().split(/[^a-z0-9]+/)
+            .filter(function(t) { return t.length >= 3; });
+    },
+
+    nameOverlap: function(feature, tokens) {
+        const p = (feature && feature.properties) || {};
+        const text = ((p.name || '') + ' ' + (p.formatted || '') + ' '
+            + (p.address_line1 || '')).toLowerCase();
+        let matched = 0;
+        tokens.forEach(function(t) { if (text.indexOf(t) !== -1) matched++; });
+        return tokens.length ? matched / tokens.length : 0;
+    },
+
+    /** US service area (50 states + DC + territories); mirrors the backend.
+     *  Undeterminable country → allowed, so only positively-foreign matches are
+     *  rejected. */
+    isInServiceArea: function(feature) {
+        const p = (feature && feature.properties) || {};
+        const code = (p.country_code || '').toLowerCase();
+        if (code) {
+            return ['us', 'pr', 'gu', 'vi', 'as', 'mp', 'um'].indexOf(code) !== -1;
+        }
+        const country = p.country || '';
+        if (country) {
+            return country.toLowerCase() === 'united states';
+        }
+        return true;
     },
 
     /** Pull lat/lon + formatted address from a Geoapify feature (mirrors backend). */

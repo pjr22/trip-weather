@@ -17,6 +17,11 @@ package com.pjr22.tripweather.dto;
  * @param completionTokens output tokens, or null if unreported
  * @param totalTokens      total tokens, or null if unreported
  * @param elapsedMs        wall-clock time spent in the model call(s), in ms
+ * @param inputCost        estimated USD cost of the input tokens, or null when
+ *                         the config has no input price (or tokens unreported)
+ * @param outputCost       estimated USD cost of the output tokens, or null
+ * @param totalCost        sum of the available cost parts, or null when neither
+ *                         could be computed
  */
 public record AiAssistDetails(
         String model,
@@ -24,5 +29,8 @@ public record AiAssistDetails(
         Integer promptTokens,
         Integer completionTokens,
         Integer totalTokens,
-        long elapsedMs) {
+        long elapsedMs,
+        Double inputCost,
+        Double outputCost,
+        Double totalCost) {
 }

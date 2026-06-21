@@ -103,6 +103,7 @@ class LocationServiceTest {
         service = new LocationService(API_KEY, restClient, routeService, objectMapper,
                 reverseCacheRepository, forwardCache,
                 new DbCacheMetrics(new SimpleMeterRegistry()),
+                new GeoapifyRateLimiter(0), // no pacing in tests
                 fixedClock,
                 RADIUS_METERS, REFRESH_DAYS);
     }

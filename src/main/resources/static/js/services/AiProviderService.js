@@ -57,7 +57,8 @@ window.TripWeather.Services.AiProvider = {
 
     /**
      * Create a provider config. Rejects with code DUPLICATE_NICKNAME on 409.
-     * @param {object} body - {provider, nickname, model, apiKey?, baseUrl?}
+     * @param {object} body - {provider, nickname, model, apiKey?, baseUrl?,
+     *                         inputCostPerMtok?, outputCostPerMtok?}
      */
     create: function(body) {
         return this._sendJson('/api/ai/providers', body, 'POST');

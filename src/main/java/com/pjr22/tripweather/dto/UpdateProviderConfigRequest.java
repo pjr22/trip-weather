@@ -14,11 +14,17 @@ import com.pjr22.tripweather.model.AiProvider;
  * "keep the stored key unchanged"; a <b>non-blank</b> value re-encrypts and
  * replaces it. (To clear a key on a provider that allows none, switch the
  * provider — there is no explicit "erase key" affordance in Phase 1.)
+ *
+ * <p>{@code inputCostPerMtok} / {@code outputCostPerMtok} (USD per 1,000,000
+ * tokens) are replaced from this body like the other editable fields; a null
+ * clears the stored price.
  */
 public record UpdateProviderConfigRequest(
         AiProvider provider,
         String nickname,
         String model,
         String apiKey,
-        String baseUrl) {
+        String baseUrl,
+        Double inputCostPerMtok,
+        Double outputCostPerMtok) {
 }

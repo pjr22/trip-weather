@@ -62,16 +62,23 @@
     border-color: #3498db;
 }
 
-/* Model row: dropdown + "Load models" button side by side. */
-.ai-model-row {
+/* Model field: a filter box + "Load models" button on top, the (sorted,
+ * filterable) dropdown below. */
+.ai-model-col {
     flex: 1 1 auto;
     display: flex;
+    flex-direction: column;
     gap: 8px;
-    align-items: center;
     min-width: 0;
 }
 
-.ai-model-row > select {
+.ai-model-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.ai-model-filter {
     flex: 1 1 auto;
     padding: 8px 10px;
     border: 2px solid #ddd;
@@ -81,14 +88,38 @@
     min-width: 0;
 }
 
-.ai-model-row > select:focus {
+.ai-model-filter:focus {
     outline: none;
     border-color: #3498db;
 }
 
-.ai-model-row > button {
+.ai-model-controls > button {
     flex: 0 0 auto;
     white-space: nowrap;
+}
+
+#ai-model-field {
+    width: 100%;
+    padding: 8px 10px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+#ai-model-field:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.ai-pricing-link {
+    font-size: 13px;
+    color: #3498db;
+    text-decoration: none;
+}
+
+.ai-pricing-link:hover {
+    text-decoration: underline;
 }
 
 .ai-form-actions {

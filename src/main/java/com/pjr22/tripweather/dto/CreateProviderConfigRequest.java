@@ -16,11 +16,18 @@ import com.pjr22.tripweather.model.AiProvider;
  * <p>{@code baseUrl} is required for {@link AiProvider#CUSTOM} (an OpenAI-
  * compatible root, subject to the SSRF guard) and ignored for the other
  * providers, which resolve their endpoint from server config.
+ *
+ * <p>{@code inputCostPerMtok} / {@code outputCostPerMtok} are optional prices in
+ * USD per 1,000,000 tokens (input and output). When supplied, the assist
+ * response reports an estimated dollar cost for the run. Null/absent = not
+ * configured.
  */
 public record CreateProviderConfigRequest(
         AiProvider provider,
         String nickname,
         String model,
         String apiKey,
-        String baseUrl) {
+        String baseUrl,
+        Double inputCostPerMtok,
+        Double outputCostPerMtok) {
 }
