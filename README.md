@@ -100,16 +100,16 @@ Email goes through [Mailtrap](https://mailtrap.io/). The only thing the app stor
 
 If the assistant is enabled on your server and you're signed in, you can describe a trip in plain language and let an AI suggest the stops for you.
 
-First, add a provider once: **profile menu → AI Providers → Add provider**. Pick OpenAI, Anthropic, a self-hosted Ollama endpoint, or any OpenAI-compatible service, paste an API key (stored encrypted, never shown again), and choose a model from the discovered list.
+First, add a provider once: **profile menu → AI Providers → Add provider**. Pick OpenAI, Anthropic, a self-hosted Ollama endpoint, or any OpenAI-compatible service, paste an API key (stored encrypted, never shown again), and choose a model from the discovered list (sorted, with a filter box for long lists). Optionally enter the model's input/output price per million tokens — there's a link to the provider's pricing page — and each request will show an estimated dollar cost.
 
 Then click the **✨ AI Assist** button in the toolbar, pick the provider, and type something like *"a 3-day drive from Denver to Moab with scenic stops"*. The assistant returns an ordered list of stops, which the app geocodes into waypoints:
 
 - If every stop is found, the route is built and loaded onto the map straight away.
-- If a stop can't be located (or the list needs trimming), a **review** dialog opens listing every stop in order. Each row shows ✓ (found) or ✗ (not found) and is fully editable — fix the text and **Re-search**, **Delete** a stop you don't want, then **Use this route** once at least two stops resolve.
+- If a stop can't be located, lands outside the US (the assistant only plans U.S. trips), or the list needs trimming, a **review** dialog opens listing every stop in order. Each row shows ✓ (found) or ✗ (not found) and is fully editable — fix the text and **Re-search**, **Delete** a stop you don't want, then **Use this route** once at least two stops resolve.
 
 The result is an unsaved working route, exactly as if you'd added the stops yourself — calculate, tweak, and **Save** it like any other. Your prompt and your stored API key are sent to whichever provider you configured; nothing AI-related happens unless you opt in by adding a provider.
 
-Once a route loads, the toolbar button turns green and becomes **AI Results** — click it any time to review what the assistant did: the description you typed, the model used, token usage (handy since you pay per request), how long it took, and the list of stops it suggested. Starting a **New Route** (or loading another) switches it back to **AI Assist**. Reasoning models can take a minute or more to answer, so the button shows a spinner while it works.
+Once a route loads, the toolbar button turns green and becomes **AI Results** — click it any time to review what the assistant did: the description you typed, the model used, token usage and the estimated cost (when you've entered the model's prices), how long it took (split into the AI's own time vs. the geocoding/routing time), and the list of stops it suggested. Starting a **New Route** (or loading another) switches it back to **AI Assist**. Reasoning models can take a minute or more to answer, so the button shows a spinner while it works.
 
 ### Drive it
 Once a route is calculated, **🧭 Navigate** starts a voice-guided drive. See the [Navigation section](#navigation-turn-by-turn) below — there are real web-platform limitations worth knowing before you rely on it.
@@ -253,6 +253,8 @@ The optional AI assistant (the **✨ AI Assist** button, [described above](#plan
 Users bring their own provider credentials (OpenAI, Anthropic, or any OpenAI-compatible endpoint); the key never leaves the server except on the outbound call to that provider, and is never returned by the API. Set `TRIP_AI_OLLAMA_URL` to offer a self-hosted Ollama endpoint as a keyless provider choice — that operator-set URL is trusted and bypasses the SSRF guard that vets user-supplied Custom base URLs (which must resolve to a public IP). See [AI_ASSIST_PLAN.md](AI_ASSIST_PLAN.md) for the design, the full env-var list, and the security model.
 
 Reasoning models (GPT-5 / o-series and the like) routinely generate for a minute or more, so the outbound call defaults to a generous response timeout — `TRIP_AI_REQUEST_TIMEOUT_MS` (240s); raise it for especially slow models. **Mind any reverse proxy in front of the app:** a shorter proxy timeout returns a 504 while the backend is still working (and the model is still billing tokens). The bundled nginx sidecar already gives `/api/ai/` a long timeout; behind an additional terminator (e.g. haproxy) raise that layer's server/client timeout for the AI path to match.
+
+The assistant geocodes its suggested stops in parallel to keep the wait down, but a global pacer keeps **all** Geoapify calls (the search box and reverse-geocodes included) under your account's rate limit — it spaces requests by `trip.geocode.min-request-interval-ms` (default 220 ms ≈ 4.5 req/s, just under a 5 req/s plan). Lower or raise it to match your Geoapify plan.
 
 ### Going easier on the external APIs
 
